@@ -1,0 +1,9 @@
+#ifndef OPENV2G_VERSION_H
+#define OPENV2G_VERSION_H
+
+#define OPENV2G_VERSION_MAJOR 0
+#define OPENV2G_VERSION_MINOR 1
+#define OPENV2G_VERSION_PATCH 0
+#define OPENV2G_VERSION_STATUS "provisional-host-sil"
+
+#endif

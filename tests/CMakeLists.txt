@@ -1,0 +1,15 @@
+add_library(openv2g_test_support STATIC test_support.c)
+target_link_libraries(openv2g_test_support PUBLIC openv2g_core)
+target_include_directories(openv2g_test_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+function(add_openv2g_test target source)
+    add_executable(${target} ${source})
+    target_link_libraries(${target} PRIVATE openv2g_test_support)
+    add_test(NAME ${target} COMMAND ${target})
+endfunction()
+
+add_openv2g_test(openv2g_test_permission unit/test_permission_manager.c)
+add_openv2g_test(openv2g_test_hlc_generation unit/test_hlc_generation.c)
+add_openv2g_test(openv2g_test_hardware_gate unit/test_hardware_gate.c)
+add_openv2g_test(openv2g_test_public_headers unit/test_public_headers.c)
+add_openv2g_test(openv2g_test_nominal_flow integration/test_nominal_flow.c)

@@ -2,7 +2,7 @@
 
 Ngày xuất: 2026-09-08. Ngôn ngữ: tiếng Việt, giữ nguyên technical identifiers.
 
-Đây là gói ngữ cảnh và tài liệu thiết kế EVCC/AUTOSAR để tiếp tục công việc trong Codex. Gói chứa bản Markdown hiện có, nội dung chuyển từ Word, hình minh họa và ba bản Word gốc. Đây không phải bản xuất toàn bộ lịch sử chat, repository implementation, hay bản release đã freeze.
+Đây là repository ngữ cảnh, tài liệu thiết kế và bộ khung G1 host/SIL cho EVCC/AUTOSAR. Bộ khung C11 hiện tại phục vụ phát triển logic độc lập target và kiểm thử kiến trúc; đây không phải production AUTOSAR implementation hay release đã freeze.
 
 ## Bắt đầu
 
@@ -37,11 +37,32 @@ Không tự coi các imported AUTOSAR types hoặc safety timing là đã freeze
 | `references/images/` | Hình tham chiếu đã có trong Project |
 | [SOURCES.md](SOURCES.md) | Nguồn, revision và giới hạn của gói xuất |
 | [VALIDATION.md](VALIDATION.md) | Kiểm tra đóng gói và chuyển đổi đã thực hiện |
-| `MANIFEST.sha256` | SHA-256 cho các file trong gói, trừ chính manifest |
+| `include/openv2g/` | Public logical contracts cho host/SIL; không phải supplier ABI |
+| `src/` | Skeleton cho ChargingCoordinator, ISO15118Chrg và supporting domains |
+| `integration/` | Điểm tích hợp bị chặn cho AUTOSAR/supplier và protocol-generated artifacts |
+| `tests/` | Unit/integration tests cho các hard invariant ở G1 |
+| `examples/host_demo/` | Ví dụ hiển thị feature baseline provisional |
+
+## Bộ khung G1 host/SIL
+
+Active scope tạm thời là DIN SPEC 70121 DC EIM và ISO 15118-2 DC EIM. PnC, ISO 15118-20 và BPT mặc định bị tắt. Xem [mô tả skeleton](docs/architecture/HOST_SIL_SKELETON.md) và [Provisional Baseline Proposal](docs/PROVISIONAL_BASELINE_PROPOSAL_VI.md).
+
+Build dự kiến bằng CMake và một C11 compiler:
+
+```powershell
+cmake -S . -B build-host
+cmake --build build-host --config Debug
+Push-Location build-host
+ctest -C Debug --output-on-failure
+Pop-Location
+```
+
+Các lệnh trên chỉ tạo host/SIL artifacts. Chúng không generate RTE/ARXML và không chứng minh target, HIL, timing, safety hoặc protocol conformance.
 
 ## Trạng thái bàn giao
 
 - Đã có tài liệu thiết kế chi tiết hai composition chính, atomic interfaces và project datatype catalogue.
-- Chưa có bằng chứng trong gói cho việc freeze đầy đủ, build implementation, chạy unit/HIL/conformance tests hoặc phê duyệt safety.
+- Đã có G1 host/SIL skeleton và test source; kết quả chạy cụ thể phụ thuộc toolchain được ghi trong lần kiểm tra tương ứng.
+- Chưa có bằng chứng cho target build, RTE generation, HIL/conformance, timing/WCET hoặc phê duyệt safety.
 - Checkbox hoàn tất trong tài liệu nguồn là trạng thái do tài liệu đó khai báo; đợt xuất này không tái chứng nhận tính đầy đủ kỹ thuật.
 - Snapshot tài liệu không tự cập nhật khi các cuộc chat hoặc repository thay đổi. Khi có quyết định mới, cập nhật context, decision log và tài liệu liên quan cùng nhau.

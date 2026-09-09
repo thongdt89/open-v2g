@@ -1,1 +1,10 @@
 .vs/
+/MANIFEST.sha256
+/build/
+/build-*/
+/out/
+/Testing/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake

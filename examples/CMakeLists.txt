@@ -1,0 +1,2 @@
+add_executable(openv2g_host_demo host_demo/main.c)
+target_link_libraries(openv2g_host_demo PRIVATE openv2g_core)
