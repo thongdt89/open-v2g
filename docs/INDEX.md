@@ -4,6 +4,7 @@ Các file có tên `EVCC_AUTOSAR_*` bên dưới là bản nguồn hoặc bản 
 
 | Ưu tiên sử dụng | File | Document revision | Nội dung / nơi tra cứu |
 |---|---|---|---|
+| Working proposal — tiếp tục khi open points chưa chốt | [Provisional Baseline Proposal](PROVISIONAL_BASELINE_PROPOSAL_VI.md) | Draft 0.1, 09/09/2026 | Phạm vi G0–G1 được phép, hard invariants, xử lý tạm `OP-001`…`OP-011`, milestone, risk và điều kiện thay thế giả định; không phải freeze approval |
 | 1 — hai composition và atomic interfaces | [Atomic Interface Specification](EVCC_AUTOSAR_Two_Main_Compositions_Atomic_Interface_Spec_VI.md) | Rev.3, 08/09/2026 | §§1–2 scope/rules/map; §§3–7 coordinator; §§8–23 HLC và sub-components; §§24–28 cross-composition/freeze; §§29–35 datatypes; §36 applicability |
 | 2 — behavior chi tiết | [Detailed Compositions](EVCC_AUTOSAR_Two_Main_Compositions_Detailed_Description_VI.md) | Rev.1, 08/09/2026 | §3 ChargingCoordinator, §4 ISO15118Chrg, §5 interactions, §8 open points |
 | 3 — kiến trúc toàn stack và supporting modules | [Charging Architecture](EVCC_AUTOSAR_Charging_Architecture.md) | Rev.4, 07/09/2026 | §9 safety SWCs; §10 HLC layers; §11 protocol adapters; §12 PLC/link/modem; phần requirements/AUTOSAR boundary phía sau |
@@ -30,5 +31,6 @@ Nếu khác biệt ảnh hưởng ABI, safety, state-transition guard/action ho�
 | Atomic payload datatypes / units / enums / capacities | Atomic §§29–34 |
 | Những điều chưa đủ để freeze | Atomic §§28, 35; root DECISIONS.md |
 | Development plan R0–R6 / WP0–WP10 | Overview §§7–10 |
+| Cách làm việc tạm trong khi chờ open points | Provisional Baseline Proposal §§4–14 |
 
 Các hình kiến trúc được giữ tại `assets/EVCC_AUTOSAR_Charging_Architecture/media/`. Markdown chuyển từ Word không bảo toàn page layout; bản Word gốc ở `../references/originals/` dùng để đối chiếu hình thức khi cần.
