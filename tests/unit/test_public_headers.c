@@ -10,6 +10,7 @@
 #include "openv2g/iso15118_chrg/iso15118_chrg.h"
 #include "openv2g/iso15118_chrg/sdp_client.h"
 #include "openv2g/iso15118_chrg/subsystems.h"
+#include "openv2g/iso15118_chrg/v2gtp_codec.h"
 #include "openv2g/platform/platform_services.h"
 #include "openv2g/support/charge_hardware_adapter.h"
 #include "openv2g/support/cp_pp_manager.h"

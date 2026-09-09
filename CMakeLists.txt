@@ -19,6 +19,7 @@ add_library(openv2g_core STATIC
     src/iso15118_chrg/iso15118_chrg.c
     src/iso15118_chrg/sdp_client.c
     src/iso15118_chrg/subsystem_stubs.c
+    src/iso15118_chrg/v2gtp_codec.c
     src/support/cp_pp_manager.c
     src/support/energy_data_provider.c
     src/support/plc_link_manager.c

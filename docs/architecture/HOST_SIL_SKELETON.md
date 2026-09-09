@@ -95,6 +95,7 @@ flowchart LR
 | `openv2g_test_permission` | Fail-closed permission, complete/current evidence and stale generation |
 | `openv2g_test_hlc_generation` | HLC late callback rejection, explicit schema/protocol gate, idempotent stop |
 | `openv2g_test_hardware_gate` | No enable with DENY or expired permission |
+| `openv2g_test_v2gtp_codec` | Bounded streaming decode, fragmented/coalesced frames, stale generation and malformed/oversized input |
 | `openv2g_test_public_headers` | Public C header self-containment and compile surface |
 | `openv2g_test_nominal_flow` | Connect→link→HLC→permission→energy and revoke-before-teardown order |
 
@@ -103,7 +104,7 @@ Passing host tests is `VERIFIED_HOST` evidence only. It is not target, safety, i
 ## 8. Next implementation order
 
 1. Add requirement/interface/state/test traceability IDs without inventing normative requirements.
-2. Replace generic HLC subsystem stubs one boundary at a time, starting with bounded V2GTP and transport stream handling.
+2. Bind the bounded V2GTP codec to the future transport adapter with caller-owned buffers; then replace the next generic HLC subsystem boundary.
 3. Add event queues and cancellation tests with compile-time capacities.
 4. Reconcile every C/S caller/server row before producing RTE ports.
 5. Replace fakes only when the G2/G3 evidence gate for that dependency is satisfied.

@@ -12,3 +12,7 @@ Rules:
 - record schema edition, generator version and output checksum;
 - validate bounds before allocation/decode;
 - provide golden vectors, malformed-input tests and target workspace/WCET evidence.
+
+The host/SIL `v2gtp_codec` now provides bounded framing and incremental stream
+handling with caller-owned storage. It is a provisional logical implementation;
+binding it to SoAd/TcpIp/PduR and proving protocol conformance remain G2 work.
