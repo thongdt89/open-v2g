@@ -37,6 +37,30 @@ typedef struct {
     OpenV2g_V2gtpParserState state;
 } OpenV2g_V2gtpParser;
 
+typedef struct {
+    void *context;
+    OpenV2g_Result (*begin)(void *context, uint32_t generation);
+    OpenV2g_Result (*consume)(
+        void *context,
+        uint32_t generation,
+        const uint8_t *data,
+        size_t length,
+        size_t *consumed);
+    OpenV2g_Result (*get_frame)(
+        void *context,
+        uint32_t generation,
+        OpenV2g_V2gtpFrameView *frame);
+    OpenV2g_Result (*reset)(void *context, uint32_t generation);
+    OpenV2g_Result (*encode)(
+        void *context,
+        uint16_t payload_type,
+        const uint8_t *payload,
+        uint32_t payload_length,
+        uint8_t *output,
+        size_t output_capacity,
+        size_t *written);
+} OpenV2g_V2gtpCodecCsPort;
+
 OpenV2g_Result OpenV2g_V2gtpParser_Init(
     OpenV2g_V2gtpParser *parser,
     uint8_t *payload_storage,
@@ -65,5 +89,9 @@ OpenV2g_Result OpenV2g_V2gtp_Encode(
     uint8_t *output,
     size_t output_capacity,
     size_t *written);
+
+OpenV2g_Result OpenV2g_V2gtpParser_CreateClientServerPort(
+    OpenV2g_V2gtpParser *parser,
+    OpenV2g_V2gtpCodecCsPort *port);
 
 #endif

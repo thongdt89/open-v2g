@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 
+#include "openv2g/common/result.h"
 #include "openv2g/common/types.h"
 
 typedef enum {
@@ -22,10 +23,19 @@ typedef struct {
     OpenV2g_CoordinatorState state;
 } OpenV2g_ChargeStateMachine;
 
+typedef struct {
+    void *context;
+    OpenV2g_Result (*read)(void *context, OpenV2g_CoordinatorState *state);
+} OpenV2g_ChargeStateSrPort;
+
 void OpenV2g_ChargeStateMachine_Init(OpenV2g_ChargeStateMachine *machine);
 
 bool OpenV2g_ChargeStateMachine_Dispatch(
     OpenV2g_ChargeStateMachine *machine,
     OpenV2g_ChargeStateEvent event);
+
+OpenV2g_Result OpenV2g_ChargeStateMachine_CreateStateSenderReceiverPort(
+    OpenV2g_ChargeStateMachine *machine,
+    OpenV2g_ChargeStateSrPort *port);
 
 #endif

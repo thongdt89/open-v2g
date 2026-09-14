@@ -213,3 +213,78 @@ OpenV2g_Result OpenV2g_V2gtp_Encode(
     *written = required;
     return OPENV2G_RESULT_OK;
 }
+
+static OpenV2g_Result cs_begin(void *context, uint32_t generation)
+{
+    return OpenV2g_V2gtpParser_Begin(
+        (OpenV2g_V2gtpParser *)context,
+        generation);
+}
+
+static OpenV2g_Result cs_consume(
+    void *context,
+    uint32_t generation,
+    const uint8_t *data,
+    size_t length,
+    size_t *consumed)
+{
+    return OpenV2g_V2gtpParser_Feed(
+        (OpenV2g_V2gtpParser *)context,
+        generation,
+        data,
+        length,
+        consumed);
+}
+
+static OpenV2g_Result cs_get_frame(
+    void *context,
+    uint32_t generation,
+    OpenV2g_V2gtpFrameView *frame)
+{
+    return OpenV2g_V2gtpParser_GetFrame(
+        (const OpenV2g_V2gtpParser *)context,
+        generation,
+        frame);
+}
+
+static OpenV2g_Result cs_reset(void *context, uint32_t generation)
+{
+    return OpenV2g_V2gtpParser_Reset(
+        (OpenV2g_V2gtpParser *)context,
+        generation);
+}
+
+static OpenV2g_Result cs_encode(
+    void *context,
+    uint16_t payload_type,
+    const uint8_t *payload,
+    uint32_t payload_length,
+    uint8_t *output,
+    size_t output_capacity,
+    size_t *written)
+{
+    (void)context;
+    return OpenV2g_V2gtp_Encode(
+        payload_type,
+        payload,
+        payload_length,
+        output,
+        output_capacity,
+        written);
+}
+
+OpenV2g_Result OpenV2g_V2gtpParser_CreateClientServerPort(
+    OpenV2g_V2gtpParser *parser,
+    OpenV2g_V2gtpCodecCsPort *port)
+{
+    if ((parser == NULL) || (port == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    port->context = parser;
+    port->begin = cs_begin;
+    port->consume = cs_consume;
+    port->get_frame = cs_get_frame;
+    port->reset = cs_reset;
+    port->encode = cs_encode;
+    return OPENV2G_RESULT_OK;
+}

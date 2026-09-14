@@ -2,6 +2,24 @@
 
 Trạng thái: PROPOSED — kế hoạch tiếp tục từ bộ tài liệu hiện có. Không thay thế release/WP plan gốc.
 
+## Cập nhật thực thi G1 — 10/09/2026
+
+Phần có thể hoàn thành độc lập với target/supplier trong baseline tạm đã được triển khai và host-verified:
+
+- logical wiring cho hai composition và supporting providers;
+- fail-closed permission với fault/BPT evidence;
+- bounded V2GTP stream codec và HLC event queue/status resync;
+- immutable SDP endpoint và typed TCP/TLS lifecycle, không implicit downgrade;
+- typed EXI/schema registry boundary với schema-specific backend, bounded caller-owned workspace và no-partial decode publication;
+- provisional ASR-style C/S operation ports và S/R status/diagnostic ports cho EXI/schema, giữ khả năng thay binding bằng generated RTE sau này;
+- typed `SapNegotiator` với ordered offer snapshot, generation/request correlation, DIN-over-TLS filtering, timeout/cancel và fail-closed unoffered selection;
+- static one-active `ProtocolAdapterFactory` cùng DIN 70121 và ISO 15118-2 EIM semantic host FSMs; generated EXI/wire mapping và normative timers vẫn ở G2;
+- cùng C/S/S/R pattern cho coordinator, permission/fault/BPT/state, CP/PP, energy, PLC, hardware, HLC facade, SDP, TCP/TLS và V2GTP; nominal host flow đã đọc snapshot qua ports;
+- stale-generation, cancel/late callback, overflow, expiry, reversal và teardown tests;
+- ma trận bao phủ 218 atomic interface rows tại `docs/architecture/INTERFACE_IMPLEMENTATION_TRACEABILITY.md`.
+
+Điểm dừng hiện tại là ranh giới G2/G3, không phải lỗi host còn che giấu: supplier ARXML/generated headers, licensed EXI schemas/generator, SoAd/TcpIp/PduR/Csm/KeyM APIs, modem capability và HARA/timing artifacts chưa có trong repository. Không tự sinh thay các đầu vào này.
+
 ## 1. Kiểm tra baseline và consistency
 
 - Đọc Atomic Rev.3 và đối chiếu Detailed Compositions Rev.1 / Architecture Rev.4 theo docs/INDEX.md.

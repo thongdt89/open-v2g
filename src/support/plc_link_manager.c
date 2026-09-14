@@ -129,3 +129,112 @@ OpenV2g_Result OpenV2g_PlcLinkManager_Stop(
     update_status(manager, now, OPENV2G_PLC_DOWN, reason);
     return OPENV2G_RESULT_OK;
 }
+
+static OpenV2g_Result cs_start(
+    void *context,
+    uint32_t generation,
+    OpenV2g_TimeUs now)
+{
+    return OpenV2g_PlcLinkManager_Start(
+        (OpenV2g_PlcLinkManager *)context,
+        generation,
+        now);
+}
+
+static OpenV2g_Result cs_stop(
+    void *context,
+    uint32_t generation,
+    OpenV2g_TimeUs now,
+    OpenV2g_ReasonCode reason)
+{
+    return OpenV2g_PlcLinkManager_Stop(
+        (OpenV2g_PlcLinkManager *)context,
+        generation,
+        now,
+        reason);
+}
+
+static OpenV2g_Result cs_modem_ready(
+    void *context,
+    uint32_t generation,
+    OpenV2g_TimeUs now)
+{
+    return OpenV2g_PlcLinkManager_OnModemReady(
+        (OpenV2g_PlcLinkManager *)context,
+        generation,
+        now);
+}
+
+static OpenV2g_Result cs_slac_matched(
+    void *context,
+    uint32_t generation,
+    OpenV2g_TimeUs now)
+{
+    return OpenV2g_PlcLinkManager_OnSlacMatched(
+        (OpenV2g_PlcLinkManager *)context,
+        generation,
+        now);
+}
+
+static OpenV2g_Result cs_associated(
+    void *context,
+    uint32_t generation,
+    OpenV2g_TimeUs now)
+{
+    return OpenV2g_PlcLinkManager_OnAssociated(
+        (OpenV2g_PlcLinkManager *)context,
+        generation,
+        now);
+}
+
+static OpenV2g_Result cs_ipv6_ready(
+    void *context,
+    uint32_t generation,
+    OpenV2g_TimeUs now)
+{
+    return OpenV2g_PlcLinkManager_OnIpv6Ready(
+        (OpenV2g_PlcLinkManager *)context,
+        generation,
+        now);
+}
+
+static OpenV2g_Result sr_read(void *context, OpenV2g_PlcLinkStatus *status)
+{
+    const OpenV2g_PlcLinkManager *manager =
+        (const OpenV2g_PlcLinkManager *)context;
+
+    if ((manager == NULL) || (status == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    *status = manager->status;
+    return OPENV2G_RESULT_OK;
+}
+
+OpenV2g_Result OpenV2g_PlcLinkManager_CreateControlClientServerPort(
+    OpenV2g_PlcLinkManager *manager,
+    OpenV2g_PlcLinkControlCsPort *port)
+{
+    if ((manager == NULL) || (port == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    port->context = manager;
+    port->start = cs_start;
+    port->stop = cs_stop;
+    port->modem_ready = cs_modem_ready;
+    port->slac_matched = cs_slac_matched;
+    port->associated = cs_associated;
+    port->ipv6_ready = cs_ipv6_ready;
+    return OPENV2G_RESULT_OK;
+}
+
+OpenV2g_Result OpenV2g_PlcLinkManager_CreateStatusSenderReceiverPort(
+    OpenV2g_PlcLinkManager *manager,
+    OpenV2g_PlcLinkStatusSrPort *port)
+{
+    if ((manager == NULL) || (port == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    port->context = manager;
+    port->read = sr_read;
+    return OPENV2G_RESULT_OK;
+}

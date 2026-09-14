@@ -17,7 +17,15 @@ add_library(openv2g_core STATIC
     src/charging_coordinator/bpt_coordinator.c
     src/charging_coordinator/charging_coordinator.c
     src/iso15118_chrg/iso15118_chrg.c
+    src/iso15118_chrg/hlc_event_queue.c
     src/iso15118_chrg/sdp_client.c
+    src/iso15118_chrg/tcp_tls_session.c
+    src/iso15118_chrg/schema_registry.c
+    src/iso15118_chrg/exi_codec.c
+    src/iso15118_chrg/sap_negotiator.c
+    src/iso15118_chrg/protocol_adapter_factory.c
+    src/iso15118_chrg/din70121_adapter.c
+    src/iso15118_chrg/iso15118_2_adapter.c
     src/iso15118_chrg/subsystem_stubs.c
     src/iso15118_chrg/v2gtp_codec.c
     src/support/cp_pp_manager.c

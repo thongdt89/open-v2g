@@ -82,6 +82,9 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnQualifiedCpPp(
         coordinator->has_energy = false;
         coordinator->has_link = false;
         coordinator->has_hlc = false;
+        coordinator->has_hlc_event = false;
+        coordinator->hlc_event_resync_required = false;
+        coordinator->hlc_event_overflow_time = 0u;
         coordinator->has_hardware = false;
         coordinator->teardown_started = false;
         return OPENV2G_RESULT_OK;
@@ -90,6 +93,17 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnQualifiedCpPp(
     if (coordinator->state_machine.state == OPENV2G_COORDINATOR_UNPLUGGED) {
         coordinator->generation = next_generation(coordinator->generation);
         coordinator->teardown_started = false;
+        coordinator->has_hlc_event = false;
+        coordinator->hlc_event_resync_required = false;
+        coordinator->hlc_event_overflow_time = 0u;
+        OpenV2g_FaultCoordinator_BeginSession(
+            &coordinator->fault_coordinator,
+            coordinator->generation,
+            now);
+        OpenV2g_BptCoordinator_BeginSession(
+            &coordinator->bpt_coordinator,
+            coordinator->generation,
+            now);
         coordinator->cp_pp = *cp_pp;
         coordinator->cp_pp.env.session_generation = coordinator->generation;
         coordinator->has_cp_pp = true;
@@ -102,7 +116,8 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnQualifiedCpPp(
 
         result = coordinator->ports.link.start(
             coordinator->ports.link.context,
-            coordinator->generation);
+            coordinator->generation,
+            now);
         if (!is_success(result)) {
             OpenV2g_FaultCoordinator_Raise(
                 &coordinator->fault_coordinator,
@@ -167,7 +182,8 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnLinkStatus(
         (coordinator->state_machine.state == OPENV2G_COORDINATOR_LINK_SETUP)) {
         result = coordinator->ports.hlc.start(
             coordinator->ports.hlc.context,
-            coordinator->generation);
+            coordinator->generation,
+            link->env.timestamp);
         if (is_success(result)) {
             (void)OpenV2g_ChargeStateMachine_Dispatch(
                 &coordinator->state_machine,
@@ -179,6 +195,12 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnLinkStatus(
     if ((link->state == OPENV2G_PLC_DOWN) &&
         (coordinator->state_machine.state >= OPENV2G_COORDINATOR_HLC_NEGOTIATION) &&
         (coordinator->state_machine.state <= OPENV2G_COORDINATOR_ENERGY_TRANSFER)) {
+        OpenV2g_FaultCoordinator_Raise(
+            &coordinator->fault_coordinator,
+            coordinator->generation,
+            link->env.timestamp,
+            OPENV2G_FAULT_CONTROLLED_STOP,
+            OPENV2G_REASON_LINK_LOSS);
         return OpenV2g_ChargingCoordinator_Stop(
             coordinator,
             link->env.timestamp,
@@ -195,18 +217,66 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnHlcStatus(
     if ((coordinator == NULL) || (hlc == NULL) ||
         (hlc->env.session_generation != coordinator->generation) ||
         (hlc->env.quality != OPENV2G_QUALITY_VALID) ||
-        (hlc->env.timestamp == 0u)) {
+        (hlc->env.timestamp == 0u) ||
+        (coordinator->hlc_event_resync_required &&
+         (hlc->env.timestamp < coordinator->hlc_event_overflow_time))) {
         return OPENV2G_RESULT_REJECTED;
     }
     coordinator->hlc = *hlc;
     coordinator->has_hlc = true;
+    coordinator->hlc_event_resync_required = false;
+    coordinator->hlc_event_overflow_time = 0u;
     if (hlc->state == OPENV2G_HLC_ERROR) {
+        OpenV2g_FaultCoordinator_Raise(
+            &coordinator->fault_coordinator,
+            coordinator->generation,
+            hlc->env.timestamp,
+            OPENV2G_FAULT_CONTROLLED_STOP,
+            hlc->env.reason);
         return OpenV2g_ChargingCoordinator_Stop(
             coordinator,
             hlc->env.timestamp,
             hlc->env.reason);
     }
     return OPENV2G_RESULT_OK;
+}
+
+OpenV2g_Result OpenV2g_ChargingCoordinator_OnHlcEvent(
+    OpenV2g_ChargingCoordinator *coordinator,
+    const OpenV2g_HlcEvent *event)
+{
+    if ((coordinator == NULL) || (event == NULL) ||
+        coordinator->hlc_event_resync_required ||
+        (event->env.session_generation != coordinator->generation) ||
+        (event->env.quality != OPENV2G_QUALITY_VALID) ||
+        (event->env.timestamp == 0u) || (event->event_id == 0u)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+
+    coordinator->last_hlc_event = *event;
+    coordinator->has_hlc_event = true;
+    return OPENV2G_RESULT_OK;
+}
+
+OpenV2g_Result OpenV2g_ChargingCoordinator_MarkHlcEventOverflow(
+    OpenV2g_ChargingCoordinator *coordinator,
+    uint32_t generation,
+    OpenV2g_TimeUs now)
+{
+    if ((coordinator == NULL) || (generation == 0u) ||
+        (generation != coordinator->generation) || (now == 0u)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+
+    coordinator->has_hlc_event = false;
+    coordinator->hlc_event_resync_required = true;
+    coordinator->hlc_event_overflow_time = now;
+    OpenV2g_PermissionManager_Revoke(
+        &coordinator->permission_manager,
+        generation,
+        now,
+        OPENV2G_REASON_RESOURCE);
+    return OPENV2G_RESULT_ACCEPTED;
 }
 
 OpenV2g_Result OpenV2g_ChargingCoordinator_OnHardwareStatus(
@@ -222,6 +292,12 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnHardwareStatus(
     coordinator->hardware = *hardware;
     coordinator->has_hardware = true;
     if (hardware->state == OPENV2G_HW_FAULT) {
+        OpenV2g_FaultCoordinator_Raise(
+            &coordinator->fault_coordinator,
+            coordinator->generation,
+            hardware->env.timestamp,
+            OPENV2G_FAULT_EMERGENCY_STOP,
+            OPENV2G_REASON_HW_MISMATCH);
         return OpenV2g_ChargingCoordinator_Stop(
             coordinator,
             hardware->env.timestamp,
@@ -240,6 +316,14 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_EvaluatePermission(
     if (coordinator == NULL) {
         return OPENV2G_RESULT_REJECTED;
     }
+    if (coordinator->hlc_event_resync_required) {
+        OpenV2g_PermissionManager_Revoke(
+            &coordinator->permission_manager,
+            coordinator->generation,
+            now,
+            OPENV2G_REASON_RESOURCE);
+        return OPENV2G_RESULT_REJECTED;
+    }
 
     evidence.generation = coordinator->generation;
     evidence.coordinator_state = coordinator->state_machine.state;
@@ -248,6 +332,9 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_EvaluatePermission(
     evidence.link = coordinator->has_link ? &coordinator->link : NULL;
     evidence.hlc = coordinator->has_hlc ? &coordinator->hlc : NULL;
     evidence.hardware = coordinator->has_hardware ? &coordinator->hardware : NULL;
+    evidence.blocking_fault = &coordinator->fault_coordinator.status;
+    evidence.bpt = OpenV2g_BptCoordinator_GetPermissionRequest(
+        &coordinator->bpt_coordinator);
 
     result = OpenV2g_PermissionManager_Evaluate(
         &coordinator->permission_manager,
@@ -262,6 +349,7 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_EvaluatePermission(
             return coordinator->ports.hardware.prepare(
                 coordinator->ports.hardware.context,
                 coordinator->generation,
+                now,
                 permission->mode);
         }
         if (permission->action == OPENV2G_ACTION_ENERGIZE) {
@@ -308,7 +396,8 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_RequestEnergyTransfer(
 
     result = coordinator->ports.hardware.enable(
         coordinator->ports.hardware.context,
-        permission);
+        permission,
+        now);
     if (is_success(result)) {
         (void)OpenV2g_ChargeStateMachine_Dispatch(
             &coordinator->state_machine,
@@ -352,14 +441,17 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_Stop(
     hardware_result = coordinator->ports.hardware.request_safe_state(
         coordinator->ports.hardware.context,
         coordinator->generation,
+        now,
         reason);
     hlc_result = coordinator->ports.hlc.stop(
         coordinator->ports.hlc.context,
         coordinator->generation,
+        now,
         reason);
     link_result = coordinator->ports.link.stop(
         coordinator->ports.link.context,
         coordinator->generation,
+        now,
         reason);
 
     if (!is_success(hardware_result)) {
@@ -394,4 +486,49 @@ const OpenV2g_ChargePermission *OpenV2g_ChargingCoordinator_GetPermission(
     const OpenV2g_ChargingCoordinator *coordinator)
 {
     return (coordinator == NULL) ? NULL : &coordinator->permission_manager.current;
+}
+
+static OpenV2g_Result cs_request_energy_transfer(
+    void *context,
+    OpenV2g_TimeUs now)
+{
+    return OpenV2g_ChargingCoordinator_RequestEnergyTransfer(
+        (OpenV2g_ChargingCoordinator *)context,
+        now);
+}
+
+static OpenV2g_Result cs_stop(
+    void *context,
+    OpenV2g_TimeUs now,
+    OpenV2g_ReasonCode reason)
+{
+    return OpenV2g_ChargingCoordinator_Stop(
+        (OpenV2g_ChargingCoordinator *)context,
+        now,
+        reason);
+}
+
+OpenV2g_Result OpenV2g_ChargingCoordinator_CreateControlClientServerPort(
+    OpenV2g_ChargingCoordinator *coordinator,
+    OpenV2g_CoordinatorControlCsPort *port)
+{
+    if ((coordinator == NULL) || (port == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    port->context = coordinator;
+    port->request_energy_transfer = cs_request_energy_transfer;
+    port->stop = cs_stop;
+    return OPENV2G_RESULT_OK;
+}
+
+OpenV2g_Result OpenV2g_ChargingCoordinator_CreatePermissionSenderReceiverPort(
+    OpenV2g_ChargingCoordinator *coordinator,
+    OpenV2g_ChargePermissionSrPort *port)
+{
+    if (coordinator == NULL) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    return OpenV2g_PermissionManager_CreatePermissionSenderReceiverPort(
+        &coordinator->permission_manager,
+        port);
 }

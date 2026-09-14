@@ -92,3 +92,80 @@ OpenV2g_Result OpenV2g_ChargeHardwareAdapter_RequestSafeState(
     update_status(adapter, now, OPENV2G_HW_SAFE, reason);
     return OPENV2G_RESULT_OK;
 }
+
+static OpenV2g_Result cs_prepare(
+    void *context,
+    uint32_t generation,
+    OpenV2g_TimeUs now,
+    OpenV2g_ChargeMode mode)
+{
+    return OpenV2g_ChargeHardwareAdapter_Prepare(
+        (OpenV2g_ChargeHardwareAdapter *)context,
+        generation,
+        now,
+        mode);
+}
+
+static OpenV2g_Result cs_enable(
+    void *context,
+    const OpenV2g_ChargePermission *permission,
+    OpenV2g_TimeUs now)
+{
+    return OpenV2g_ChargeHardwareAdapter_Enable(
+        (OpenV2g_ChargeHardwareAdapter *)context,
+        permission,
+        now);
+}
+
+static OpenV2g_Result cs_safe_state(
+    void *context,
+    uint32_t generation,
+    OpenV2g_TimeUs now,
+    OpenV2g_ReasonCode reason)
+{
+    return OpenV2g_ChargeHardwareAdapter_RequestSafeState(
+        (OpenV2g_ChargeHardwareAdapter *)context,
+        generation,
+        now,
+        reason);
+}
+
+static OpenV2g_Result sr_read(
+    void *context,
+    OpenV2g_ChargeHardwareStatus *status)
+{
+    const OpenV2g_ChargeHardwareAdapter *adapter =
+        (const OpenV2g_ChargeHardwareAdapter *)context;
+
+    if ((adapter == NULL) || (status == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    *status = adapter->status;
+    return OPENV2G_RESULT_OK;
+}
+
+OpenV2g_Result OpenV2g_ChargeHardwareAdapter_CreateControlClientServerPort(
+    OpenV2g_ChargeHardwareAdapter *adapter,
+    OpenV2g_ChargeHardwareControlCsPort *port)
+{
+    if ((adapter == NULL) || (port == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    port->context = adapter;
+    port->prepare = cs_prepare;
+    port->enable = cs_enable;
+    port->request_safe_state = cs_safe_state;
+    return OPENV2G_RESULT_OK;
+}
+
+OpenV2g_Result OpenV2g_ChargeHardwareAdapter_CreateStatusSenderReceiverPort(
+    OpenV2g_ChargeHardwareAdapter *adapter,
+    OpenV2g_ChargeHardwareStatusSrPort *port)
+{
+    if ((adapter == NULL) || (port == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    port->context = adapter;
+    port->read = sr_read;
+    return OPENV2G_RESULT_OK;
+}

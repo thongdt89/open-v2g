@@ -9,9 +9,17 @@ typedef struct {
     bool has_value;
 } OpenV2g_CpPpManager;
 
+typedef struct {
+    void *context;
+    OpenV2g_Result (*read)(void *context, OpenV2g_QualifiedCpPp *value);
+} OpenV2g_CpPpStatusSrPort;
+
 void OpenV2g_CpPpManager_Init(OpenV2g_CpPpManager *manager);
 OpenV2g_Result OpenV2g_CpPpManager_PublishQualified(
     OpenV2g_CpPpManager *manager,
     const OpenV2g_QualifiedCpPp *value);
+OpenV2g_Result OpenV2g_CpPpManager_CreateStatusSenderReceiverPort(
+    OpenV2g_CpPpManager *manager,
+    OpenV2g_CpPpStatusSrPort *port);
 
 #endif

@@ -9,77 +9,102 @@ static void record(OpenV2g_TestRig *rig, OpenV2g_TestOperation operation)
     }
 }
 
-static OpenV2g_Result link_start(void *context, uint32_t generation)
+static OpenV2g_Result link_start(
+    void *context,
+    uint32_t generation,
+    OpenV2g_TimeUs now)
 {
     OpenV2g_TestRig *rig = (OpenV2g_TestRig *)context;
     record(rig, TEST_OP_LINK_START);
-    return OpenV2g_PlcLinkManager_Start(&rig->plc, generation, rig->now);
+    return rig->plc_control_port.start(
+        rig->plc_control_port.context,
+        generation,
+        now);
 }
 
 static OpenV2g_Result link_stop(
     void *context,
     uint32_t generation,
+    OpenV2g_TimeUs now,
     OpenV2g_ReasonCode reason)
 {
     OpenV2g_TestRig *rig = (OpenV2g_TestRig *)context;
     record(rig, TEST_OP_LINK_STOP);
-    return OpenV2g_PlcLinkManager_Stop(&rig->plc, generation, rig->now, reason);
+    return rig->plc_control_port.stop(
+        rig->plc_control_port.context,
+        generation,
+        now,
+        reason);
 }
 
-static OpenV2g_Result hlc_start(void *context, uint32_t generation)
+static OpenV2g_Result hlc_start(
+    void *context,
+    uint32_t generation,
+    OpenV2g_TimeUs now)
 {
     OpenV2g_TestRig *rig = (OpenV2g_TestRig *)context;
     record(rig, TEST_OP_HLC_START);
-    return OpenV2g_Iso15118Chrg_Start(&rig->hlc, generation, rig->now);
+    return rig->hlc_control_port.start(
+        rig->hlc_control_port.context,
+        generation,
+        now);
 }
 
 static OpenV2g_Result hlc_stop(
     void *context,
     uint32_t generation,
+    OpenV2g_TimeUs now,
     OpenV2g_ReasonCode reason)
 {
     OpenV2g_TestRig *rig = (OpenV2g_TestRig *)context;
     record(rig, TEST_OP_HLC_STOP);
-    return OpenV2g_Iso15118Chrg_Stop(&rig->hlc, generation, rig->now, reason);
+    return rig->hlc_control_port.stop(
+        rig->hlc_control_port.context,
+        generation,
+        now,
+        reason);
 }
 
 static OpenV2g_Result hardware_prepare(
     void *context,
     uint32_t generation,
+    OpenV2g_TimeUs now,
     OpenV2g_ChargeMode mode)
 {
     OpenV2g_TestRig *rig = (OpenV2g_TestRig *)context;
     record(rig, TEST_OP_HW_PREPARE);
-    return OpenV2g_ChargeHardwareAdapter_Prepare(
-        &rig->hardware,
+    return rig->hardware_control_port.prepare(
+        rig->hardware_control_port.context,
         generation,
-        rig->now,
+        now,
         mode);
 }
 
 static OpenV2g_Result hardware_enable(
     void *context,
-    const OpenV2g_ChargePermission *permission)
+    const OpenV2g_ChargePermission *permission,
+    OpenV2g_TimeUs now)
 {
     OpenV2g_TestRig *rig = (OpenV2g_TestRig *)context;
     record(rig, TEST_OP_HW_ENABLE);
-    return OpenV2g_ChargeHardwareAdapter_Enable(
-        &rig->hardware,
+    return rig->hardware_control_port.enable(
+        rig->hardware_control_port.context,
         permission,
-        rig->now);
+        now);
 }
 
 static OpenV2g_Result hardware_safe(
     void *context,
     uint32_t generation,
+    OpenV2g_TimeUs now,
     OpenV2g_ReasonCode reason)
 {
     OpenV2g_TestRig *rig = (OpenV2g_TestRig *)context;
     record(rig, TEST_OP_HW_SAFE);
-    return OpenV2g_ChargeHardwareAdapter_RequestSafeState(
-        &rig->hardware,
+    return rig->hardware_control_port.request_safe_state(
+        rig->hardware_control_port.context,
         generation,
-        rig->now,
+        now,
         reason);
 }
 
@@ -89,9 +114,42 @@ void OpenV2g_TestRig_Init(OpenV2g_TestRig *rig)
         return;
     }
     (void)memset(rig, 0, sizeof(*rig));
+    OpenV2g_CpPpManager_Init(&rig->cp_pp);
+    (void)OpenV2g_CpPpManager_CreateStatusSenderReceiverPort(
+        &rig->cp_pp,
+        &rig->cp_pp_status_port);
+    OpenV2g_EnergyDataProvider_Init(&rig->energy);
+    (void)OpenV2g_EnergyDataProvider_CreateSnapshotSenderReceiverPort(
+        &rig->energy,
+        &rig->energy_status_port);
     OpenV2g_PlcLinkManager_Init(&rig->plc);
+    (void)OpenV2g_PlcLinkManager_CreateControlClientServerPort(
+        &rig->plc,
+        &rig->plc_control_port);
+    (void)OpenV2g_PlcLinkManager_CreateStatusSenderReceiverPort(
+        &rig->plc,
+        &rig->plc_status_port);
     OpenV2g_Iso15118Chrg_Init(&rig->hlc, NULL);
+    (void)OpenV2g_Iso15118Chrg_AttachV2gtpStorage(
+        &rig->hlc,
+        rig->v2gtp_storage,
+        sizeof(rig->v2gtp_storage));
+    (void)OpenV2g_Iso15118Chrg_CreateControlClientServerPort(
+        &rig->hlc,
+        &rig->hlc_control_port);
+    (void)OpenV2g_Iso15118Chrg_CreateStatusSenderReceiverPort(
+        &rig->hlc,
+        &rig->hlc_status_port);
+    (void)OpenV2g_Iso15118Chrg_CreateEventQueuedSenderReceiverPort(
+        &rig->hlc,
+        &rig->hlc_event_port);
     OpenV2g_ChargeHardwareAdapter_InitHostFake(&rig->hardware);
+    (void)OpenV2g_ChargeHardwareAdapter_CreateControlClientServerPort(
+        &rig->hardware,
+        &rig->hardware_control_port);
+    (void)OpenV2g_ChargeHardwareAdapter_CreateStatusSenderReceiverPort(
+        &rig->hardware,
+        &rig->hardware_status_port);
 }
 
 OpenV2g_CoordinatorPorts OpenV2g_TestRig_Ports(OpenV2g_TestRig *rig)
@@ -121,4 +179,70 @@ OpenV2g_CoordinatorConfig OpenV2g_TestRig_Config(void)
     config.permission.hardware_max_age_us = 1000u;
     config.permission.permission_validity_us = 50u;
     return config;
+}
+
+OpenV2g_Endpoint OpenV2g_TestEndpoint(OpenV2g_SecurityMode security)
+{
+    OpenV2g_Endpoint endpoint;
+    (void)memset(&endpoint, 0, sizeof(endpoint));
+    endpoint.address[0] = 0xfeu;
+    endpoint.address[1] = 0x80u;
+    endpoint.address[15] = 0x01u;
+    endpoint.port = 15118u;
+    endpoint.transport = OPENV2G_TRANSPORT_TCP;
+    endpoint.security = security;
+    endpoint.interface_id = 1u;
+    return endpoint;
+}
+
+OpenV2g_Result OpenV2g_TestRig_ReadCpPp(
+    OpenV2g_TestRig *rig,
+    OpenV2g_QualifiedCpPp *value)
+{
+    if (rig == NULL) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    return rig->cp_pp_status_port.read(rig->cp_pp_status_port.context, value);
+}
+
+OpenV2g_Result OpenV2g_TestRig_ReadEnergy(
+    OpenV2g_TestRig *rig,
+    OpenV2g_EvEnergySnapshot *value)
+{
+    if (rig == NULL) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    return rig->energy_status_port.read(rig->energy_status_port.context, value);
+}
+
+OpenV2g_Result OpenV2g_TestRig_ReadPlc(
+    OpenV2g_TestRig *rig,
+    OpenV2g_PlcLinkStatus *value)
+{
+    if (rig == NULL) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    return rig->plc_status_port.read(rig->plc_status_port.context, value);
+}
+
+OpenV2g_Result OpenV2g_TestRig_ReadHlc(
+    OpenV2g_TestRig *rig,
+    OpenV2g_HlcSessionStatus *value)
+{
+    if (rig == NULL) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    return rig->hlc_status_port.read(rig->hlc_status_port.context, value);
+}
+
+OpenV2g_Result OpenV2g_TestRig_ReadHardware(
+    OpenV2g_TestRig *rig,
+    OpenV2g_ChargeHardwareStatus *value)
+{
+    if (rig == NULL) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    return rig->hardware_status_port.read(
+        rig->hardware_status_port.context,
+        value);
 }

@@ -1,5 +1,7 @@
 #include <string.h>
 
+#include "openv2g/charging_coordinator/bpt_coordinator.h"
+#include "openv2g/charging_coordinator/fault_coordinator.h"
 #include "openv2g/charging_coordinator/permission_manager.h"
 #include "test.h"
 
@@ -26,6 +28,8 @@ int main(void)
     OpenV2g_PlcLinkStatus link;
     OpenV2g_HlcSessionStatus hlc;
     OpenV2g_ChargeHardwareStatus hardware;
+    OpenV2g_FaultCoordinator fault_coordinator;
+    OpenV2g_BptCoordinator bpt_coordinator;
 
     (void)memset(&config, 0, sizeof(config));
     config.cp_pp_max_age_us = 100u;
@@ -78,11 +82,18 @@ int main(void)
     hardware.env = envelope(generation, 104u);
     hardware.state = OPENV2G_HW_SAFE;
 
+    OpenV2g_FaultCoordinator_Init(&fault_coordinator);
+    OpenV2g_FaultCoordinator_BeginSession(&fault_coordinator, generation, 105u);
+    OpenV2g_BptCoordinator_Init(&bpt_coordinator);
+    OpenV2g_BptCoordinator_BeginSession(&bpt_coordinator, generation, 106u);
+
     evidence.cp_pp = &cp_pp;
     evidence.energy = &energy;
     evidence.link = &link;
     evidence.hlc = &hlc;
     evidence.hardware = &hardware;
+    evidence.blocking_fault = &fault_coordinator.status;
+    evidence.bpt = OpenV2g_BptCoordinator_GetPermissionRequest(&bpt_coordinator);
 
     TEST_ASSERT(OpenV2g_PermissionManager_Evaluate(&manager, &config, &evidence, now) ==
                 OPENV2G_RESULT_OK);
@@ -102,5 +113,17 @@ int main(void)
                 OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(manager.current.decision == OPENV2G_PERMISSION_DENY);
     TEST_ASSERT(manager.current.env.sequence_counter == 4u);
+
+    energy.env.session_generation = generation;
+    OpenV2g_FaultCoordinator_Raise(
+        &fault_coordinator,
+        generation,
+        now,
+        OPENV2G_FAULT_CONTROLLED_STOP,
+        OPENV2G_REASON_INTERNAL);
+    TEST_ASSERT(OpenV2g_PermissionManager_Evaluate(&manager, &config, &evidence, now) ==
+                OPENV2G_RESULT_REJECTED);
+    TEST_ASSERT(manager.current.decision == OPENV2G_PERMISSION_DENY);
+    TEST_ASSERT(manager.current.env.sequence_counter == 5u);
     return 0;
 }

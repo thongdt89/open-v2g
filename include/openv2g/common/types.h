@@ -109,6 +109,16 @@ typedef enum {
 } OpenV2g_HlcState;
 
 typedef enum {
+    OPENV2G_HLC_EVENT_STATE_CHANGED = 0,
+    OPENV2G_HLC_EVENT_PARAMETERS_ACCEPTED = 1,
+    OPENV2G_HLC_EVENT_PEER_REQUEST = 2,
+    OPENV2G_HLC_EVENT_AUTH_RESULT = 3,
+    OPENV2G_HLC_EVENT_SESSION_COMPLETE = 4,
+    OPENV2G_HLC_EVENT_WARNING = 5,
+    OPENV2G_HLC_EVENT_FAILURE = 6
+} OpenV2g_HlcEventCategory;
+
+typedef enum {
     OPENV2G_PROTOCOL_NONE = 0,
     OPENV2G_PROTOCOL_DIN_70121 = 1,
     OPENV2G_PROTOCOL_ISO_15118_2 = 2,
@@ -124,6 +134,34 @@ typedef enum {
     OPENV2G_SCHEMA_ISO_20_AC = 5,
     OPENV2G_SCHEMA_ISO_20_DC = 6
 } OpenV2g_SchemaId;
+
+typedef enum {
+    OPENV2G_TRANSPORT_TCP = 0,
+    OPENV2G_TRANSPORT_UDP = 1
+} OpenV2g_TransportProtocol;
+
+typedef enum {
+    OPENV2G_SECURITY_NONE = 0,
+    OPENV2G_SECURITY_TLS12 = 1,
+    OPENV2G_SECURITY_TLS13 = 2
+} OpenV2g_SecurityMode;
+
+typedef enum {
+    OPENV2G_SECURITY_NOT_REQUESTED = 0,
+    OPENV2G_SECURITY_NEGOTIATING = 1,
+    OPENV2G_SECURITY_ESTABLISHED = 2,
+    OPENV2G_SECURITY_FAILED = 3
+} OpenV2g_SecurityState;
+
+typedef enum {
+    OPENV2G_TRANSPORT_CLOSED = 0,
+    OPENV2G_TRANSPORT_CONNECTING = 1,
+    OPENV2G_TRANSPORT_PLAIN_ACTIVE = 2,
+    OPENV2G_TRANSPORT_TLS_HANDSHAKE = 3,
+    OPENV2G_TRANSPORT_SECURE_ACTIVE = 4,
+    OPENV2G_TRANSPORT_CLOSING = 5,
+    OPENV2G_TRANSPORT_ERROR = 6
+} OpenV2g_TransportState;
 
 typedef enum {
     OPENV2G_PLC_DOWN = 0,
@@ -211,6 +249,17 @@ typedef struct {
 
 typedef struct {
     OpenV2g_CommEnvelope env;
+    uint32_t event_id;
+    uint32_t evidence_id;
+    OpenV2g_HlcEventCategory category;
+    OpenV2g_ProtocolId protocol;
+    uint16_t protocol_step;
+    OpenV2g_AllowedAction requested_action;
+    int32_t requested_power_w;
+} OpenV2g_HlcEvent;
+
+typedef struct {
+    OpenV2g_CommEnvelope env;
     OpenV2g_HardwareState state;
     bool connector_locked;
     bool precharge_active;
@@ -239,5 +288,32 @@ typedef struct {
     OpenV2g_ReasonCode cause;
     bool latched;
 } OpenV2g_BlockingFaultStatus;
+
+typedef struct {
+    OpenV2g_CommEnvelope env;
+    bool enabled;
+    OpenV2g_PowerDirection direction;
+    bool measured_zero_confirmed;
+    bool has_new_permission;
+    OpenV2g_PowerLimits limits;
+} OpenV2g_BptPermissionRequest;
+
+typedef struct {
+    uint8_t address[16];
+    uint16_t port;
+    OpenV2g_TransportProtocol transport;
+    OpenV2g_SecurityMode security;
+    uint16_t interface_id;
+} OpenV2g_Endpoint;
+
+typedef struct {
+    OpenV2g_CommEnvelope env;
+    uint32_t connection_id;
+    OpenV2g_TransportState state;
+    OpenV2g_SecurityState security;
+    OpenV2g_Endpoint endpoint;
+    uint16_t tx_queue_used;
+    uint16_t rx_queue_used;
+} OpenV2g_TransportStatus;
 
 #endif

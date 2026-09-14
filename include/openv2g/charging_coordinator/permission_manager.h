@@ -26,7 +26,14 @@ typedef struct {
     const OpenV2g_PlcLinkStatus *link;
     const OpenV2g_HlcSessionStatus *hlc;
     const OpenV2g_ChargeHardwareStatus *hardware;
+    const OpenV2g_BlockingFaultStatus *blocking_fault;
+    const OpenV2g_BptPermissionRequest *bpt;
 } OpenV2g_PermissionEvidence;
+
+typedef struct {
+    void *context;
+    OpenV2g_Result (*read)(void *context, OpenV2g_ChargePermission *permission);
+} OpenV2g_ChargePermissionSrPort;
 
 void OpenV2g_PermissionManager_Init(OpenV2g_PermissionManager *manager);
 
@@ -41,5 +48,9 @@ void OpenV2g_PermissionManager_Revoke(
     uint32_t generation,
     OpenV2g_TimeUs now,
     OpenV2g_ReasonCode reason);
+
+OpenV2g_Result OpenV2g_PermissionManager_CreatePermissionSenderReceiverPort(
+    OpenV2g_PermissionManager *manager,
+    OpenV2g_ChargePermissionSrPort *port);
 
 #endif

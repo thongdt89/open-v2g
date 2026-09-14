@@ -25,3 +25,32 @@ OpenV2g_Result OpenV2g_EnergyDataProvider_Publish(
     provider->has_value = true;
     return OPENV2G_RESULT_OK;
 }
+
+static OpenV2g_Result sr_read(
+    void *context,
+    OpenV2g_EvEnergySnapshot *snapshot)
+{
+    const OpenV2g_EnergyDataProvider *provider =
+        (const OpenV2g_EnergyDataProvider *)context;
+
+    if ((provider == NULL) || (snapshot == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    if (!provider->has_value) {
+        return OPENV2G_RESULT_NOT_IMPLEMENTED;
+    }
+    *snapshot = provider->snapshot;
+    return OPENV2G_RESULT_OK;
+}
+
+OpenV2g_Result OpenV2g_EnergyDataProvider_CreateSnapshotSenderReceiverPort(
+    OpenV2g_EnergyDataProvider *provider,
+    OpenV2g_EnergySnapshotSrPort *port)
+{
+    if ((provider == NULL) || (port == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    port->context = provider;
+    port->read = sr_read;
+    return OPENV2G_RESULT_OK;
+}

@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "openv2g/common/result.h"
 #include "openv2g/common/types.h"
 
 typedef struct {
@@ -11,7 +12,19 @@ typedef struct {
     uint32_t next_fault_id;
 } OpenV2g_FaultCoordinator;
 
+typedef struct {
+    void *context;
+    OpenV2g_Result (*read)(
+        void *context,
+        OpenV2g_BlockingFaultStatus *status);
+} OpenV2g_BlockingFaultStatusSrPort;
+
 void OpenV2g_FaultCoordinator_Init(OpenV2g_FaultCoordinator *coordinator);
+
+void OpenV2g_FaultCoordinator_BeginSession(
+    OpenV2g_FaultCoordinator *coordinator,
+    uint32_t generation,
+    OpenV2g_TimeUs now);
 
 void OpenV2g_FaultCoordinator_Raise(
     OpenV2g_FaultCoordinator *coordinator,
@@ -26,5 +39,9 @@ void OpenV2g_FaultCoordinator_ClearOnUnplug(
 
 bool OpenV2g_FaultCoordinator_IsBlocking(
     const OpenV2g_FaultCoordinator *coordinator);
+
+OpenV2g_Result OpenV2g_FaultCoordinator_CreateStatusSenderReceiverPort(
+    OpenV2g_FaultCoordinator *coordinator,
+    OpenV2g_BlockingFaultStatusSrPort *port);
 
 #endif

@@ -2,6 +2,29 @@
 
 #include <string.h>
 
+bool OpenV2g_EndpointIsValid(const OpenV2g_Endpoint *endpoint)
+{
+    size_t index;
+    bool address_is_nonzero = false;
+
+    if ((endpoint == NULL) || (endpoint->port == 0u) ||
+        (endpoint->transport != OPENV2G_TRANSPORT_TCP)) {
+        return false;
+    }
+    switch (endpoint->security) {
+    case OPENV2G_SECURITY_NONE:
+    case OPENV2G_SECURITY_TLS12:
+    case OPENV2G_SECURITY_TLS13:
+        break;
+    default:
+        return false;
+    }
+    for (index = 0u; index < sizeof(endpoint->address); index++) {
+        address_is_nonzero = address_is_nonzero || (endpoint->address[index] != 0u);
+    }
+    return address_is_nonzero;
+}
+
 bool OpenV2g_EnvelopeIsCurrent(
     const OpenV2g_CommEnvelope *env,
     uint32_t expected_generation,

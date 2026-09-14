@@ -42,12 +42,20 @@ int main(void)
     OpenV2g_ChargingCoordinator coordinator;
     OpenV2g_QualifiedCpPp cp_pp;
     OpenV2g_EvEnergySnapshot energy;
+    OpenV2g_PlcLinkStatus plc_status;
+    OpenV2g_HlcSessionStatus hlc_status;
+    OpenV2g_ChargeHardwareStatus hardware_status;
     uint32_t generation;
     size_t before_stop;
+    OpenV2g_Endpoint endpoint;
+    OpenV2g_SapTxRequest sap_request;
+    OpenV2g_SapResponse sap_response;
+    OpenV2g_ProtocolMessage protocol_message;
 
     OpenV2g_TestRig_Init(&rig);
     ports = OpenV2g_TestRig_Ports(&rig);
     config = OpenV2g_TestRig_Config();
+    endpoint = OpenV2g_TestEndpoint(OPENV2G_SECURITY_NONE);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_Init(&coordinator, &config, &ports) ==
                 OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_GetPermission(&coordinator)->decision ==
@@ -55,6 +63,9 @@ int main(void)
 
     rig.now = 100u;
     cp_pp = qualified_connect(rig.now);
+    TEST_ASSERT(OpenV2g_CpPpManager_PublishQualified(&rig.cp_pp, &cp_pp) ==
+                OPENV2G_RESULT_OK);
+    TEST_ASSERT(OpenV2g_TestRig_ReadCpPp(&rig, &cp_pp) == OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_OnQualifiedCpPp(
                     &coordinator,
                     &cp_pp,
@@ -65,20 +76,25 @@ int main(void)
     TEST_ASSERT(rig.operations[0] == TEST_OP_LINK_START);
 
     rig.now = 110u;
-    TEST_ASSERT(OpenV2g_PlcLinkManager_OnModemReady(&rig.plc, generation, rig.now) ==
+    TEST_ASSERT(rig.plc_control_port.modem_ready(
+                    rig.plc_control_port.context, generation, rig.now) ==
                 OPENV2G_RESULT_OK);
     rig.now = 120u;
-    TEST_ASSERT(OpenV2g_PlcLinkManager_OnSlacMatched(&rig.plc, generation, rig.now) ==
+    TEST_ASSERT(rig.plc_control_port.slac_matched(
+                    rig.plc_control_port.context, generation, rig.now) ==
                 OPENV2G_RESULT_OK);
     rig.now = 130u;
-    TEST_ASSERT(OpenV2g_PlcLinkManager_OnAssociated(&rig.plc, generation, rig.now) ==
+    TEST_ASSERT(rig.plc_control_port.associated(
+                    rig.plc_control_port.context, generation, rig.now) ==
                 OPENV2G_RESULT_OK);
     rig.now = 140u;
-    TEST_ASSERT(OpenV2g_PlcLinkManager_OnIpv6Ready(&rig.plc, generation, rig.now) ==
+    TEST_ASSERT(rig.plc_control_port.ipv6_ready(
+                    rig.plc_control_port.context, generation, rig.now) ==
                 OPENV2G_RESULT_OK);
+    TEST_ASSERT(OpenV2g_TestRig_ReadPlc(&rig, &plc_status) == OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_OnLinkStatus(
                     &coordinator,
-                    &rig.plc.status) == OPENV2G_RESULT_ACCEPTED);
+                    &plc_status) == OPENV2G_RESULT_ACCEPTED);
     TEST_ASSERT(coordinator.state_machine.state == OPENV2G_COORDINATOR_HLC_NEGOTIATION);
     TEST_ASSERT(rig.operations[1] == TEST_OP_HLC_START);
 
@@ -87,35 +103,54 @@ int main(void)
                     &rig.hlc,
                     generation,
                     rig.now,
-                    true) == OPENV2G_RESULT_ACCEPTED);
+                    &endpoint) == OPENV2G_RESULT_ACCEPTED);
     rig.now = 160u;
     TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTransportReady(
                     &rig.hlc,
                     generation,
                     rig.now) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(OpenV2g_Iso15118Chrg_TakeSapRequest(
+                    &rig.hlc, generation, &sap_request) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(sap_request.offer_count == 2u);
     rig.now = 170u;
-    TEST_ASSERT(OpenV2g_Iso15118Chrg_OnProtocolSelected(
-                    &rig.hlc,
-                    generation,
-                    rig.now,
-                    OPENV2G_PROTOCOL_ISO_15118_2,
-                    OPENV2G_SCHEMA_ISO_15118_2) == OPENV2G_RESULT_OK);
+    (void)memset(&sap_response, 0, sizeof(sap_response));
+    sap_response.generation = generation;
+    sap_response.request_id = sap_request.request_id;
+    sap_response.response_code = OPENV2G_SAP_RESPONSE_ACCEPTED;
+    sap_response.selected_schema = OPENV2G_SCHEMA_ISO_15118_2;
+    TEST_ASSERT(OpenV2g_Iso15118Chrg_OnSapResponse(
+                    &rig.hlc, rig.now, &sap_response) == OPENV2G_RESULT_OK);
+    (void)memset(&protocol_message, 0, sizeof(protocol_message));
+    protocol_message.generation = generation;
+    protocol_message.correlation_id = 1u;
+    protocol_message.kind = OPENV2G_PROTOCOL_MESSAGE_SESSION_SETUP;
+    protocol_message.accepted = true;
+    TEST_ASSERT(OpenV2g_Iso15118Chrg_OnProtocolMessage(
+                    &rig.hlc, 170u, &protocol_message) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(OpenV2g_TestRig_ReadHlc(&rig, &hlc_status) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(hlc_status.protocol_step ==
+                (uint16_t)OPENV2G_PROTOCOL_STATE_SERVICE_DISCOVERY);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_OnHlcStatus(
                     &coordinator,
-                    &rig.hlc.status) == OPENV2G_RESULT_OK);
+                    &hlc_status) == OPENV2G_RESULT_OK);
 
     energy = energy_snapshot(generation, 171u);
+    TEST_ASSERT(OpenV2g_EnergyDataProvider_Publish(&rig.energy, &energy) ==
+                OPENV2G_RESULT_OK);
+    TEST_ASSERT(OpenV2g_TestRig_ReadEnergy(&rig, &energy) == OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_OnEnergySnapshot(
                     &coordinator,
                     &energy) == OPENV2G_RESULT_OK);
-    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_RequestSafeState(
-                    &rig.hardware,
+    TEST_ASSERT(rig.hardware_control_port.request_safe_state(
+                    rig.hardware_control_port.context,
                     generation,
                     172u,
                     OPENV2G_REASON_NONE) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(OpenV2g_TestRig_ReadHardware(&rig, &hardware_status) ==
+                OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_OnHardwareStatus(
                     &coordinator,
-                    &rig.hardware.status) == OPENV2G_RESULT_OK);
+                    &hardware_status) == OPENV2G_RESULT_OK);
 
     rig.now = 180u;
     TEST_ASSERT(OpenV2g_ChargingCoordinator_EvaluatePermission(
@@ -123,9 +158,11 @@ int main(void)
                     rig.now) == OPENV2G_RESULT_ACCEPTED);
     TEST_ASSERT(rig.operations[2] == TEST_OP_HW_PREPARE);
     TEST_ASSERT(coordinator.state_machine.state == OPENV2G_COORDINATOR_HLC_NEGOTIATION);
+    TEST_ASSERT(OpenV2g_TestRig_ReadHardware(&rig, &hardware_status) ==
+                OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_OnHardwareStatus(
                     &coordinator,
-                    &rig.hardware.status) == OPENV2G_RESULT_OK);
+                    &hardware_status) == OPENV2G_RESULT_OK);
 
     rig.now = 190u;
     TEST_ASSERT(OpenV2g_ChargingCoordinator_EvaluatePermission(
@@ -140,7 +177,9 @@ int main(void)
                     &coordinator,
                     rig.now) == OPENV2G_RESULT_ACCEPTED);
     TEST_ASSERT(coordinator.state_machine.state == OPENV2G_COORDINATOR_ENERGY_TRANSFER);
-    TEST_ASSERT(rig.hardware.status.state == OPENV2G_HW_ENERGIZED);
+    TEST_ASSERT(OpenV2g_TestRig_ReadHardware(&rig, &hardware_status) ==
+                OPENV2G_RESULT_OK);
+    TEST_ASSERT(hardware_status.state == OPENV2G_HW_ENERGIZED);
 
     before_stop = rig.operation_count;
     rig.now = 250u;

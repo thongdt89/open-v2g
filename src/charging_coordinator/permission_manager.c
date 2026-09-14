@@ -13,7 +13,8 @@ static bool evidence_is_complete(
     if ((config == NULL) || (evidence == NULL) ||
         (evidence->cp_pp == NULL) || (evidence->energy == NULL) ||
         (evidence->link == NULL) || (evidence->hlc == NULL) ||
-        (evidence->hardware == NULL)) {
+        (evidence->hardware == NULL) || (evidence->blocking_fault == NULL) ||
+        (evidence->bpt == NULL)) {
         return false;
     }
 
@@ -22,6 +23,36 @@ static bool evidence_is_complete(
         !OpenV2g_EnvelopeIsCurrent(&evidence->link->env, evidence->generation, now, config->link_max_age_us) ||
         !OpenV2g_EnvelopeIsCurrent(&evidence->hlc->env, evidence->generation, now, config->hlc_max_age_us) ||
         !OpenV2g_EnvelopeIsCurrent(&evidence->hardware->env, evidence->generation, now, config->hardware_max_age_us)) {
+        return false;
+    }
+
+    if ((evidence->blocking_fault->env.session_generation != evidence->generation) ||
+        (evidence->blocking_fault->env.quality != OPENV2G_QUALITY_VALID) ||
+        (evidence->blocking_fault->env.timestamp == 0u) ||
+        (evidence->blocking_fault->env.timestamp > now) ||
+        (evidence->bpt->env.session_generation != evidence->generation) ||
+        (evidence->bpt->env.quality != OPENV2G_QUALITY_VALID) ||
+        (evidence->bpt->env.timestamp == 0u) ||
+        (evidence->bpt->env.timestamp > now)) {
+        return false;
+    }
+
+    if (evidence->blocking_fault->latched ||
+        (evidence->blocking_fault->severity >= OPENV2G_FAULT_CONTROLLED_STOP)) {
+        return false;
+    }
+
+    if (evidence->bpt->enabled &&
+        !OpenV2g_EnvelopeIsCurrent(
+            &evidence->bpt->env,
+            evidence->generation,
+            now,
+            config->hardware_max_age_us)) {
+        return false;
+    }
+
+    /* BPT remains deliberately fail-disabled in the active G1 feature scope. */
+    if (evidence->bpt->enabled) {
         return false;
     }
 
@@ -141,4 +172,30 @@ void OpenV2g_PermissionManager_Revoke(
         OpenV2g_PermissionSetDeny(&manager->current, generation, now, reason);
         manager->current.env.sequence_counter = publication_sequence;
     }
+}
+
+static OpenV2g_Result sr_read_permission(
+    void *context,
+    OpenV2g_ChargePermission *permission)
+{
+    const OpenV2g_PermissionManager *manager =
+        (const OpenV2g_PermissionManager *)context;
+
+    if ((manager == NULL) || (permission == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    *permission = manager->current;
+    return OPENV2G_RESULT_OK;
+}
+
+OpenV2g_Result OpenV2g_PermissionManager_CreatePermissionSenderReceiverPort(
+    OpenV2g_PermissionManager *manager,
+    OpenV2g_ChargePermissionSrPort *port)
+{
+    if ((manager == NULL) || (port == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    port->context = manager;
+    port->read = sr_read_permission;
+    return OPENV2G_RESULT_OK;
 }

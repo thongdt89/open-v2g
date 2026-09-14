@@ -86,3 +86,29 @@ bool OpenV2g_ChargeStateMachine_Dispatch(
 
     return false;
 }
+
+static OpenV2g_Result sr_read_state(
+    void *context,
+    OpenV2g_CoordinatorState *state)
+{
+    const OpenV2g_ChargeStateMachine *machine =
+        (const OpenV2g_ChargeStateMachine *)context;
+
+    if ((machine == NULL) || (state == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    *state = machine->state;
+    return OPENV2G_RESULT_OK;
+}
+
+OpenV2g_Result OpenV2g_ChargeStateMachine_CreateStateSenderReceiverPort(
+    OpenV2g_ChargeStateMachine *machine,
+    OpenV2g_ChargeStateSrPort *port)
+{
+    if ((machine == NULL) || (port == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    port->context = machine;
+    port->read = sr_read_state;
+    return OPENV2G_RESULT_OK;
+}

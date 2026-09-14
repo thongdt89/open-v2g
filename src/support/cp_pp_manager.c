@@ -25,3 +25,30 @@ OpenV2g_Result OpenV2g_CpPpManager_PublishQualified(
     manager->has_value = true;
     return OPENV2G_RESULT_OK;
 }
+
+static OpenV2g_Result sr_read(void *context, OpenV2g_QualifiedCpPp *value)
+{
+    const OpenV2g_CpPpManager *manager =
+        (const OpenV2g_CpPpManager *)context;
+
+    if ((manager == NULL) || (value == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    if (!manager->has_value) {
+        return OPENV2G_RESULT_NOT_IMPLEMENTED;
+    }
+    *value = manager->qualified;
+    return OPENV2G_RESULT_OK;
+}
+
+OpenV2g_Result OpenV2g_CpPpManager_CreateStatusSenderReceiverPort(
+    OpenV2g_CpPpManager *manager,
+    OpenV2g_CpPpStatusSrPort *port)
+{
+    if ((manager == NULL) || (port == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    port->context = manager;
+    port->read = sr_read;
+    return OPENV2G_RESULT_OK;
+}

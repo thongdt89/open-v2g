@@ -21,12 +21,46 @@ typedef struct {
     uint32_t generation;
     uint32_t request_id;
     uint8_t retry_count;
+    OpenV2g_Endpoint endpoint;
 } OpenV2g_SdpClient;
+
+typedef struct {
+    OpenV2g_SdpState state;
+    uint32_t generation;
+    uint32_t request_id;
+    uint8_t retry_count;
+    OpenV2g_Endpoint endpoint;
+} OpenV2g_SdpStatus;
+
+typedef struct {
+    void *context;
+    OpenV2g_Result (*start)(void *context, uint32_t generation);
+    OpenV2g_Result (*request_sent)(void *context, uint32_t generation);
+    OpenV2g_Result (*response)(
+        void *context,
+        uint32_t generation,
+        const OpenV2g_Endpoint *endpoint);
+    OpenV2g_Result (*cancel)(void *context, uint32_t generation);
+} OpenV2g_SdpClientCsPort;
+
+typedef struct {
+    void *context;
+    OpenV2g_Result (*read)(void *context, OpenV2g_SdpStatus *status);
+} OpenV2g_SdpStatusSrPort;
 
 void OpenV2g_SdpClient_Init(OpenV2g_SdpClient *client);
 OpenV2g_Result OpenV2g_SdpClient_Start(OpenV2g_SdpClient *client, uint32_t generation);
 OpenV2g_Result OpenV2g_SdpClient_OnRequestSent(OpenV2g_SdpClient *client, uint32_t generation);
-OpenV2g_Result OpenV2g_SdpClient_OnResponse(OpenV2g_SdpClient *client, uint32_t generation, bool endpoint_valid);
+OpenV2g_Result OpenV2g_SdpClient_OnResponse(
+    OpenV2g_SdpClient *client,
+    uint32_t generation,
+    const OpenV2g_Endpoint *endpoint);
 OpenV2g_Result OpenV2g_SdpClient_Cancel(OpenV2g_SdpClient *client, uint32_t generation);
+OpenV2g_Result OpenV2g_SdpClient_CreateClientServerPort(
+    OpenV2g_SdpClient *client,
+    OpenV2g_SdpClientCsPort *port);
+OpenV2g_Result OpenV2g_SdpClient_CreateStatusSenderReceiverPort(
+    OpenV2g_SdpClient *client,
+    OpenV2g_SdpStatusSrPort *port);
 
 #endif
