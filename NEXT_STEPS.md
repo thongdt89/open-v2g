@@ -17,6 +17,7 @@ Phần có thể hoàn thành độc lập với target/supplier trong baseline 
 - typed `SapNegotiator` với ordered offer snapshot, generation/request correlation, DIN-over-TLS filtering, timeout/cancel và fail-closed unoffered selection;
 - static one-active `ProtocolAdapterFactory` cùng DIN 70121 và ISO 15118-2 EIM request-generating semantic host FSMs; exact pending correlation, energy/permission S/R gates, current-demand/metering loops và retained diagnostics đã có test; generated EXI/wire mapping và normative timers vẫn ở G2;
 - shared `ProtocolDataFlow` rules đã map các flow session/service/auth, charge-parameter, DC safety/precharge, power start/loop/stop, metering và post-charge vào request C/S, context S/R và HLC queued event; target/permission limit intersection và required availability bits fail-closed;
+- DIN/ISO-2 DC permission-expiry matrix đã cover precharge, power start, first current-demand và ongoing-loop renewal; mỗi request phụ thuộc permission đều đọc lại S/R sample hiện tại;
 - cùng C/S/S/R pattern cho coordinator, permission/fault/BPT/state, CP/PP, energy, PLC, hardware, HLC facade, SDP, TCP/TLS và V2GTP; nominal host flow đã đọc snapshot qua ports;
 - stale-generation, cancel/late callback, overflow, expiry, reversal và teardown tests;
 - ma trận bao phủ 218 atomic interface rows tại `docs/architecture/INTERFACE_IMPLEMENTATION_TRACEABILITY.md`.

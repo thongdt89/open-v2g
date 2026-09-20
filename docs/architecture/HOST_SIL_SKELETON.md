@@ -1,6 +1,6 @@
 # G1 host/SIL skeleton architecture
 
-**Revision:** Draft 0.11 — 20/09/2026
+**Revision:** Draft 0.12 — 20/09/2026
 
 **Status:** `PROPOSED_IMPLEMENTATION` — host/SIL only, not AUTOSAR production evidence
 
@@ -119,7 +119,7 @@ flowchart LR
 | `openv2g_test_v2gtp_codec` | Bounded streaming decode, fragmented/coalesced frames, stale generation and malformed/oversized input |
 | `openv2g_test_exi_codec` | Explicit immutable schema registry, backend binding, bounded encode/decode, stale generation, reset and no-partial-delivery |
 | `openv2g_test_sap_negotiator` | Ordered/bounded offers, DIN-over-TLS filtering, request correlation, unoffered selection, cancel and timeout |
-| `openv2g_test_protocol_adapters` | One-active static factory; outbound DIN/ISO-2 DC EIM request sequences, exact pending correlation, current-demand/metering loops, context/permission gates, timer/peer failures and retained diagnostics |
+| `openv2g_test_protocol_adapters` | One-active static factory; outbound DIN/ISO-2 DC EIM request sequences, exact pending correlation, current-demand/metering loops, state-by-state permission-expiry gates, timer/peer failures and retained diagnostics |
 | `openv2g_test_protocol_data_flow` | DIN/ISO-2 mode/message applicability, required field masks, target/permission limit intersection, target-power projection, metering evidence and stop semantics |
 | `openv2g_test_asr_style_ports` | C/S and S/R port bindings across coordinator internals, CP/PP, energy, PLC, hardware, SDP, TCP/TLS, V2GTP and HLC façade |
 | `openv2g_test_public_headers` | Public C header self-containment and compile surface |
@@ -149,3 +149,4 @@ Passing host tests is `VERIFIED_HOST` evidence only. It is not target, safety, i
 | Draft 0.9 | 15/09/2026 | Added a shared protocol data-flow rule/validation layer, target voltage/current availability, dispatched-request event provenance, correlated metering evidence and main-flow documentation/tests. |
 | Draft 0.10 | 20/09/2026 | Added connection-ID correlation to TCP/TLS callbacks and HLC RX intake; covered cancel during handshake, same-generation reconnect and late callbacks from the closed connection. |
 | Draft 0.11 | 20/09/2026 | Added bounded transport TX descriptors, fixed-capacity outstanding-request tracking, lower send seam, request/result/deadline correlation, backpressure and cancel cleanup; real SoAd/TcpIp/PduR binding remains G2. |
+| Draft 0.12 | 20/09/2026 | Added DIN/ISO-2 DC expiry-matrix regression for precharge, power start, first energy loop and ongoing energy-loop renewal; each dependent request re-reads current permission and fails closed. |

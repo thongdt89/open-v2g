@@ -122,6 +122,92 @@ static OpenV2g_ProtocolMessage response_for(
     return response;
 }
 
+static int TestPermissionExpiryAtTransition(
+    OpenV2g_ProtocolId protocol,
+    OpenV2g_ProtocolMessageKind trigger_kind,
+    uint32_t generation,
+    bool ongoing)
+{
+    OpenV2g_Din70121Adapter din;
+    OpenV2g_Iso15118_2Adapter iso2;
+    OpenV2g_ProtocolAdapterCsPort port;
+    OpenV2g_ProtocolDiagnosticSrPort diagnostic_port;
+    OpenV2g_ProtocolDiagnostic diagnostic;
+    OpenV2g_ProtocolAdapterStatus *status;
+    OpenV2g_ProtocolStartRequest start;
+    OpenV2g_ProtocolMessage response;
+    OpenV2g_ProtocolMessageChannelCsPort message_port;
+    OpenV2g_EnergySnapshotSrPort energy_port;
+    OpenV2g_ChargePermissionSrPort permission_port;
+    TestProtocolContext test;
+    OpenV2g_TimeUs now = 700u;
+    unsigned int guard = 0u;
+
+    init_context(&test, generation, OPENV2G_MODE_DC);
+    make_ports(&test, &message_port, &energy_port, &permission_port);
+    if (protocol == OPENV2G_PROTOCOL_DIN_70121) {
+        OpenV2g_Din70121Adapter_Init(&din, true);
+        TEST_ASSERT(OpenV2g_Din70121Adapter_BindRequiredPorts(
+                        &din,
+                        &message_port,
+                        &energy_port,
+                        &permission_port) == OPENV2G_RESULT_OK);
+        TEST_ASSERT(OpenV2g_Din70121Adapter_CreateClientServerPort(
+                        &din, &port) == OPENV2G_RESULT_OK);
+        TEST_ASSERT(OpenV2g_Din70121Adapter_CreateDiagnosticSenderReceiverPort(
+                        &din, &diagnostic_port) == OPENV2G_RESULT_OK);
+        status = &din.status;
+    } else {
+        OpenV2g_Iso15118_2Adapter_Init(&iso2, true, false, false);
+        TEST_ASSERT(OpenV2g_Iso15118_2Adapter_BindRequiredPorts(
+                        &iso2,
+                        &message_port,
+                        &energy_port,
+                        &permission_port) == OPENV2G_RESULT_OK);
+        TEST_ASSERT(OpenV2g_Iso15118_2Adapter_CreateClientServerPort(
+                        &iso2, &port) == OPENV2G_RESULT_OK);
+        TEST_ASSERT(
+            OpenV2g_Iso15118_2Adapter_CreateDiagnosticSenderReceiverPort(
+                &iso2, &diagnostic_port) == OPENV2G_RESULT_OK);
+        status = &iso2.status;
+    }
+
+    (void)memset(&start, 0, sizeof(start));
+    start.generation = generation;
+    start.protocol = protocol;
+    start.schema = (protocol == OPENV2G_PROTOCOL_DIN_70121)
+                       ? OPENV2G_SCHEMA_DIN_70121
+                       : OPENV2G_SCHEMA_ISO_15118_2;
+    start.mode = OPENV2G_MODE_DC;
+    start.security = (protocol == OPENV2G_PROTOCOL_DIN_70121)
+                         ? OPENV2G_SECURITY_NONE
+                         : OPENV2G_SECURITY_TLS12;
+    start.now = now;
+    TEST_ASSERT(port.start(port.context, &start) == OPENV2G_RESULT_ACCEPTED);
+
+    while (test.tx.kind != trigger_kind) {
+        now++;
+        response = response_for(&test, generation, now);
+        TEST_ASSERT(result_is_success(
+            port.on_message(port.context, &response)));
+        guard++;
+        TEST_ASSERT(guard < 16u);
+    }
+
+    test.permission.valid_until = now;
+    now++;
+    response = response_for(&test, generation, now);
+    response.ongoing = ongoing;
+    TEST_ASSERT(port.on_message(port.context, &response) ==
+                OPENV2G_RESULT_REJECTED);
+    TEST_ASSERT(status->state == OPENV2G_PROTOCOL_STATE_FAILED);
+    TEST_ASSERT(diagnostic_port.read(
+                    diagnostic_port.context, &diagnostic) ==
+                OPENV2G_RESULT_OK);
+    TEST_ASSERT(diagnostic.reason == OPENV2G_REASON_PERMISSION_EXPIRED);
+    return 0;
+}
+
 static int TestDinRequestResponseSequence(void)
 {
     OpenV2g_Din70121Adapter din;
@@ -411,5 +497,45 @@ int main(void)
 {
     TEST_ASSERT(TestDinRequestResponseSequence() == 0);
     TEST_ASSERT(TestIso2DcMeteringPermissionAndFactory() == 0);
+    TEST_ASSERT(TestPermissionExpiryAtTransition(
+                    OPENV2G_PROTOCOL_DIN_70121,
+                    OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK,
+                    31u,
+                    false) == 0);
+    TEST_ASSERT(TestPermissionExpiryAtTransition(
+                    OPENV2G_PROTOCOL_DIN_70121,
+                    OPENV2G_PROTOCOL_MESSAGE_PRECHARGE,
+                    32u,
+                    false) == 0);
+    TEST_ASSERT(TestPermissionExpiryAtTransition(
+                    OPENV2G_PROTOCOL_DIN_70121,
+                    OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START,
+                    33u,
+                    false) == 0);
+    TEST_ASSERT(TestPermissionExpiryAtTransition(
+                    OPENV2G_PROTOCOL_DIN_70121,
+                    OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND,
+                    34u,
+                    true) == 0);
+    TEST_ASSERT(TestPermissionExpiryAtTransition(
+                    OPENV2G_PROTOCOL_ISO_15118_2,
+                    OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK,
+                    35u,
+                    false) == 0);
+    TEST_ASSERT(TestPermissionExpiryAtTransition(
+                    OPENV2G_PROTOCOL_ISO_15118_2,
+                    OPENV2G_PROTOCOL_MESSAGE_PRECHARGE,
+                    36u,
+                    false) == 0);
+    TEST_ASSERT(TestPermissionExpiryAtTransition(
+                    OPENV2G_PROTOCOL_ISO_15118_2,
+                    OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START,
+                    37u,
+                    false) == 0);
+    TEST_ASSERT(TestPermissionExpiryAtTransition(
+                    OPENV2G_PROTOCOL_ISO_15118_2,
+                    OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND,
+                    38u,
+                    true) == 0);
     return 0;
 }
