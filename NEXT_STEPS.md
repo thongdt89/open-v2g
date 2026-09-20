@@ -19,6 +19,7 @@ Phần có thể hoàn thành độc lập với target/supplier trong baseline 
 - shared `ProtocolDataFlow` rules đã map các flow session/service/auth, charge-parameter, DC safety/precharge, power start/loop/stop, metering và post-charge vào request C/S, context S/R và HLC queued event; target/permission limit intersection và required availability bits fail-closed;
 - DIN/ISO-2 DC permission-expiry matrix đã cover precharge, power start, first current-demand và ongoing-loop renewal; mỗi request phụ thuộc permission đều đọc lại S/R sample hiện tại;
 - cùng C/S/S/R pattern cho coordinator, permission/fault/BPT/state, CP/PP, energy, PLC, hardware, HLC facade, SDP, TCP/TLS và V2GTP; nominal host flow đã đọc snapshot qua ports;
+- hardware host model đã tách command acceptance khỏi measured feedback, correlate command ID/result, loại stale feedback và fail `HW_MISMATCH` khi lock/contactor feedback không khớp; exact electrical criteria/deadline vẫn cần HARA/target;
 - stale-generation, cancel/late callback, overflow, expiry, reversal và teardown tests;
 - ma trận bao phủ 218 atomic interface rows tại `docs/architecture/INTERFACE_IMPLEMENTATION_TRACEABILITY.md`.
 

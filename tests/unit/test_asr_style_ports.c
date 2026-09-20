@@ -144,6 +144,7 @@ static int TestPlcAndHardwarePorts(void)
     OpenV2g_ChargeHardwareAdapter hardware;
     OpenV2g_ChargeHardwareControlCsPort hardware_control;
     OpenV2g_ChargeHardwareStatusSrPort hardware_status_port;
+    OpenV2g_HardwareCommandResultSrPort hardware_result_port;
     OpenV2g_ChargeHardwareStatus hardware_status;
     OpenV2g_ChargePermission permission;
 
@@ -173,6 +174,9 @@ static int TestPlcAndHardwarePorts(void)
                     &hardware, &hardware_control) == OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_CreateStatusSenderReceiverPort(
                     &hardware, &hardware_status_port) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_CreateResultSenderReceiverPort(
+                    &hardware, &hardware_result_port) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(hardware_result_port.read != NULL);
     TEST_ASSERT(hardware_control.prepare(
                     hardware_control.context,
                     4u,

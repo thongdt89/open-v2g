@@ -1,6 +1,6 @@
 # G1 host/SIL skeleton architecture
 
-**Revision:** Draft 0.12 — 20/09/2026
+**Revision:** Draft 0.13 — 20/09/2026
 
 **Status:** `PROPOSED_IMPLEMENTATION` — host/SIL only, not AUTOSAR production evidence
 
@@ -115,7 +115,7 @@ flowchart LR
 | `openv2g_test_sdp_client` | SDP cancel race, late response rejection and immutable endpoint validation |
 | `openv2g_test_tcp_tls_session` | Typed endpoint/connection lifecycle, cancel during handshake, same-generation reconnect, stale connection callbacks, bounded TX queue/backpressure, request/result/deadline correlation, idempotent close and TLS no-downgrade behavior |
 | `openv2g_test_hlc_tls` | HLC waits for TLS result; failure stays error and success alone starts message stack |
-| `openv2g_test_hardware_gate` | No enable with DENY or expired permission |
+| `openv2g_test_hardware_gate` | No enable with DENY/expired permission; command/feedback correlation, stale feedback rejection, measured contactor mismatch fault and safe-state recovery |
 | `openv2g_test_v2gtp_codec` | Bounded streaming decode, fragmented/coalesced frames, stale generation and malformed/oversized input |
 | `openv2g_test_exi_codec` | Explicit immutable schema registry, backend binding, bounded encode/decode, stale generation, reset and no-partial-delivery |
 | `openv2g_test_sap_negotiator` | Ordered/bounded offers, DIN-over-TLS filtering, request correlation, unoffered selection, cancel and timeout |
@@ -150,3 +150,4 @@ Passing host tests is `VERIFIED_HOST` evidence only. It is not target, safety, i
 | Draft 0.10 | 20/09/2026 | Added connection-ID correlation to TCP/TLS callbacks and HLC RX intake; covered cancel during handshake, same-generation reconnect and late callbacks from the closed connection. |
 | Draft 0.11 | 20/09/2026 | Added bounded transport TX descriptors, fixed-capacity outstanding-request tracking, lower send seam, request/result/deadline correlation, backpressure and cancel cleanup; real SoAd/TcpIp/PduR binding remains G2. |
 | Draft 0.12 | 20/09/2026 | Added DIN/ISO-2 DC expiry-matrix regression for precharge, power start, first energy loop and ongoing energy-loop renewal; each dependent request re-reads current permission and fails closed. |
+| Draft 0.13 | 20/09/2026 | Added provisional hardware command IDs/results and independently applied measured feedback; correlated lock/contactor mismatch enters hardware fault and clears accepted permission, while stale command feedback cannot affect the active command. |

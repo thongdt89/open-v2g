@@ -16,7 +16,8 @@ correlation, TLS no-downgrade, bounded HLC
 event overflow/status resynchronization, V2GTP fragmentation/coalescing/overflow,
 EXI/schema adapter bounds and no-partial-delivery, state-by-state DIN/ISO-2 DC
 permission expiry and BPT
-reversal guards, correlated SAP selection, DIN-over-TLS filtering, one-active
+reversal guards, hardware command/feedback correlation and measured contactor
+mismatch, correlated SAP selection, DIN-over-TLS filtering, one-active
 adapter ownership, outbound DIN/ISO-2 DC semantic sequences, exact pending
 correlation, energy/permission gates, current-demand/metering loops and retained
 protocol diagnostics. The EXI test backend is deterministic test code, not a protocol
@@ -35,5 +36,4 @@ Remaining extensions requiring more implementation or G2/G3 inputs:
 - generated SoAd/TcpIp/PduR adapter mapping for the host-tested bounded transport TX/RX seams;
 - malformed EXI and unoffered schema using licensed/generated backends and golden vectors;
 - edition-specific DIN/ISO-2 response-code, timer and generated-message mapping;
-- hardware command/result mismatch;
 - BPT capability/limit integration while the feature remains disabled.

@@ -1,6 +1,6 @@
 # Quy ước interface kiểu AUTOSAR trước giai đoạn ARXML
 
-**Revision:** Draft 0.5 — 20/09/2026
+**Revision:** Draft 0.6 — 20/09/2026
 **Status:** `PROVISIONAL_ASR_STYLE` — dùng cho host/SIL và implementation-first; không phải generated RTE contract
 
 ## 1. Mục tiêu
@@ -63,7 +63,7 @@ Một port instance đại diện P-port ở server và được copy/bind thàn
 | `CpPpManager` | qualification/publish là local producer operation | qualified CP/PP |
 | `EnergyDataProvider` | validate/publish là local producer operation | energy snapshot |
 | `PlcLinkManager` | start, stop và modem/SLAC/association/IPv6 callbacks | PLC link status |
-| `ChargeHardwareAdapter` | prepare, enable, request safe state | measured hardware status |
+| `ChargeHardwareAdapter` | prepare, enable, request safe state; apply correlated measured feedback | authoritative measured hardware status; retained command result |
 
 ### 5.2 ISO15118Chrg transport/facade
 

@@ -6,7 +6,12 @@
 int main(void)
 {
     OpenV2g_ChargeHardwareAdapter adapter;
+    OpenV2g_ChargeHardwareAdapter mismatch_adapter;
     OpenV2g_ChargePermission permission;
+    OpenV2g_ChargeHardwareFeedback feedback;
+    OpenV2g_HardwareCommandResult command_result;
+    OpenV2g_HardwareCommandResultSrPort result_port;
+    uint32_t command_id;
 
     OpenV2g_ChargeHardwareAdapter_InitHostFake(&adapter);
     TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_RequestSafeState(
@@ -44,5 +49,91 @@ int main(void)
                 OPENV2G_RESULT_ACCEPTED);
     TEST_ASSERT(adapter.status.state == OPENV2G_HW_ENERGIZED);
     TEST_ASSERT(adapter.accepted_permission_id == permission.permission_id);
+
+    OpenV2g_ChargeHardwareAdapter_InitHostFake(&mismatch_adapter);
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_SetAutoFeedback(
+                    &mismatch_adapter, false) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_CreateResultSenderReceiverPort(
+                    &mismatch_adapter, &result_port) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(result_port.read(result_port.context, &command_result) ==
+                OPENV2G_RESULT_NOT_IMPLEMENTED);
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_Prepare(
+                    &mismatch_adapter,
+                    4u,
+                    300u,
+                    OPENV2G_MODE_DC) == OPENV2G_RESULT_ACCEPTED);
+    TEST_ASSERT(mismatch_adapter.status.state == OPENV2G_HW_PREPARING);
+    command_id = mismatch_adapter.pending_command_id;
+    TEST_ASSERT(command_id != 0u);
+
+    (void)memset(&feedback, 0, sizeof(feedback));
+    feedback.generation = 4u;
+    feedback.command_id = command_id + 1u;
+    feedback.timestamp = 301u;
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_ApplyMeasuredFeedback(
+                    &mismatch_adapter, &feedback) == OPENV2G_RESULT_REJECTED);
+    TEST_ASSERT(mismatch_adapter.status.state == OPENV2G_HW_PREPARING);
+
+    feedback.command_id = command_id;
+    feedback.timestamp = 302u;
+    feedback.connector_locked = false;
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_ApplyMeasuredFeedback(
+                    &mismatch_adapter, &feedback) == OPENV2G_RESULT_REJECTED);
+    TEST_ASSERT(mismatch_adapter.status.state == OPENV2G_HW_FAULT);
+    TEST_ASSERT(mismatch_adapter.status.env.reason ==
+                OPENV2G_REASON_HW_MISMATCH);
+    TEST_ASSERT(result_port.read(result_port.context, &command_result) ==
+                OPENV2G_RESULT_OK);
+    TEST_ASSERT(command_result.command_id == command_id);
+    TEST_ASSERT(command_result.result == OPENV2G_HW_COMMAND_FAILED);
+    TEST_ASSERT(command_result.measured_state == OPENV2G_HW_FAULT);
+
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_RequestSafeState(
+                    &mismatch_adapter,
+                    4u,
+                    310u,
+                    OPENV2G_REASON_HW_MISMATCH) == OPENV2G_RESULT_OK);
+    command_id = mismatch_adapter.pending_command_id;
+    (void)memset(&feedback, 0, sizeof(feedback));
+    feedback.generation = 4u;
+    feedback.command_id = command_id;
+    feedback.timestamp = 311u;
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_ApplyMeasuredFeedback(
+                    &mismatch_adapter, &feedback) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(mismatch_adapter.status.state == OPENV2G_HW_SAFE);
+
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_Prepare(
+                    &mismatch_adapter,
+                    4u,
+                    320u,
+                    OPENV2G_MODE_DC) == OPENV2G_RESULT_ACCEPTED);
+    command_id = mismatch_adapter.pending_command_id;
+    (void)memset(&feedback, 0, sizeof(feedback));
+    feedback.generation = 4u;
+    feedback.command_id = command_id;
+    feedback.timestamp = 321u;
+    feedback.connector_locked = true;
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_ApplyMeasuredFeedback(
+                    &mismatch_adapter, &feedback) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(mismatch_adapter.status.state == OPENV2G_HW_READY);
+
+    permission.env.session_generation = 4u;
+    permission.permission_id = 10u;
+    permission.valid_until = 400u;
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_Enable(
+                    &mismatch_adapter, &permission, 330u) ==
+                OPENV2G_RESULT_ACCEPTED);
+    command_id = mismatch_adapter.pending_command_id;
+    (void)memset(&feedback, 0, sizeof(feedback));
+    feedback.generation = 4u;
+    feedback.command_id = command_id;
+    feedback.timestamp = 331u;
+    feedback.connector_locked = true;
+    feedback.positive_contactor_closed = true;
+    feedback.negative_contactor_closed = false;
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_ApplyMeasuredFeedback(
+                    &mismatch_adapter, &feedback) == OPENV2G_RESULT_REJECTED);
+    TEST_ASSERT(mismatch_adapter.status.state == OPENV2G_HW_FAULT);
+    TEST_ASSERT(mismatch_adapter.accepted_permission_id == 0u);
     return 0;
 }

@@ -1,6 +1,6 @@
 # Ma trận truy vết interface tới host/SIL implementation
 
-**Revision:** Draft 0.10 — 20/09/2026
+**Revision:** Draft 0.11 — 20/09/2026
 **Status:** `VERIFIED_HOST_MAPPING` — không phải ARXML/RTE, target build hoặc bằng chứng conformance
 
 ## 1. Phạm vi kiểm kê
@@ -28,7 +28,7 @@ Ma trận dưới đây bao phủ toàn bộ các dải ID đó theo subcomponen
 
 | Atomic IDs | Subcomponent/boundary | Host mapping | Verification | Trạng thái và khoảng trống |
 |---|---|---|---|---|
-| `CC-EXT-001…018` | `ChargingCoordinator` external boundary | `charging_coordinator.h/.c`; typed link/HLC/hardware ports; provider/status/event inputs; permission output | `openv2g_test_nominal_flow`, `openv2g_test_hlc_event_bridge`, `openv2g_test_hardware_gate` | `PARTIAL_HOST`: 001–006, 008–016 có logical path; 007 command-result correlation, 017 renegotiate và 018 public coordinator status chưa hiện thực. HLC event overflow bắt buộc status resync và revoke permission. |
+| `CC-EXT-001…018` | `ChargingCoordinator` external boundary | `charging_coordinator.h/.c`; typed link/HLC/hardware ports; provider/status/event inputs; permission output | `openv2g_test_nominal_flow`, `openv2g_test_hlc_event_bridge`, `openv2g_test_hardware_gate` | `PARTIAL_HOST`: 001–006, 008–016 có logical path; 007 result seam/correlation exists at the hardware adapter but coordinator consumption remains, while 017 renegotiate and 018 public coordinator status are not implemented. HLC event overflow requires status resync and permission revoke. |
 | `CSM-IF-001…008` | `ChargeStateMachine` | deterministic owner state machine; coordinator dispatches local events; state exposed by S/R copy port | nominal flow, permission, BPT, ASR-style ports | `PARTIAL_HOST`: progression owner đã có; event queue riêng, đầy đủ BPT/fault local-operation payload chưa có. |
 | `PM-IF-001…006` | `PermissionManager` | fail-closed evaluation, freshness/generation, fault/BPT gates, permission ID/expiry/revoke; permission S/R port | `openv2g_test_permission`, nominal flow, ASR-style ports | `IMPLEMENTED_HOST` cho G1 DC EIM; limit intersection và timing là provisional, chưa phải safety baseline. |
 | `BPT-IF-001…008` | `BptCoordinator` | typed permission request and S/R port; generation, measured-zero và new-permission reversal guards | `openv2g_test_bpt_coordinator`, permission, ASR-style ports | `DISABLED_G1`: guard cốt lõi có test; capability, vehicle policy, negotiated service, power request, status/event đầy đủ bị giữ ngoài active scope. |
@@ -64,7 +64,7 @@ Ma trận dưới đây bao phủ toàn bộ các dải ID đó theo subcomponen
 | `CpPpManager` | qualified CP/PP S/R copy port into coordinator-facing flow | nominal flow, ASR-style ports | ADC/PWM/EthTrcv/vendor mapping and timing |
 | `EvEnergyDataProvider` | atomic energy snapshot S/R copy port into coordinator/permission | nominal flow, permission, ASR-style ports | real BMS/OBC/inverter data, E2E/freshness budget |
 | `PlcLinkManager` | C/S control/callback port and S/R status for modem-ready → SLAC → association → IPv6 | nominal flow, ASR-style ports | modem/raw MME/PEV capability and TcpIp/SoAd binding |
-| `ChargeHardwareAdapter` | C/S permission-gated control and S/R measured status | hardware gate, nominal flow, ASR-style ports | HARA, physical feedback, command IDs/results, target drivers |
+| `ChargeHardwareAdapter` | C/S permission-gated control; provisional command IDs/results; separately applied S/R-style measured status with stale-correlation rejection and contactor/lock mismatch fault | hardware gate, nominal flow, ASR-style ports | HARA-derived electrical criteria/deadlines, coordinator result consumption, real physical feedback and target drivers |
 | Platform services | clock/diagnostic/crypto function-port seams | header compile | OS/RTE/Dem/Csm/KeyM/NvM generated configuration |
 
 ## 6. Compatibility conclusion
