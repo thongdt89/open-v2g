@@ -1,6 +1,6 @@
 # G1 host/SIL skeleton architecture
 
-**Revision:** Draft 0.10 — 20/09/2026
+**Revision:** Draft 0.11 — 20/09/2026
 
 **Status:** `PROPOSED_IMPLEMENTATION` — host/SIL only, not AUTOSAR production evidence
 
@@ -113,7 +113,7 @@ flowchart LR
 | `openv2g_test_hlc_event_queue` | Bounded queue, drop-newest overflow flag/count, generation reset và stale event rejection |
 | `openv2g_test_hlc_event_bridge` | HLC event consumer wiring; overflow revokes permission và requires fresh authoritative status resync |
 | `openv2g_test_sdp_client` | SDP cancel race, late response rejection and immutable endpoint validation |
-| `openv2g_test_tcp_tls_session` | Typed endpoint/connection lifecycle, cancel during handshake, same-generation reconnect, stale connection callbacks, idempotent close and TLS no-downgrade behavior |
+| `openv2g_test_tcp_tls_session` | Typed endpoint/connection lifecycle, cancel during handshake, same-generation reconnect, stale connection callbacks, bounded TX queue/backpressure, request/result/deadline correlation, idempotent close and TLS no-downgrade behavior |
 | `openv2g_test_hlc_tls` | HLC waits for TLS result; failure stays error and success alone starts message stack |
 | `openv2g_test_hardware_gate` | No enable with DENY or expired permission |
 | `openv2g_test_v2gtp_codec` | Bounded streaming decode, fragmented/coalesced frames, stale generation and malformed/oversized input |
@@ -148,3 +148,4 @@ Passing host tests is `VERIFIED_HOST` evidence only. It is not target, safety, i
 | Draft 0.8 | 15/09/2026 | Added semantic EV request generation, exact request/response correlation, energy and permission S/R gates, HLC protocol-TX mailbox, retained diagnostics and complete DIN/ISO-2 DC EIM host sequences. |
 | Draft 0.9 | 15/09/2026 | Added a shared protocol data-flow rule/validation layer, target voltage/current availability, dispatched-request event provenance, correlated metering evidence and main-flow documentation/tests. |
 | Draft 0.10 | 20/09/2026 | Added connection-ID correlation to TCP/TLS callbacks and HLC RX intake; covered cancel during handshake, same-generation reconnect and late callbacks from the closed connection. |
+| Draft 0.11 | 20/09/2026 | Added bounded transport TX descriptors, fixed-capacity outstanding-request tracking, lower send seam, request/result/deadline correlation, backpressure and cancel cleanup; real SoAd/TcpIp/PduR binding remains G2. |

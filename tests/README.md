@@ -11,7 +11,8 @@ target compiler, generated RTE, timing, safety or protocol-conformance evidence.
 
 Covered high-risk host cases now include stale generations, idempotent stop,
 SDP cancel/late response, TCP/TLS cancel/reconnect with connection-correlated
-callbacks and RX, TLS no-downgrade, bounded HLC
+callbacks and RX, bounded TX queue/backpressure and request/result/deadline
+correlation, TLS no-downgrade, bounded HLC
 event overflow/status resynchronization, V2GTP fragmentation/coalescing/overflow,
 EXI/schema adapter bounds and no-partial-delivery, permission expiry and BPT
 reversal guards, correlated SAP selection, DIN-over-TLS filtering, one-active
@@ -30,7 +31,7 @@ HLC façade. Passing it proves host connection semantics only, not generated RTE
 
 Remaining extensions requiring more implementation or G2/G3 inputs:
 
-- bounded TCP send/TX-result/backpressure and SoAd/TcpIp/PduR adapter mapping for the tested V2GTP stream input;
+- generated SoAd/TcpIp/PduR adapter mapping for the host-tested bounded transport TX/RX seams;
 - malformed EXI and unoffered schema using licensed/generated backends and golden vectors;
 - edition-specific DIN/ISO-2 response-code, timer and generated-message mapping;
 - permission expiry is covered at the first dependent transition; a state-by-state expiry matrix remains;

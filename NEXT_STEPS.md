@@ -11,6 +11,7 @@ Phần có thể hoàn thành độc lập với target/supplier trong baseline 
 - bounded V2GTP stream codec và HLC event queue/status resync;
 - immutable SDP endpoint và typed TCP/TLS lifecycle, không implicit downgrade;
 - TCP/TLS generation + connection-ID correlation cho connect/TLS/RX, cancel khi handshake, reconnect cùng generation và loại late callback của connection cũ;
+- bounded transport TX queue metadata, lower send seam, request/result/deadline correlation, backpressure và cancel cleanup; binding SoAd/TcpIp/PduR thật vẫn ở G2;
 - typed EXI/schema registry boundary với schema-specific backend, bounded caller-owned workspace và no-partial decode publication;
 - provisional ASR-style C/S operation ports và S/R status/diagnostic ports cho EXI/schema, giữ khả năng thay binding bằng generated RTE sau này;
 - typed `SapNegotiator` với ordered offer snapshot, generation/request correlation, DIN-over-TLS filtering, timeout/cancel và fail-closed unoffered selection;

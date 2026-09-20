@@ -1,6 +1,6 @@
 # Quy ước interface kiểu AUTOSAR trước giai đoạn ARXML
 
-**Revision:** Draft 0.4 — 15/09/2026
+**Revision:** Draft 0.5 — 20/09/2026
 **Status:** `PROVISIONAL_ASR_STYLE` — dùng cho host/SIL và implementation-first; không phải generated RTE contract
 
 ## 1. Mục tiêu
@@ -71,7 +71,7 @@ Một port instance đại diện P-port ở server và được copy/bind thàn
 |---|---|---|
 | `ISO15118Chrg` façade | start, stop; take bounded semantic protocol request | HLC status; queued HLC events + overflow; protocol diagnostic |
 | `SdpClient` | start, request sent, response, cancel | SDP status/selected endpoint |
-| `TcpTlsSession` | connect, TCP connected, TLS result, close | transport/security status |
+| `TcpTlsSession` | connect, bounded send, correlated TX result, TCP connected, TLS result, close | transport/security status including bounded queue usage |
 | `V2gtpCodec` | begin, consume, get frame, reset, encode | frame is C/S result view with bounded lifetime |
 | `ExiCodec` | encode, decode, reset workspace | retained EXI diagnostic |
 | `SchemaRegistry` | get descriptor, get limits, compatibility check | authoritative registry status |
@@ -102,6 +102,8 @@ Một port instance đại diện P-port ở server và được copy/bind thàn
 DIN/ISO-2 adapter phát `OpenV2g_ProtocolTxRequest` qua required C/S channel. Mỗi request mang generation, exact correlation ID, protocol/schema/mode và bản copy energy/permission khi bước đó cần. Mapper lấy request bằng `OpenV2g_Iso15118Chrg_TakeProtocolRequest`, map sang generated schema object, encode/đóng V2GTP, rồi đưa decoded response về `OpenV2g_Iso15118Chrg_OnProtocolMessage`. Chỉ response khớp pending generation/correlation/message kind được chấp nhận. Các enum/payload này là semantic project contract, không phải wire message ID hay generated DIN/ISO datatype.
 
 `ProtocolDataFlow` định nghĩa một rule cho mỗi protocol/mode/message: flow case, energy fields relevant/required, permission/action, metering evidence và HLC event category. Adapter dùng rule này trước khi gọi required message channel; HLC giữ bản request đã dispatch và dùng chính bản đó để tạo `HlcEvent`, tránh tin action/power do peer hoặc mapper cung cấp.
+
+Transport TX ở host giữ fixed-capacity metadata của request đang chờ, không giữ payload pointer. Lower `TcpTx` seam phải copy hoặc consume payload trong operation call; ownership TP/IF thực tế chỉ được chốt khi có generated SoAd/TcpIp/PduR contract.
 
 ## 6. Mapping khi có AUTOSAR vendor
 

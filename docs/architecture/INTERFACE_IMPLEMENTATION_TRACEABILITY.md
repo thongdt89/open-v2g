@@ -1,6 +1,6 @@
 # Ma trận truy vết interface tới host/SIL implementation
 
-**Revision:** Draft 0.8 — 20/09/2026
+**Revision:** Draft 0.9 — 20/09/2026
 **Status:** `VERIFIED_HOST_MAPPING` — không phải ARXML/RTE, target build hoặc bằng chứng conformance
 
 ## 1. Phạm vi kiểm kê
@@ -44,7 +44,7 @@ Ma trận dưới đây bao phủ toàn bộ các dải ID đó theo subcomponen
 | `HSA-IF-001…011` | `HlcSessionAdapter` façade | C/S start/stop and bounded protocol-request take operations; S/R HLC status, queued event/overflow and retained protocol diagnostic; coordinator HLC required port | HLC generation, event queue/bridge, nominal flow, protocol adapters, ASR-style ports | `PARTIAL_HOST`: start/stop/status/event and protocol request/diagnostic paths exist; renegotiate, link facade mapping and complete service/power payloads remain. |
 | `HSS-IF-001…012` | `HlcSessionSupervisor` | single `ISO15118Chrg` owner sequences SDP → transport/TLS → V2GTP/schema/EXI/SAP → adapter and stop rollback | HLC generation, HLC TLS | `PARTIAL_HOST`: lifecycle/cancel/late-generation/rollback are present; renegotiate and real lower owners remain. |
 | `SDP-IF-001…010` | `SdpClient` | C/S lifecycle/callback port; S/R status/endpoint; bounded generation, request ID and idempotent cancel | `openv2g_test_sdp_client`, HLC generation, ASR-style ports | `PARTIAL_HOST`: discovery lifecycle is tested; UDP socket, LinkContext, timers/retries and diagnostic publication require G2/config input. |
-| `TTS-IF-001…012` | `TcpTlsSession` | C/S connect/callback/close port; S/R transport status; generation + connection-ID correlation, cancel/reconnect late-callback rejection and no implicit downgrade | `openv2g_test_tcp_tls_session`, `openv2g_test_hlc_tls`, HLC generation, ASR-style ports | `PARTIAL_HOST`: connect/close/status and correlated HLC RX intake exist; bounded send/TX result/backpressure and real socket/TLS adapter remain G2. |
+| `TTS-IF-001…012` | `TcpTlsSession` | C/S connect/send/TX-result/callback/close port; S/R transport status; fixed-capacity TX metadata queue; generation + connection/request-ID/deadline correlation, backpressure, cancel/reconnect late-callback rejection and no implicit downgrade | `openv2g_test_tcp_tls_session`, `openv2g_test_hlc_tls`, HLC generation, ASR-style ports | `PARTIAL_HOST`: connect/send/close/status and correlated HLC RX/TX lifecycle exist; real SoAd/TcpIp/PduR and TLS adapter binding remains `BLOCKED_G2`. |
 | `V2GTP-IF-001…005` | `V2gtpCodec` | C/S encode/begin/consume/frame/reset port, immutable caller-owned frame view and bounded capacity | `openv2g_test_v2gtp_codec`, HLC generation, ASR-style ports | `PARTIAL_HOST`: 001–004 are implemented; explicit diagnostic publication for 005 is represented only by result/HLC reason. |
 | `EXI-IF-001…007` | `ExiCodec` | provisional C/S encode/decode/reset port, S/R diagnostic sample, typed pluggable backend; explicit schema/message, caller-owned bounded buffers/workspace, generation guard and no-partial decode publication | `openv2g_test_exi_codec`, dependency-failure branch in HLC generation | `PARTIAL_HOST`: ASR-style project adapter contract is implemented; production generated backend, licensed schema, golden vectors and target WCET remain `BLOCKED_G2`. |
 | `SCH-IF-001…004` | `SchemaRegistry` | provisional C/S descriptor/limits/compatibility port and S/R authoritative status; immutable descriptor, availability and integrity masks | `openv2g_test_exi_codec`, schema/protocol mismatch branch | `PARTIAL_HOST`: registry/port behavior is implemented; real descriptors/checksums and integrity evidence require generated artifacts. |
@@ -86,4 +86,4 @@ cmake -S . -B build-host -A x64
 cmake --build build-host --config Debug
 ```
 
-Clean MSVC `/W4 /WX` build passed and all 17 host test executables passed on 20/09/2026. This includes DIN/ISO-2 data-flow projection, complete DC EIM semantic request/response loops, TCP/TLS cancel/reconnect correlation, fake-backend EXI and cross-library ASR-style port tests and is `VERIFIED_HOST` evidence only.
+Clean MSVC `/W4 /WX` build passed and all 17 host test executables passed on 20/09/2026. This includes DIN/ISO-2 data-flow projection, complete DC EIM semantic request/response loops, TCP/TLS cancel/reconnect and bounded TX correlation, fake-backend EXI and cross-library ASR-style port tests and is `VERIFIED_HOST` evidence only.

@@ -236,6 +236,8 @@ static int TestTransportClientServerPorts(void)
     OpenV2g_TcpTlsSession_Init(&transport);
     TEST_ASSERT(OpenV2g_TcpTlsSession_CreateClientServerPort(
                     &transport, &transport_cs) == OPENV2G_RESULT_OK);
+    TEST_ASSERT((transport_cs.send != NULL) &&
+                (transport_cs.tx_result != NULL));
     TEST_ASSERT(OpenV2g_TcpTlsSession_CreateStatusSenderReceiverPort(
                     &transport, &transport_sr) == OPENV2G_RESULT_OK);
     TEST_ASSERT(transport_cs.connect(
