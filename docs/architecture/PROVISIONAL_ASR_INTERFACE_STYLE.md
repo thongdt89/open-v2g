@@ -1,6 +1,6 @@
 # Quy ước interface kiểu AUTOSAR trước giai đoạn ARXML
 
-**Revision:** Draft 0.2 — 11/09/2026
+**Revision:** Draft 0.4 — 15/09/2026
 **Status:** `PROVISIONAL_ASR_STYLE` — dùng cho host/SIL và implementation-first; không phải generated RTE contract
 
 ## 1. Mục tiêu
@@ -69,7 +69,7 @@ Một port instance đại diện P-port ở server và được copy/bind thàn
 
 | Boundary | C/S | S/R / queued S/R |
 |---|---|---|
-| `ISO15118Chrg` façade | start, stop | HLC status; queued HLC events + overflow |
+| `ISO15118Chrg` façade | start, stop; take bounded semantic protocol request | HLC status; queued HLC events + overflow; protocol diagnostic |
 | `SdpClient` | start, request sent, response, cancel | SDP status/selected endpoint |
 | `TcpTlsSession` | connect, TCP connected, TLS result, close | transport/security status |
 | `V2gtpCodec` | begin, consume, get frame, reset, encode | frame is C/S result view with bounded lifetime |
@@ -77,7 +77,7 @@ Một port instance đại diện P-port ở server và được copy/bind thàn
 | `SchemaRegistry` | get descriptor, get limits, compatibility check | authoritative registry status |
 | `SapNegotiator` | negotiate, receive response, cancel, timer expiry; required typed message channel | authoritative SAP state/diagnostic status |
 | `ProtocolAdapterFactory` | create, destroy, reset static adapter | authoritative factory status |
-| DIN/ISO-2 protocol adapters | start, stop, decoded semantic message, timer expiry | authoritative protocol state; events copied by HLC façade to queued S/R |
+| DIN/ISO-2 protocol adapters | start, stop, decoded semantic response, timer expiry; required semantic message channel | authoritative protocol state and retained diagnostic; required energy/permission snapshots read by S/R; events copied by HLC façade to queued S/R |
 
 `ISO15118Chrg` gọi SDP, TCP/TLS và V2GTP qua required C/S ports, đồng thời đọc SDP endpoint qua S/R port. Test integration truyền CP/PP, energy, PLC, HLC và hardware snapshots bằng S/R read ports thay vì truy cập trực tiếp state của producer.
 
@@ -97,7 +97,11 @@ Một port instance đại diện P-port ở server và được copy/bind thàn
 
 `ExiCodec` dùng required C/S và S/R ports của `SchemaRegistry` ở runtime. Backend bind/generator metadata vẫn là local configuration operation.
 
-`SapNegotiator` gửi một bounded typed offer snapshot qua required C/S channel. Trong host/SIL, `ISO15118Chrg` giữ mailbox một phần tử để test; target mapper phải encode snapshot bằng `EXI_SCHEMA_SAP`, đóng V2GTP và chuyển response đã decode về operation tương ứng. DIN/ISO-2 generated objects được map thành `OpenV2g_ProtocolMessage` tại cùng boundary; enum này là semantic project ID, không phải wire message ID.
+`SapNegotiator` gửi một bounded typed offer snapshot qua required C/S channel. Trong host/SIL, `ISO15118Chrg` giữ mailbox một phần tử để test; target mapper phải encode snapshot bằng `EXI_SCHEMA_SAP`, đóng V2GTP và chuyển response đã decode về operation tương ứng.
+
+DIN/ISO-2 adapter phát `OpenV2g_ProtocolTxRequest` qua required C/S channel. Mỗi request mang generation, exact correlation ID, protocol/schema/mode và bản copy energy/permission khi bước đó cần. Mapper lấy request bằng `OpenV2g_Iso15118Chrg_TakeProtocolRequest`, map sang generated schema object, encode/đóng V2GTP, rồi đưa decoded response về `OpenV2g_Iso15118Chrg_OnProtocolMessage`. Chỉ response khớp pending generation/correlation/message kind được chấp nhận. Các enum/payload này là semantic project contract, không phải wire message ID hay generated DIN/ISO datatype.
+
+`ProtocolDataFlow` định nghĩa một rule cho mỗi protocol/mode/message: flow case, energy fields relevant/required, permission/action, metering evidence và HLC event category. Adapter dùng rule này trước khi gọi required message channel; HLC giữ bản request đã dispatch và dùng chính bản đó để tạo `HlcEvent`, tránh tin action/power do peer hoặc mapper cung cấp.
 
 ## 6. Mapping khi có AUTOSAR vendor
 

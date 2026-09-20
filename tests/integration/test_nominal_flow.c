@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include "openv2g/config.h"
 #include "openv2g/charging_coordinator/charging_coordinator.h"
 #include "test.h"
 #include "test_support.h"
@@ -31,6 +32,18 @@ static OpenV2g_EvEnergySnapshot energy_snapshot(
     value.limits.max_import_power_w = 50000;
     value.limits.max_charge_current_ma = 125000;
     value.limits.max_voltage_mv = 500000u;
+    value.target_voltage_mv = 400000u;
+    value.target_current_ma = 100000;
+    value.availability_mask =
+        OPENV2G_ENERGY_FIELD_SOC |
+        OPENV2G_ENERGY_FIELD_DC_VOLTAGE |
+        OPENV2G_ENERGY_FIELD_DC_CURRENT |
+        OPENV2G_ENERGY_FIELD_BATTERY_TEMPERATURE |
+        OPENV2G_ENERGY_FIELD_ISOLATION |
+        OPENV2G_ENERGY_FIELD_INTERLOCK |
+        OPENV2G_ENERGY_FIELD_LIMITS |
+        OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE |
+        OPENV2G_ENERGY_FIELD_TARGET_CURRENT;
     return value;
 }
 
@@ -50,7 +63,11 @@ int main(void)
     OpenV2g_Endpoint endpoint;
     OpenV2g_SapTxRequest sap_request;
     OpenV2g_SapResponse sap_response;
+    OpenV2g_ProtocolTxRequest protocol_request;
     OpenV2g_ProtocolMessage protocol_message;
+    OpenV2g_ChargePermissionSrPort permission_port;
+    OpenV2g_HlcEvent protocol_event;
+    unsigned int event_guard;
 
     OpenV2g_TestRig_Init(&rig);
     ports = OpenV2g_TestRig_Ports(&rig);
@@ -58,6 +75,12 @@ int main(void)
     endpoint = OpenV2g_TestEndpoint(OPENV2G_SECURITY_NONE);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_Init(&coordinator, &config, &ports) ==
                 OPENV2G_RESULT_OK);
+    TEST_ASSERT(OpenV2g_ChargingCoordinator_CreatePermissionSenderReceiverPort(
+                    &coordinator, &permission_port) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(OpenV2g_Iso15118Chrg_BindEvContextPorts(
+                    &rig.hlc,
+                    &rig.energy_status_port,
+                    &permission_port) == OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_GetPermission(&coordinator)->decision ==
                 OPENV2G_PERMISSION_DENY);
 
@@ -120,13 +143,35 @@ int main(void)
     sap_response.selected_schema = OPENV2G_SCHEMA_ISO_15118_2;
     TEST_ASSERT(OpenV2g_Iso15118Chrg_OnSapResponse(
                     &rig.hlc, rig.now, &sap_response) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(OpenV2g_Iso15118Chrg_TakeProtocolRequest(
+                    &rig.hlc, generation, &protocol_request) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(protocol_request.kind == OPENV2G_PROTOCOL_MESSAGE_SESSION_SETUP);
     (void)memset(&protocol_message, 0, sizeof(protocol_message));
     protocol_message.generation = generation;
-    protocol_message.correlation_id = 1u;
-    protocol_message.kind = OPENV2G_PROTOCOL_MESSAGE_SESSION_SETUP;
+    protocol_message.correlation_id = protocol_request.correlation_id;
+    protocol_message.kind = protocol_request.kind;
+    protocol_message.now = 1u;
     protocol_message.accepted = true;
+    protocol_message.requested_action = OPENV2G_ACTION_EXPORT_POWER;
+    protocol_message.requested_power_w = -123;
     TEST_ASSERT(OpenV2g_Iso15118Chrg_OnProtocolMessage(
-                    &rig.hlc, 170u, &protocol_message) == OPENV2G_RESULT_OK);
+                    &rig.hlc, rig.now, &protocol_message) == OPENV2G_RESULT_ACCEPTED);
+    event_guard = 0u;
+    do {
+        TEST_ASSERT(OpenV2g_Iso15118Chrg_PopEvent(
+                        &rig.hlc, generation, &protocol_event) ==
+                    OPENV2G_RESULT_OK);
+        event_guard++;
+        TEST_ASSERT(event_guard <= OPENV2G_CFG_HLC_EVENT_QUEUE_MAX);
+    } while (protocol_event.evidence_id != protocol_request.correlation_id);
+    TEST_ASSERT(protocol_event.requested_action == OPENV2G_ACTION_NONE);
+    TEST_ASSERT(protocol_event.requested_power_w == 0);
+    TEST_ASSERT(OpenV2g_Iso15118Chrg_TakeProtocolRequest(
+                    &rig.hlc, generation, &protocol_request) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(protocol_request.kind ==
+                OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY);
+    TEST_ASSERT(protocol_request.correlation_id == 2u);
+    TEST_ASSERT(protocol_request.timestamp == rig.now);
     TEST_ASSERT(OpenV2g_TestRig_ReadHlc(&rig, &hlc_status) == OPENV2G_RESULT_OK);
     TEST_ASSERT(hlc_status.protocol_step ==
                 (uint16_t)OPENV2G_PROTOCOL_STATE_SERVICE_DISCOVERY);

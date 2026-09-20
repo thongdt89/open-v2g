@@ -52,9 +52,7 @@ Build dự kiến bằng CMake và một C11 compiler:
 ```powershell
 cmake -S . -B build-host
 cmake --build build-host --config Debug
-Push-Location build-host
-ctest -C Debug --output-on-failure
-Pop-Location
+cmake -E chdir build-host ctest -C Debug --output-on-failure
 ```
 
 Các lệnh trên chỉ tạo host/SIL artifacts. Chúng không generate RTE/ARXML và không chứng minh target, HIL, timing, safety hoặc protocol conformance.

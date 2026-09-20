@@ -28,6 +28,7 @@ typedef struct {
     OpenV2g_Iso15118_2Adapter *iso2;
     OpenV2g_ProtocolAdapterCsPort active_port;
     OpenV2g_ProtocolAdapterStatusSrPort active_status_port;
+    OpenV2g_ProtocolDiagnosticSrPort active_diagnostic_port;
     OpenV2g_AdapterFactoryStatus status;
 } OpenV2g_ProtocolAdapterFactory;
 
@@ -37,7 +38,8 @@ typedef struct {
         void *context,
         const OpenV2g_ProtocolStartRequest *request,
         OpenV2g_ProtocolAdapterCsPort *adapter_port,
-        OpenV2g_ProtocolAdapterStatusSrPort *status_port);
+        OpenV2g_ProtocolAdapterStatusSrPort *status_port,
+        OpenV2g_ProtocolDiagnosticSrPort *diagnostic_port);
     OpenV2g_Result (*destroy)(
         void *context,
         uint32_t generation,
@@ -60,7 +62,8 @@ OpenV2g_Result OpenV2g_ProtocolAdapterFactory_Create(
     OpenV2g_ProtocolAdapterFactory *factory,
     const OpenV2g_ProtocolStartRequest *request,
     OpenV2g_ProtocolAdapterCsPort *adapter_port,
-    OpenV2g_ProtocolAdapterStatusSrPort *status_port);
+    OpenV2g_ProtocolAdapterStatusSrPort *status_port,
+    OpenV2g_ProtocolDiagnosticSrPort *diagnostic_port);
 OpenV2g_Result OpenV2g_ProtocolAdapterFactory_Destroy(
     OpenV2g_ProtocolAdapterFactory *factory,
     uint32_t generation,

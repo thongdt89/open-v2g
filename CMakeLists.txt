@@ -23,6 +23,7 @@ add_library(openv2g_core STATIC
     src/iso15118_chrg/schema_registry.c
     src/iso15118_chrg/exi_codec.c
     src/iso15118_chrg/sap_negotiator.c
+    src/iso15118_chrg/protocol_data_flow.c
     src/iso15118_chrg/protocol_adapter_factory.c
     src/iso15118_chrg/din70121_adapter.c
     src/iso15118_chrg/iso15118_2_adapter.c

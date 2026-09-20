@@ -83,6 +83,13 @@ typedef struct {
     OpenV2g_AdapterFactoryStatusSrPort adapter_factory_status_required_port;
     OpenV2g_ProtocolAdapterCsPort active_adapter_port;
     OpenV2g_ProtocolAdapterStatusSrPort active_adapter_status_port;
+    OpenV2g_ProtocolDiagnosticSrPort active_adapter_diagnostic_port;
+    OpenV2g_EnergySnapshotSrPort energy_required_port;
+    OpenV2g_ChargePermissionSrPort permission_required_port;
+    OpenV2g_ProtocolTxRequest pending_protocol_request;
+    OpenV2g_ProtocolTxRequest dispatched_protocol_request;
+    bool protocol_request_pending;
+    bool protocol_request_dispatched;
     OpenV2g_Subsystem iso_15118_20_adapter;
     OpenV2g_Subsystem pki_security_adapter;
     OpenV2g_Subsystem certificate_manager;
@@ -96,6 +103,11 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_AttachV2gtpStorage(
     OpenV2g_Iso15118Chrg *hlc,
     uint8_t *payload_storage,
     size_t payload_capacity);
+
+OpenV2g_Result OpenV2g_Iso15118Chrg_BindEvContextPorts(
+    OpenV2g_Iso15118Chrg *hlc,
+    const OpenV2g_EnergySnapshotSrPort *energy_port,
+    const OpenV2g_ChargePermissionSrPort *permission_port);
 
 OpenV2g_Result OpenV2g_Iso15118Chrg_Start(
     OpenV2g_Iso15118Chrg *hlc,
@@ -166,6 +178,12 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_OnProtocolSelected(
     OpenV2g_ProtocolId protocol,
     OpenV2g_SchemaId schema);
 
+/* Semantic request for the generated DIN/ISO-2 EXI/V2GTP mapper. */
+OpenV2g_Result OpenV2g_Iso15118Chrg_TakeProtocolRequest(
+    OpenV2g_Iso15118Chrg *hlc,
+    uint32_t generation,
+    OpenV2g_ProtocolTxRequest *request);
+
 OpenV2g_Result OpenV2g_Iso15118Chrg_OnProtocolMessage(
     OpenV2g_Iso15118Chrg *hlc,
     OpenV2g_TimeUs now,
@@ -176,6 +194,10 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_OnProtocolTimerExpired(
     uint32_t generation,
     OpenV2g_TimeUs now,
     uint16_t timer_id);
+
+OpenV2g_Result OpenV2g_Iso15118Chrg_ReadProtocolDiagnostic(
+    OpenV2g_Iso15118Chrg *hlc,
+    OpenV2g_ProtocolDiagnostic *diagnostic);
 
 OpenV2g_Result OpenV2g_Iso15118Chrg_Stop(
     OpenV2g_Iso15118Chrg *hlc,

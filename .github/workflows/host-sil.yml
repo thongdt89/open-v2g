@@ -1,0 +1,44 @@
+name: Host SIL
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: host-sil-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.os }} / C11
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure host/SIL build
+        run: >-
+          cmake -S . -B build-ci
+          -DOPENV2G_BUILD_TESTS=ON
+          -DOPENV2G_BUILD_EXAMPLES=ON
+          -DOPENV2G_WARNINGS_AS_ERRORS=ON
+
+      - name: Build host/SIL artifacts
+        run: cmake --build build-ci --config Debug --parallel
+
+      - name: Run host/SIL tests
+        run: cmake -E chdir build-ci ctest -C Debug --output-on-failure

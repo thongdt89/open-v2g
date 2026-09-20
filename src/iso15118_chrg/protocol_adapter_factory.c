@@ -30,12 +30,14 @@ OpenV2g_Result OpenV2g_ProtocolAdapterFactory_Create(
     OpenV2g_ProtocolAdapterFactory *factory,
     const OpenV2g_ProtocolStartRequest *request,
     OpenV2g_ProtocolAdapterCsPort *adapter_port,
-    OpenV2g_ProtocolAdapterStatusSrPort *status_port)
+    OpenV2g_ProtocolAdapterStatusSrPort *status_port,
+    OpenV2g_ProtocolDiagnosticSrPort *diagnostic_port)
 {
     OpenV2g_Result result;
 
     if ((factory == NULL) || (request == NULL) || (adapter_port == NULL) ||
-        (status_port == NULL) || (request->generation == 0u)) {
+        (status_port == NULL) || (diagnostic_port == NULL) ||
+        (request->generation == 0u)) {
         return OPENV2G_RESULT_REJECTED;
     }
     if (factory->status.state == OPENV2G_ADAPTER_FACTORY_ACTIVE) {
@@ -50,6 +52,10 @@ OpenV2g_Result OpenV2g_ProtocolAdapterFactory_Create(
     (void)memset(&factory->active_port, 0, sizeof(factory->active_port));
     (void)memset(
         &factory->active_status_port, 0, sizeof(factory->active_status_port));
+    (void)memset(
+        &factory->active_diagnostic_port,
+        0,
+        sizeof(factory->active_diagnostic_port));
     if ((request->protocol == OPENV2G_PROTOCOL_DIN_70121) &&
         (request->schema == OPENV2G_SCHEMA_DIN_70121) &&
         (factory->din != NULL)) {
@@ -58,6 +64,10 @@ OpenV2g_Result OpenV2g_ProtocolAdapterFactory_Create(
         if (result == OPENV2G_RESULT_OK) {
             result = OpenV2g_Din70121Adapter_CreateStatusSenderReceiverPort(
                 factory->din, &factory->active_status_port);
+        }
+        if (result == OPENV2G_RESULT_OK) {
+            result = OpenV2g_Din70121Adapter_CreateDiagnosticSenderReceiverPort(
+                factory->din, &factory->active_diagnostic_port);
         }
     } else if ((request->protocol == OPENV2G_PROTOCOL_ISO_15118_2) &&
                (request->schema == OPENV2G_SCHEMA_ISO_15118_2) &&
@@ -68,6 +78,11 @@ OpenV2g_Result OpenV2g_ProtocolAdapterFactory_Create(
             result =
                 OpenV2g_Iso15118_2Adapter_CreateStatusSenderReceiverPort(
                     factory->iso2, &factory->active_status_port);
+        }
+        if (result == OPENV2G_RESULT_OK) {
+            result =
+                OpenV2g_Iso15118_2Adapter_CreateDiagnosticSenderReceiverPort(
+                    factory->iso2, &factory->active_diagnostic_port);
         }
     } else {
         result = OPENV2G_RESULT_NOT_IMPLEMENTED;
@@ -84,6 +99,10 @@ OpenV2g_Result OpenV2g_ProtocolAdapterFactory_Create(
             &factory->active_status_port,
             0,
             sizeof(factory->active_status_port));
+        (void)memset(
+            &factory->active_diagnostic_port,
+            0,
+            sizeof(factory->active_diagnostic_port));
         factory->status.generation = request->generation;
         publish_status(
             factory,
@@ -101,6 +120,7 @@ OpenV2g_Result OpenV2g_ProtocolAdapterFactory_Create(
         factory, OPENV2G_ADAPTER_FACTORY_ACTIVE, OPENV2G_REASON_NONE);
     *adapter_port = factory->active_port;
     *status_port = factory->active_status_port;
+    *diagnostic_port = factory->active_diagnostic_port;
     return OPENV2G_RESULT_OK;
 }
 
@@ -132,6 +152,10 @@ OpenV2g_Result OpenV2g_ProtocolAdapterFactory_Destroy(
     (void)memset(&factory->active_port, 0, sizeof(factory->active_port));
     (void)memset(
         &factory->active_status_port, 0, sizeof(factory->active_status_port));
+    (void)memset(
+        &factory->active_diagnostic_port,
+        0,
+        sizeof(factory->active_diagnostic_port));
     factory->status.active_protocol = OPENV2G_PROTOCOL_NONE;
     factory->status.active_schema = OPENV2G_SCHEMA_NONE;
     publish_status(factory, OPENV2G_ADAPTER_FACTORY_READY, reason);
@@ -156,6 +180,10 @@ OpenV2g_Result OpenV2g_ProtocolAdapterFactory_Reset(
     (void)memset(&factory->active_port, 0, sizeof(factory->active_port));
     (void)memset(
         &factory->active_status_port, 0, sizeof(factory->active_status_port));
+    (void)memset(
+        &factory->active_diagnostic_port,
+        0,
+        sizeof(factory->active_diagnostic_port));
     factory->status.active_protocol = OPENV2G_PROTOCOL_NONE;
     factory->status.active_schema = OPENV2G_SCHEMA_NONE;
     publish_status(
@@ -167,13 +195,15 @@ static OpenV2g_Result cs_create(
     void *context,
     const OpenV2g_ProtocolStartRequest *request,
     OpenV2g_ProtocolAdapterCsPort *adapter_port,
-    OpenV2g_ProtocolAdapterStatusSrPort *status_port)
+    OpenV2g_ProtocolAdapterStatusSrPort *status_port,
+    OpenV2g_ProtocolDiagnosticSrPort *diagnostic_port)
 {
     return OpenV2g_ProtocolAdapterFactory_Create(
         (OpenV2g_ProtocolAdapterFactory *)context,
         request,
         adapter_port,
-        status_port);
+        status_port,
+        diagnostic_port);
 }
 
 static OpenV2g_Result cs_destroy(

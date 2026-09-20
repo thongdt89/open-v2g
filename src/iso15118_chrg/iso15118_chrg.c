@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "openv2g/config.h"
+#include "openv2g/iso15118_chrg/protocol_data_flow.h"
 
 static void update_status(
     OpenV2g_Iso15118Chrg *hlc,
@@ -80,6 +81,24 @@ static OpenV2g_Result sap_channel_send(
     return OPENV2G_RESULT_ACCEPTED;
 }
 
+static OpenV2g_Result protocol_channel_send(
+    void *context,
+    const OpenV2g_ProtocolTxRequest *request)
+{
+    OpenV2g_Iso15118Chrg *hlc = (OpenV2g_Iso15118Chrg *)context;
+
+    if ((hlc == NULL) || (request == NULL) ||
+        (request->generation != hlc->generation)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    if (hlc->protocol_request_pending) {
+        return OPENV2G_RESULT_BUSY;
+    }
+    hlc->pending_protocol_request = *request;
+    hlc->protocol_request_pending = true;
+    return OPENV2G_RESULT_ACCEPTED;
+}
+
 static OpenV2g_SapProtocolConfig make_sap_config(
     const OpenV2g_HlcFeatureConfig *features)
 {
@@ -121,7 +140,7 @@ static OpenV2g_SapProtocolConfig make_sap_config(
 static void push_protocol_event(
     OpenV2g_Iso15118Chrg *hlc,
     OpenV2g_TimeUs now,
-    const OpenV2g_ProtocolMessage *message,
+    const OpenV2g_ProtocolTxRequest *request,
     OpenV2g_HlcEventCategory category)
 {
     OpenV2g_HlcEvent event;
@@ -134,12 +153,12 @@ static void push_protocol_event(
     event.env = hlc->status.env;
     event.env.timestamp = now;
     event.event_id = hlc->next_event_id;
-    event.evidence_id = message->correlation_id;
+    event.evidence_id = request->correlation_id;
     event.category = category;
     event.protocol = hlc->status.protocol;
     event.protocol_step = hlc->status.protocol_step;
-    event.requested_action = message->requested_action;
-    event.requested_power_w = message->requested_power_w;
+    event.requested_action = request->requested_action;
+    event.requested_power_w = request->requested_power_w;
     (void)OpenV2g_HlcEventQueue_Push(&hlc->event_queue, &event);
 }
 
@@ -168,11 +187,13 @@ static OpenV2g_Result activate_protocol_adapter(
     request.schema = selection->schema;
     request.mode = selection->mode;
     request.security = transport_status.endpoint.security;
+    request.now = now;
     result = hlc->adapter_factory_required_port.create(
         hlc->adapter_factory_required_port.context,
         &request,
         &hlc->active_adapter_port,
-        &hlc->active_adapter_status_port);
+        &hlc->active_adapter_status_port,
+        &hlc->active_adapter_diagnostic_port);
     if (result != OPENV2G_RESULT_OK) {
         update_status(
             hlc,
@@ -265,6 +286,7 @@ void OpenV2g_Iso15118Chrg_Init(
     OpenV2g_HlcFeatureConfig defaults;
     OpenV2g_SapProtocolConfig sap_config;
     OpenV2g_SapMessageChannelCsPort sap_channel;
+    OpenV2g_ProtocolMessageChannelCsPort protocol_channel;
 
     if (hlc == NULL) {
         return;
@@ -316,6 +338,23 @@ void OpenV2g_Iso15118Chrg_Init(
         hlc->features.iso_15118_2_dc_eim,
         hlc->features.iso_15118_2_ac_eim,
         hlc->features.iso_15118_2_pnc);
+    protocol_channel.context = hlc;
+    protocol_channel.send = protocol_channel_send;
+    if (hlc->features.din_70121_dc_eim) {
+        (void)OpenV2g_Din70121Adapter_BindRequiredPorts(
+            &hlc->din_70121_adapter,
+            &protocol_channel,
+            NULL,
+            NULL);
+    }
+    if (hlc->features.iso_15118_2_dc_eim ||
+        hlc->features.iso_15118_2_ac_eim || hlc->features.iso_15118_2_pnc) {
+        (void)OpenV2g_Iso15118_2Adapter_BindRequiredPorts(
+            &hlc->iso_15118_2_adapter,
+            &protocol_channel,
+            NULL,
+            NULL);
+    }
     OpenV2g_ProtocolAdapterFactory_Init(
         &hlc->protocol_adapter_factory,
         &hlc->din_70121_adapter,
@@ -329,6 +368,43 @@ void OpenV2g_Iso15118Chrg_Init(
     OpenV2g_Subsystem_Init(&hlc->iso_15118_20_adapter, "Iso15118_20Adapter", hlc->features.iso_15118_20);
     OpenV2g_Subsystem_Init(&hlc->pki_security_adapter, "PkiSecurityAdapter", hlc->features.iso_15118_2_pnc || hlc->features.iso_15118_20);
     OpenV2g_Subsystem_Init(&hlc->certificate_manager, "CertificateManager", hlc->features.iso_15118_2_pnc || hlc->features.iso_15118_20);
+}
+
+OpenV2g_Result OpenV2g_Iso15118Chrg_BindEvContextPorts(
+    OpenV2g_Iso15118Chrg *hlc,
+    const OpenV2g_EnergySnapshotSrPort *energy_port,
+    const OpenV2g_ChargePermissionSrPort *permission_port)
+{
+    OpenV2g_ProtocolMessageChannelCsPort channel;
+    OpenV2g_Result result = OPENV2G_RESULT_OK;
+
+    if ((hlc == NULL) || (energy_port == NULL) || (permission_port == NULL) ||
+        (energy_port->read == NULL) || (permission_port->read == NULL) ||
+        (hlc->status.state != OPENV2G_HLC_IDLE)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    hlc->energy_required_port = *energy_port;
+    hlc->permission_required_port = *permission_port;
+    channel.context = hlc;
+    channel.send = protocol_channel_send;
+    if (hlc->features.din_70121_dc_eim) {
+        result = OpenV2g_Din70121Adapter_BindRequiredPorts(
+            &hlc->din_70121_adapter,
+            &channel,
+            energy_port,
+            permission_port);
+    }
+    if ((result == OPENV2G_RESULT_OK) &&
+        (hlc->features.iso_15118_2_dc_eim ||
+         hlc->features.iso_15118_2_ac_eim ||
+         hlc->features.iso_15118_2_pnc)) {
+        result = OpenV2g_Iso15118_2Adapter_BindRequiredPorts(
+            &hlc->iso_15118_2_adapter,
+            &channel,
+            energy_port,
+            permission_port);
+    }
+    return result;
 }
 
 OpenV2g_Result OpenV2g_Iso15118Chrg_AttachV2gtpStorage(
@@ -370,6 +446,16 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_Start(
 
     hlc->generation = generation;
     hlc->next_event_id = 0u;
+    hlc->protocol_request_pending = false;
+    hlc->protocol_request_dispatched = false;
+    (void)memset(
+        &hlc->pending_protocol_request,
+        0,
+        sizeof(hlc->pending_protocol_request));
+    (void)memset(
+        &hlc->dispatched_protocol_request,
+        0,
+        sizeof(hlc->dispatched_protocol_request));
     (void)OpenV2g_HlcEventQueue_Reset(&hlc->event_queue, generation);
     result = hlc->sdp_required_port.start(
         hlc->sdp_required_port.context,
@@ -654,31 +740,69 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_OnProtocolSelected(
     return OpenV2g_Iso15118Chrg_OnSapResponse(hlc, now, &response);
 }
 
+OpenV2g_Result OpenV2g_Iso15118Chrg_TakeProtocolRequest(
+    OpenV2g_Iso15118Chrg *hlc,
+    uint32_t generation,
+    OpenV2g_ProtocolTxRequest *request)
+{
+    if (request != NULL) {
+        (void)memset(request, 0, sizeof(*request));
+    }
+    if ((hlc == NULL) || (request == NULL) ||
+        (generation != hlc->generation) || !hlc->protocol_request_pending ||
+        hlc->protocol_request_dispatched ||
+        (hlc->pending_protocol_request.generation != generation)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    *request = hlc->pending_protocol_request;
+    hlc->dispatched_protocol_request = hlc->pending_protocol_request;
+    hlc->protocol_request_dispatched = true;
+    (void)memset(
+        &hlc->pending_protocol_request,
+        0,
+        sizeof(hlc->pending_protocol_request));
+    hlc->protocol_request_pending = false;
+    return OPENV2G_RESULT_OK;
+}
+
 OpenV2g_Result OpenV2g_Iso15118Chrg_OnProtocolMessage(
     OpenV2g_Iso15118Chrg *hlc,
     OpenV2g_TimeUs now,
     const OpenV2g_ProtocolMessage *message)
 {
     OpenV2g_ProtocolAdapterStatus adapter_status;
+    OpenV2g_ProtocolDataFlowRule flow_rule;
+    OpenV2g_ProtocolTxRequest completed_request;
+    OpenV2g_ProtocolMessage normalized_message;
     OpenV2g_Result result;
-    OpenV2g_HlcEventCategory category = OPENV2G_HLC_EVENT_STATE_CHANGED;
 
     if ((hlc == NULL) || (message == NULL) ||
         (hlc->status.state != OPENV2G_HLC_PROTOCOL_SESSION) ||
         (message->generation != hlc->generation) ||
+        hlc->protocol_request_pending ||
+        !hlc->protocol_request_dispatched ||
+        (hlc->dispatched_protocol_request.generation != hlc->generation) ||
         (hlc->active_adapter_port.on_message == NULL) ||
         (hlc->active_adapter_status_port.read == NULL)) {
         return OPENV2G_RESULT_REJECTED;
     }
     (void)memset(&adapter_status, 0, sizeof(adapter_status));
+    completed_request = hlc->dispatched_protocol_request;
+    normalized_message = *message;
+    normalized_message.now = now;
     result = hlc->active_adapter_port.on_message(
-        hlc->active_adapter_port.context, message);
+        hlc->active_adapter_port.context, &normalized_message);
+    hlc->protocol_request_dispatched = false;
+    (void)memset(
+        &hlc->dispatched_protocol_request,
+        0,
+        sizeof(hlc->dispatched_protocol_request));
     if (hlc->active_adapter_status_port.read(
             hlc->active_adapter_status_port.context, &adapter_status) ==
         OPENV2G_RESULT_OK) {
         hlc->status.protocol_step = (uint16_t)adapter_status.state;
     }
-    if (result != OPENV2G_RESULT_OK) {
+    if (!result_is_success(result)) {
         update_status(
             hlc,
             now,
@@ -688,28 +812,22 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_OnProtocolMessage(
                 : adapter_status.reason);
         return result;
     }
+    if (OpenV2g_ProtocolDataFlow_GetRule(
+            completed_request.protocol,
+            completed_request.mode,
+            completed_request.kind,
+            &flow_rule) != OPENV2G_RESULT_OK) {
+        update_status(
+            hlc,
+            now,
+            OPENV2G_HLC_ERROR,
+            OPENV2G_REASON_CONFIGURATION);
+        return OPENV2G_RESULT_REJECTED;
+    }
     hlc->status.env.sequence_counter++;
     hlc->status.env.timestamp = now;
-    if ((message->kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION) ||
-        (message->kind == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER)) {
-        category = OPENV2G_HLC_EVENT_PARAMETERS_ACCEPTED;
-    } else if (message->kind == OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION) {
-        category = OPENV2G_HLC_EVENT_AUTH_RESULT;
-    } else if (message->kind == OPENV2G_PROTOCOL_MESSAGE_SESSION_STOP) {
-        category = OPENV2G_HLC_EVENT_SESSION_COMPLETE;
-    } else if ((message->kind == OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK) ||
-               (message->kind == OPENV2G_PROTOCOL_MESSAGE_PRECHARGE) ||
-               (message->kind ==
-                OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START) ||
-               (message->kind == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND) ||
-               (message->kind ==
-                OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_STOP) ||
-               (message->kind ==
-                OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION)) {
-        category = OPENV2G_HLC_EVENT_PEER_REQUEST;
-    }
-    push_protocol_event(hlc, now, message, category);
-    return OPENV2G_RESULT_OK;
+    push_protocol_event(hlc, now, &completed_request, flow_rule.event_category);
+    return result;
 }
 
 OpenV2g_Result OpenV2g_Iso15118Chrg_OnProtocolTimerExpired(
@@ -737,6 +855,18 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_OnProtocolTimerExpired(
         update_status(hlc, now, OPENV2G_HLC_ERROR, OPENV2G_REASON_TIMEOUT);
     }
     return result;
+}
+
+OpenV2g_Result OpenV2g_Iso15118Chrg_ReadProtocolDiagnostic(
+    OpenV2g_Iso15118Chrg *hlc,
+    OpenV2g_ProtocolDiagnostic *diagnostic)
+{
+    if ((hlc == NULL) || (diagnostic == NULL) ||
+        (hlc->active_adapter_diagnostic_port.read == NULL)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    return hlc->active_adapter_diagnostic_port.read(
+        hlc->active_adapter_diagnostic_port.context, diagnostic);
 }
 
 OpenV2g_Result OpenV2g_Iso15118Chrg_Stop(
@@ -788,12 +918,26 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_Stop(
     hlc->status.selected_mode = OPENV2G_MODE_NONE;
     hlc->status.protocol_step = 0u;
     hlc->sap_request_pending = false;
+    hlc->protocol_request_pending = false;
+    hlc->protocol_request_dispatched = false;
     (void)memset(&hlc->pending_sap_request, 0, sizeof(hlc->pending_sap_request));
     (void)memset(&hlc->active_adapter_port, 0, sizeof(hlc->active_adapter_port));
     (void)memset(
         &hlc->active_adapter_status_port,
         0,
         sizeof(hlc->active_adapter_status_port));
+    (void)memset(
+        &hlc->active_adapter_diagnostic_port,
+        0,
+        sizeof(hlc->active_adapter_diagnostic_port));
+    (void)memset(
+        &hlc->pending_protocol_request,
+        0,
+        sizeof(hlc->pending_protocol_request));
+    (void)memset(
+        &hlc->dispatched_protocol_request,
+        0,
+        sizeof(hlc->dispatched_protocol_request));
     update_status(hlc, now, OPENV2G_HLC_IDLE, reason);
     return OPENV2G_RESULT_OK;
 }

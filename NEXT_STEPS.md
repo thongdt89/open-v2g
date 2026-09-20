@@ -2,7 +2,7 @@
 
 Trạng thái: PROPOSED — kế hoạch tiếp tục từ bộ tài liệu hiện có. Không thay thế release/WP plan gốc.
 
-## Cập nhật thực thi G1 — 10/09/2026
+## Cập nhật thực thi G1 — 15/09/2026
 
 Phần có thể hoàn thành độc lập với target/supplier trong baseline tạm đã được triển khai và host-verified:
 
@@ -13,7 +13,8 @@ Phần có thể hoàn thành độc lập với target/supplier trong baseline 
 - typed EXI/schema registry boundary với schema-specific backend, bounded caller-owned workspace và no-partial decode publication;
 - provisional ASR-style C/S operation ports và S/R status/diagnostic ports cho EXI/schema, giữ khả năng thay binding bằng generated RTE sau này;
 - typed `SapNegotiator` với ordered offer snapshot, generation/request correlation, DIN-over-TLS filtering, timeout/cancel và fail-closed unoffered selection;
-- static one-active `ProtocolAdapterFactory` cùng DIN 70121 và ISO 15118-2 EIM semantic host FSMs; generated EXI/wire mapping và normative timers vẫn ở G2;
+- static one-active `ProtocolAdapterFactory` cùng DIN 70121 và ISO 15118-2 EIM request-generating semantic host FSMs; exact pending correlation, energy/permission S/R gates, current-demand/metering loops và retained diagnostics đã có test; generated EXI/wire mapping và normative timers vẫn ở G2;
+- shared `ProtocolDataFlow` rules đã map các flow session/service/auth, charge-parameter, DC safety/precharge, power start/loop/stop, metering và post-charge vào request C/S, context S/R và HLC queued event; target/permission limit intersection và required availability bits fail-closed;
 - cùng C/S/S/R pattern cho coordinator, permission/fault/BPT/state, CP/PP, energy, PLC, hardware, HLC facade, SDP, TCP/TLS và V2GTP; nominal host flow đã đọc snapshot qua ports;
 - stale-generation, cancel/late callback, overflow, expiry, reversal và teardown tests;
 - ma trận bao phủ 218 atomic interface rows tại `docs/architecture/INTERFACE_IMPLEMENTATION_TRACEABILITY.md`.

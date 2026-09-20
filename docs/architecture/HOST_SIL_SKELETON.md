@@ -1,6 +1,6 @@
 # G1 host/SIL skeleton architecture
 
-**Revision:** Draft 0.7 — 14/09/2026
+**Revision:** Draft 0.9 — 15/09/2026
 
 **Status:** `PROPOSED_IMPLEMENTATION` — host/SIL only, not AUTOSAR production evidence
 
@@ -76,7 +76,12 @@ flowchart LR
 - HLC event queue có compile-time capacity; overflow revoke permission và buộc coordinator resync bằng authoritative status mới hơn overflow.
 - Khởi động schema/EXI/SAP dependency được kiểm tra; lỗi khởi động không còn bị bỏ qua.
 - SAP giữ exact ordered offer snapshot theo generation/request ID, lọc DIN khỏi TLS, từ chối unoffered schema/no-match/timeout và chỉ chuyển selection đã xác thực sang static adapter factory.
-- Factory cấp đúng một typed DIN hoặc ISO-2 adapter; mỗi adapter sở hữu state riêng, kiểm tra generation/correlation/sequence/timer và xuất semantic HLC event qua façade.
+- Factory cấp đúng một typed DIN hoặc ISO-2 adapter; mỗi adapter sở hữu state riêng, kiểm tra generation/exact pending correlation/sequence/timer và xuất semantic HLC event qua façade.
+- DIN và ISO-2 chủ động phát từng semantic EV request qua required C/S message channel; request copy toàn bộ energy/permission snapshot cần thiết để mapper không giữ pointer vào mutable producer state.
+- Các bước liên quan năng lượng đọc `EvEnergyDataProvider` và `ChargePermission` qua S/R ports. Missing, sai generation/quality/mode/direction/action hoặc permission hết hạn đều fail-closed trước khi phát request tiếp theo.
+- HLC façade cung cấp one-slot bounded protocol-TX mailbox và retained protocol diagnostic. Nó dùng thời gian của owner runnable cho freshness/permission thay vì tin timestamp từ decoded response.
+- `ProtocolDataFlow` là rule source dùng chung cho DIN/ISO-2: kiểm tra mode/message applicability, required availability bits, target/permission limit intersection, semantic action/power và correlated metering evidence.
+- `EvEnergySnapshot` host type đã khớp catalogue Rev.3 với target voltage/current và project semantic availability bits; đây vẫn không phải supplier/generated ABI.
 - ISO-20/PnC/BPT không được quảng bá là active feature.
 
 ## 5. Deliberately provisional or stubbed
@@ -114,7 +119,8 @@ flowchart LR
 | `openv2g_test_v2gtp_codec` | Bounded streaming decode, fragmented/coalesced frames, stale generation and malformed/oversized input |
 | `openv2g_test_exi_codec` | Explicit immutable schema registry, backend binding, bounded encode/decode, stale generation, reset and no-partial-delivery |
 | `openv2g_test_sap_negotiator` | Ordered/bounded offers, DIN-over-TLS filtering, request correlation, unoffered selection, cancel and timeout |
-| `openv2g_test_protocol_adapters` | One-active static factory; DIN and ISO-2 DC EIM semantic sequences, loop behavior, stale generation, sequence and timer failures |
+| `openv2g_test_protocol_adapters` | One-active static factory; outbound DIN/ISO-2 DC EIM request sequences, exact pending correlation, current-demand/metering loops, context/permission gates, timer/peer failures and retained diagnostics |
+| `openv2g_test_protocol_data_flow` | DIN/ISO-2 mode/message applicability, required field masks, target/permission limit intersection, target-power projection, metering evidence and stop semantics |
 | `openv2g_test_asr_style_ports` | C/S and S/R port bindings across coordinator internals, CP/PP, energy, PLC, hardware, SDP, TCP/TLS, V2GTP and HLC façade |
 | `openv2g_test_public_headers` | Public C header self-containment and compile surface |
 | `openv2g_test_nominal_flow` | CpPp/Energy provider→coordinator→link→HLC→permission→hardware và revoke-before-teardown order |
@@ -139,3 +145,5 @@ Passing host tests is `VERIFIED_HOST` evidence only. It is not target, safety, i
 | Draft 0.5 | 11/09/2026 | Added provisional AUTOSAR-style C/S ports for EXI/schema operations and S/R ports for registry status/EXI diagnostics; documented later RTE/ARXML mapping. |
 | Draft 0.6 | 11/09/2026 | Extended provisional C/S and S/R port bindings across support, coordinator, HLC façade and transport libraries; moved internal HLC transport calls and nominal snapshot flow onto ports. |
 | Draft 0.7 | 14/09/2026 | Replaced SAP/factory/DIN/ISO-2 lifecycle stubs with typed host components, correlated offer selection, static one-active factory, semantic protocol FSMs and negative-path tests. |
+| Draft 0.8 | 15/09/2026 | Added semantic EV request generation, exact request/response correlation, energy and permission S/R gates, HLC protocol-TX mailbox, retained diagnostics and complete DIN/ISO-2 DC EIM host sequences. |
+| Draft 0.9 | 15/09/2026 | Added a shared protocol data-flow rule/validation layer, target voltage/current availability, dispatched-request event provenance, correlated metering evidence and main-flow documentation/tests. |

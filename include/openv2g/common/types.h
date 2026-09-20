@@ -207,6 +207,19 @@ typedef struct {
     uint32_t ramp_limit_w_per_s;
 } OpenV2g_PowerLimits;
 
+/* Project semantic availability bits; not DIN/ISO wire bit positions. */
+typedef enum {
+    OPENV2G_ENERGY_FIELD_SOC = (1u << 0),
+    OPENV2G_ENERGY_FIELD_DC_VOLTAGE = (1u << 1),
+    OPENV2G_ENERGY_FIELD_DC_CURRENT = (1u << 2),
+    OPENV2G_ENERGY_FIELD_BATTERY_TEMPERATURE = (1u << 3),
+    OPENV2G_ENERGY_FIELD_ISOLATION = (1u << 4),
+    OPENV2G_ENERGY_FIELD_INTERLOCK = (1u << 5),
+    OPENV2G_ENERGY_FIELD_LIMITS = (1u << 6),
+    OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE = (1u << 7),
+    OPENV2G_ENERGY_FIELD_TARGET_CURRENT = (1u << 8)
+} OpenV2g_EnergyField;
+
 typedef struct {
     OpenV2g_CommEnvelope env;
     OpenV2g_PlugState plug_state;
@@ -224,6 +237,8 @@ typedef struct {
     uint32_t isolation_kohm;
     bool interlock_closed;
     OpenV2g_PowerLimits limits;
+    uint32_t target_voltage_mv;
+    int32_t target_current_ma;
     uint32_t availability_mask;
 } OpenV2g_EvEnergySnapshot;
 

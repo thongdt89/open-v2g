@@ -14,6 +14,7 @@
 #include "openv2g/iso15118_chrg/iso15118_2_adapter.h"
 #include "openv2g/iso15118_chrg/protocol_adapter.h"
 #include "openv2g/iso15118_chrg/protocol_adapter_factory.h"
+#include "openv2g/iso15118_chrg/protocol_data_flow.h"
 #include "openv2g/iso15118_chrg/sap_negotiator.h"
 #include "openv2g/iso15118_chrg/sdp_client.h"
 #include "openv2g/iso15118_chrg/schema_registry.h"
