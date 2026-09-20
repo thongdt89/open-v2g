@@ -514,18 +514,32 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_OnSdpComplete(
 OpenV2g_Result OpenV2g_Iso15118Chrg_OnTransportReady(
     OpenV2g_Iso15118Chrg *hlc,
     uint32_t generation,
+    uint32_t connection_id,
     OpenV2g_TimeUs now)
 {
+    OpenV2g_TransportStatus transport_status;
     OpenV2g_Result result;
 
     if ((hlc == NULL) || (generation != hlc->generation) ||
+        (connection_id == 0u) ||
         (hlc->status.state != OPENV2G_HLC_TRANSPORT)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    (void)memset(&transport_status, 0, sizeof(transport_status));
+    if ((hlc->transport_status_required_port.read == NULL) ||
+        (hlc->transport_status_required_port.read(
+             hlc->transport_status_required_port.context,
+             &transport_status) != OPENV2G_RESULT_OK) ||
+        (transport_status.env.session_generation != generation) ||
+        (transport_status.connection_id != connection_id) ||
+        (transport_status.state != OPENV2G_TRANSPORT_CONNECTING)) {
         return OPENV2G_RESULT_REJECTED;
     }
 
     result = hlc->transport_required_port.tcp_connected(
         hlc->transport_required_port.context,
         generation,
+        connection_id,
         now);
     if (result == OPENV2G_RESULT_ACCEPTED) {
         return result;
@@ -540,19 +554,33 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_OnTransportReady(
 OpenV2g_Result OpenV2g_Iso15118Chrg_OnTlsComplete(
     OpenV2g_Iso15118Chrg *hlc,
     uint32_t generation,
+    uint32_t connection_id,
     OpenV2g_TimeUs now,
     bool established)
 {
+    OpenV2g_TransportStatus transport_status;
     OpenV2g_Result result;
 
     if ((hlc == NULL) || (generation != hlc->generation) ||
+        (connection_id == 0u) ||
         (hlc->status.state != OPENV2G_HLC_TRANSPORT)) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    (void)memset(&transport_status, 0, sizeof(transport_status));
+    if ((hlc->transport_status_required_port.read == NULL) ||
+        (hlc->transport_status_required_port.read(
+             hlc->transport_status_required_port.context,
+             &transport_status) != OPENV2G_RESULT_OK) ||
+        (transport_status.env.session_generation != generation) ||
+        (transport_status.connection_id != connection_id) ||
+        (transport_status.state != OPENV2G_TRANSPORT_TLS_HANDSHAKE)) {
         return OPENV2G_RESULT_REJECTED;
     }
 
     result = hlc->transport_required_port.tls_result(
         hlc->transport_required_port.context,
         generation,
+        connection_id,
         now,
         established);
     if (result != OPENV2G_RESULT_OK) {
@@ -565,12 +593,14 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_OnTlsComplete(
 OpenV2g_Result OpenV2g_Iso15118Chrg_OnTransportBytes(
     OpenV2g_Iso15118Chrg *hlc,
     uint32_t generation,
+    uint32_t connection_id,
     OpenV2g_TimeUs now,
     const uint8_t *data,
     size_t length,
     size_t *consumed,
     OpenV2g_V2gtpFrameView *frame)
 {
+    OpenV2g_TransportStatus transport_status;
     OpenV2g_Result result;
 
     if (consumed != NULL) {
@@ -580,9 +610,20 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_OnTransportBytes(
         (void)memset(frame, 0, sizeof(*frame));
     }
     if ((hlc == NULL) || (consumed == NULL) || (frame == NULL) ||
-        (generation != hlc->generation) ||
+        (generation != hlc->generation) || (connection_id == 0u) ||
         ((hlc->status.state != OPENV2G_HLC_SAP) &&
          (hlc->status.state != OPENV2G_HLC_PROTOCOL_SESSION))) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    (void)memset(&transport_status, 0, sizeof(transport_status));
+    if ((hlc->transport_status_required_port.read == NULL) ||
+        (hlc->transport_status_required_port.read(
+             hlc->transport_status_required_port.context,
+             &transport_status) != OPENV2G_RESULT_OK) ||
+        (transport_status.env.session_generation != generation) ||
+        (transport_status.connection_id != connection_id) ||
+        ((transport_status.state != OPENV2G_TRANSPORT_PLAIN_ACTIVE) &&
+         (transport_status.state != OPENV2G_TRANSPORT_SECURE_ACTIVE))) {
         return OPENV2G_RESULT_REJECTED;
     }
 
@@ -911,6 +952,7 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_Stop(
     (void)hlc->transport_required_port.close(
         hlc->transport_required_port.context,
         generation,
+        hlc->tcp_tls_session.status.connection_id,
         now,
         reason);
     hlc->status.protocol = OPENV2G_PROTOCOL_NONE;

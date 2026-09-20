@@ -131,6 +131,7 @@ int main(void)
     TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTransportReady(
                     &rig.hlc,
                     generation,
+                    rig.hlc.tcp_tls_session.status.connection_id,
                     rig.now) == OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_Iso15118Chrg_TakeSapRequest(
                     &rig.hlc, generation, &sap_request) == OPENV2G_RESULT_OK);

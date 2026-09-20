@@ -63,10 +63,13 @@ OpenV2g_Result OpenV2g_TcpTlsSession_Connect(
 OpenV2g_Result OpenV2g_TcpTlsSession_OnTcpConnected(
     OpenV2g_TcpTlsSession *session,
     uint32_t generation,
+    uint32_t connection_id,
     OpenV2g_TimeUs now)
 {
     if ((session == NULL) || (now == 0u) ||
         (generation != session->generation) ||
+        (connection_id == 0u) ||
+        (connection_id != session->status.connection_id) ||
         (session->status.state != OPENV2G_TRANSPORT_CONNECTING)) {
         return OPENV2G_RESULT_REJECTED;
     }
@@ -93,11 +96,14 @@ OpenV2g_Result OpenV2g_TcpTlsSession_OnTcpConnected(
 OpenV2g_Result OpenV2g_TcpTlsSession_OnTlsResult(
     OpenV2g_TcpTlsSession *session,
     uint32_t generation,
+    uint32_t connection_id,
     OpenV2g_TimeUs now,
     bool established)
 {
     if ((session == NULL) || (now == 0u) ||
         (generation != session->generation) ||
+        (connection_id == 0u) ||
+        (connection_id != session->status.connection_id) ||
         (session->status.state != OPENV2G_TRANSPORT_TLS_HANDSHAKE)) {
         return OPENV2G_RESULT_REJECTED;
     }
@@ -116,6 +122,7 @@ OpenV2g_Result OpenV2g_TcpTlsSession_OnTlsResult(
 OpenV2g_Result OpenV2g_TcpTlsSession_Close(
     OpenV2g_TcpTlsSession *session,
     uint32_t generation,
+    uint32_t connection_id,
     OpenV2g_TimeUs now,
     OpenV2g_ReasonCode reason)
 {
@@ -123,9 +130,14 @@ OpenV2g_Result OpenV2g_TcpTlsSession_Close(
         return OPENV2G_RESULT_REJECTED;
     }
     if (session->status.state == OPENV2G_TRANSPORT_CLOSED) {
-        return OPENV2G_RESULT_OK;
+        return ((connection_id == 0u) ||
+                ((generation == session->generation) &&
+                 (connection_id == session->last_closed_connection_id)))
+                   ? OPENV2G_RESULT_OK
+                   : OPENV2G_RESULT_REJECTED;
     }
-    if (generation != session->generation) {
+    if ((generation != session->generation) || (connection_id == 0u) ||
+        (connection_id != session->status.connection_id)) {
         return OPENV2G_RESULT_REJECTED;
     }
 
@@ -135,6 +147,7 @@ OpenV2g_Result OpenV2g_TcpTlsSession_Close(
         OPENV2G_TRANSPORT_CLOSING,
         session->status.security,
         reason);
+    session->last_closed_connection_id = connection_id;
     (void)memset(&session->status.endpoint, 0, sizeof(session->status.endpoint));
     session->status.connection_id = 0u;
     session->status.tx_queue_used = 0u;
@@ -171,23 +184,27 @@ static OpenV2g_Result cs_connect(
 static OpenV2g_Result cs_tcp_connected(
     void *context,
     uint32_t generation,
+    uint32_t connection_id,
     OpenV2g_TimeUs now)
 {
     return OpenV2g_TcpTlsSession_OnTcpConnected(
         (OpenV2g_TcpTlsSession *)context,
         generation,
+        connection_id,
         now);
 }
 
 static OpenV2g_Result cs_tls_result(
     void *context,
     uint32_t generation,
+    uint32_t connection_id,
     OpenV2g_TimeUs now,
     bool established)
 {
     return OpenV2g_TcpTlsSession_OnTlsResult(
         (OpenV2g_TcpTlsSession *)context,
         generation,
+        connection_id,
         now,
         established);
 }
@@ -195,12 +212,14 @@ static OpenV2g_Result cs_tls_result(
 static OpenV2g_Result cs_close(
     void *context,
     uint32_t generation,
+    uint32_t connection_id,
     OpenV2g_TimeUs now,
     OpenV2g_ReasonCode reason)
 {
     return OpenV2g_TcpTlsSession_Close(
         (OpenV2g_TcpTlsSession *)context,
         generation,
+        connection_id,
         now,
         reason);
 }

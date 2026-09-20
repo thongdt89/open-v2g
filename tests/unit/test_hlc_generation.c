@@ -16,6 +16,9 @@ int main(void)
     size_t encoded_length;
     size_t consumed;
     OpenV2g_Endpoint endpoint;
+    uint32_t connection_id;
+    uint32_t unattached_connection_id;
+    uint32_t failed_connection_id;
 
     endpoint = OpenV2g_TestEndpoint(OPENV2G_SECURITY_NONE);
 
@@ -39,8 +42,12 @@ int main(void)
     TEST_ASSERT(OpenV2g_Iso15118Chrg_OnSdpComplete(&hlc, 1u, 110u, &endpoint) ==
                 OPENV2G_RESULT_ACCEPTED);
     TEST_ASSERT(hlc.status.state == OPENV2G_HLC_TRANSPORT);
-    TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTransportReady(&hlc, 1u, 120u) ==
-                OPENV2G_RESULT_OK);
+    connection_id = hlc.tcp_tls_session.status.connection_id;
+    TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTransportReady(
+                    &hlc,
+                    1u,
+                    connection_id,
+                    120u) == OPENV2G_RESULT_OK);
     TEST_ASSERT(hlc.status.state == OPENV2G_HLC_SAP);
 
     TEST_ASSERT(OpenV2g_V2gtp_Encode(
@@ -54,6 +61,7 @@ int main(void)
     TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTransportBytes(
                     &hlc,
                     2u,
+                    connection_id,
                     121u,
                     encoded,
                     encoded_length,
@@ -64,6 +72,18 @@ int main(void)
     TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTransportBytes(
                     &hlc,
                     1u,
+                    connection_id + 1u,
+                    121u,
+                    encoded,
+                    encoded_length,
+                    &consumed,
+                    &frame) == OPENV2G_RESULT_REJECTED);
+    TEST_ASSERT(consumed == 0u);
+    TEST_ASSERT(hlc.status.state == OPENV2G_HLC_SAP);
+    TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTransportBytes(
+                    &hlc,
+                    1u,
+                    connection_id,
                     121u,
                     encoded,
                     encoded_length,
@@ -110,9 +130,12 @@ int main(void)
                     2u,
                     210u,
                     &endpoint) == OPENV2G_RESULT_ACCEPTED);
+    unattached_connection_id =
+        unattached_hlc.tcp_tls_session.status.connection_id;
     TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTransportReady(
                     &unattached_hlc,
                     2u,
+                    unattached_connection_id,
                     220u) == OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(unattached_hlc.status.state == OPENV2G_HLC_ERROR);
 
@@ -128,10 +151,12 @@ int main(void)
                     3u,
                     310u,
                     &endpoint) == OPENV2G_RESULT_ACCEPTED);
+    failed_connection_id = failed_hlc.tcp_tls_session.status.connection_id;
     failed_hlc.exi_codec.state = OPENV2G_SUBSYSTEM_DISABLED;
     TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTransportReady(
                     &failed_hlc,
                     3u,
+                    failed_connection_id,
                     320u) == OPENV2G_RESULT_NOT_IMPLEMENTED);
     TEST_ASSERT(failed_hlc.status.state == OPENV2G_HLC_ERROR);
     TEST_ASSERT(failed_hlc.schema_registry.state == OPENV2G_SUBSYSTEM_IDLE);

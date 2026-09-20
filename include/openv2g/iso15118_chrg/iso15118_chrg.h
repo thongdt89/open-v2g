@@ -123,17 +123,20 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_OnSdpComplete(
 OpenV2g_Result OpenV2g_Iso15118Chrg_OnTransportReady(
     OpenV2g_Iso15118Chrg *hlc,
     uint32_t generation,
+    uint32_t connection_id,
     OpenV2g_TimeUs now);
 
 OpenV2g_Result OpenV2g_Iso15118Chrg_OnTlsComplete(
     OpenV2g_Iso15118Chrg *hlc,
     uint32_t generation,
+    uint32_t connection_id,
     OpenV2g_TimeUs now,
     bool established);
 
 OpenV2g_Result OpenV2g_Iso15118Chrg_OnTransportBytes(
     OpenV2g_Iso15118Chrg *hlc,
     uint32_t generation,
+    uint32_t connection_id,
     OpenV2g_TimeUs now,
     const uint8_t *data,
     size_t length,

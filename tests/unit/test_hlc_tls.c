@@ -7,6 +7,8 @@ int main(void)
     OpenV2g_Iso15118Chrg failed_hlc;
     OpenV2g_Iso15118Chrg secure_hlc;
     OpenV2g_Endpoint endpoint;
+    uint32_t failed_connection_id;
+    uint32_t secure_connection_id;
     uint8_t failed_storage[32];
     uint8_t secure_storage[32];
 
@@ -23,22 +25,39 @@ int main(void)
                     1u,
                     110u,
                     &endpoint) == OPENV2G_RESULT_ACCEPTED);
+    failed_connection_id = failed_hlc.tcp_tls_session.status.connection_id;
     TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTransportReady(
                     &failed_hlc,
                     1u,
+                    failed_connection_id + 1u,
+                    119u) == OPENV2G_RESULT_REJECTED);
+    TEST_ASSERT(failed_hlc.status.state == OPENV2G_HLC_TRANSPORT);
+    TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTransportReady(
+                    &failed_hlc,
+                    1u,
+                    failed_connection_id,
                     120u) == OPENV2G_RESULT_ACCEPTED);
     TEST_ASSERT(failed_hlc.status.state == OPENV2G_HLC_TRANSPORT);
     TEST_ASSERT(failed_hlc.tcp_tls_session.status.state ==
                 OPENV2G_TRANSPORT_TLS_HANDSHAKE);
     TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTlsComplete(
                     &failed_hlc,
+                    1u,
+                    failed_connection_id + 1u,
+                    129u,
+                    true) == OPENV2G_RESULT_REJECTED);
+    TEST_ASSERT(failed_hlc.status.state == OPENV2G_HLC_TRANSPORT);
+    TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTlsComplete(
+                    &failed_hlc,
                     2u,
+                    failed_connection_id,
                     130u,
                     true) == OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(failed_hlc.status.state == OPENV2G_HLC_TRANSPORT);
     TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTlsComplete(
                     &failed_hlc,
                     1u,
+                    failed_connection_id,
                     130u,
                     false) == OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(failed_hlc.status.state == OPENV2G_HLC_ERROR);
@@ -59,13 +78,16 @@ int main(void)
                     3u,
                     310u,
                     &endpoint) == OPENV2G_RESULT_ACCEPTED);
+    secure_connection_id = secure_hlc.tcp_tls_session.status.connection_id;
     TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTransportReady(
                     &secure_hlc,
                     3u,
+                    secure_connection_id,
                     320u) == OPENV2G_RESULT_ACCEPTED);
     TEST_ASSERT(OpenV2g_Iso15118Chrg_OnTlsComplete(
                     &secure_hlc,
                     3u,
+                    secure_connection_id,
                     330u,
                     true) == OPENV2G_RESULT_OK);
     TEST_ASSERT(secure_hlc.status.state == OPENV2G_HLC_SAP);

@@ -1,6 +1,6 @@
 # G1 host/SIL skeleton architecture
 
-**Revision:** Draft 0.9 — 15/09/2026
+**Revision:** Draft 0.10 — 20/09/2026
 
 **Status:** `PROPOSED_IMPLEMENTATION` — host/SIL only, not AUTOSAR production evidence
 
@@ -72,7 +72,7 @@ flowchart LR
 - EXI operations và schema queries đi qua provisional C/S ports; registry status và EXI diagnostic đi qua S/R read ports để giữ semantics RTE-like trước khi có ARXML.
 - Coordinator/HLC/PLC/hardware control paths, SDP/TCP/V2GTP operations và lower callbacks có provisional C/S ports; CP/PP, energy, link, HLC, transport, hardware, permission, fault, BPT và state status có S/R copy ports.
 - HLC supervisor gọi SDP/TCP/V2GTP qua required ports; nominal integration đọc producer snapshots qua S/R ports, không dereference producer state.
-- SDP result được copy thành immutable typed endpoint; TCP/TLS host lifecycle kiểm tra generation, connection state và cấm implicit downgrade khi TLS lỗi.
+- SDP result được copy thành immutable typed endpoint; TCP/TLS host lifecycle kiểm tra generation, connection ID và state, loại callback/RX cũ sau cancel/reconnect và cấm implicit downgrade khi TLS lỗi.
 - HLC event queue có compile-time capacity; overflow revoke permission và buộc coordinator resync bằng authoritative status mới hơn overflow.
 - Khởi động schema/EXI/SAP dependency được kiểm tra; lỗi khởi động không còn bị bỏ qua.
 - SAP giữ exact ordered offer snapshot theo generation/request ID, lọc DIN khỏi TLS, từ chối unoffered schema/no-match/timeout và chỉ chuyển selection đã xác thực sang static adapter factory.
@@ -113,7 +113,7 @@ flowchart LR
 | `openv2g_test_hlc_event_queue` | Bounded queue, drop-newest overflow flag/count, generation reset và stale event rejection |
 | `openv2g_test_hlc_event_bridge` | HLC event consumer wiring; overflow revokes permission và requires fresh authoritative status resync |
 | `openv2g_test_sdp_client` | SDP cancel race, late response rejection and immutable endpoint validation |
-| `openv2g_test_tcp_tls_session` | Typed endpoint/connection lifecycle, stale callbacks, idempotent close and TLS no-downgrade behavior |
+| `openv2g_test_tcp_tls_session` | Typed endpoint/connection lifecycle, cancel during handshake, same-generation reconnect, stale connection callbacks, idempotent close and TLS no-downgrade behavior |
 | `openv2g_test_hlc_tls` | HLC waits for TLS result; failure stays error and success alone starts message stack |
 | `openv2g_test_hardware_gate` | No enable with DENY or expired permission |
 | `openv2g_test_v2gtp_codec` | Bounded streaming decode, fragmented/coalesced frames, stale generation and malformed/oversized input |
@@ -147,3 +147,4 @@ Passing host tests is `VERIFIED_HOST` evidence only. It is not target, safety, i
 | Draft 0.7 | 14/09/2026 | Replaced SAP/factory/DIN/ISO-2 lifecycle stubs with typed host components, correlated offer selection, static one-active factory, semantic protocol FSMs and negative-path tests. |
 | Draft 0.8 | 15/09/2026 | Added semantic EV request generation, exact request/response correlation, energy and permission S/R gates, HLC protocol-TX mailbox, retained diagnostics and complete DIN/ISO-2 DC EIM host sequences. |
 | Draft 0.9 | 15/09/2026 | Added a shared protocol data-flow rule/validation layer, target voltage/current availability, dispatched-request event provenance, correlated metering evidence and main-flow documentation/tests. |
+| Draft 0.10 | 20/09/2026 | Added connection-ID correlation to TCP/TLS callbacks and HLC RX intake; covered cancel during handshake, same-generation reconnect and late callbacks from the closed connection. |

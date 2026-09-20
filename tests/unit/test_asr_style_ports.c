@@ -241,8 +241,13 @@ static int TestTransportClientServerPorts(void)
     TEST_ASSERT(transport_cs.connect(
                     transport_cs.context, 5u, 40u, &sdp_status.endpoint) ==
                 OPENV2G_RESULT_ACCEPTED);
+    TEST_ASSERT(transport_sr.read(transport_sr.context, &transport_status) ==
+                OPENV2G_RESULT_OK);
     TEST_ASSERT(transport_cs.tcp_connected(
-                    transport_cs.context, 5u, 41u) == OPENV2G_RESULT_OK);
+                    transport_cs.context,
+                    5u,
+                    transport_status.connection_id,
+                    41u) == OPENV2G_RESULT_OK);
     TEST_ASSERT(transport_sr.read(transport_sr.context, &transport_status) ==
                 OPENV2G_RESULT_OK);
     TEST_ASSERT(transport_status.state == OPENV2G_TRANSPORT_PLAIN_ACTIVE);
