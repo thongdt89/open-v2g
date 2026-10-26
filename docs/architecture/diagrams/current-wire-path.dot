@@ -1,0 +1,26 @@
+digraph Wire {
+ graph [rankdir=TB, bgcolor="white", pad="0.35", nodesep="0.3", ranksep="0.45", fontname="DejaVu Sans", fontsize=20, label="Generated EXI and network path", labelloc=t];
+ node [shape=box, style="rounded,filled", fillcolor="#edf5fc", color="#8ca8bd", fontname="DejaVu Sans", fontsize=14, margin="0.18,0.14"];
+ edge [fontname="DejaVu Sans", fontsize=11, color="#526779", arrowsize=0.75];
+ owner [label="HLC semantic owners\nSAP + selected DIN / ISO-2 adapter"];
+ mapping [label="Linux wire runner\nLocal generation / connection / pending request\nWire-ID map · SessionID · EVSE ID · schedule ID"];
+ facade [label="Project-neutral SAP / DC DTOs\nConcrete ExiCodec + SchemaRegistry\nExplicit schema · bounded candidate / output"];
+ codecs [label="Separate generated backends\nSAP appHand  |  DIN  |  ISO-2\nOpt-in libcbv2g · pinned / hash checked", fillcolor="#eee8f8", color="#a393c0"];
+ tx [label="TX\nEXI → V2GTP encode\nTcpTlsSession.Send\nBounded copying queue"];
+ rx [label="RX\nHLC.OnTransportBytes\nGeneration / connection guard\nV2GTP parser → bounded EXI view"];
+ {rank=same; tx; rx;}
+ io [label="Nonblocking POSIX socket pump\nSend / receive / poll · correlated TX completion\nCoordinator tick before permission renewal"];
+ station [label="Separate station process — SIM\nActual EXI / V2GTP on loopback TCP", fillcolor="#fff0d8", color="#c79c54"];
+ note [shape=note, fillcolor="#f3f4f6", color="#aeb8c3", fontsize=12, label="Concrete codec is bound by the Linux runner.\nCore EXI / registry lifecycle fields remain placeholders.\nPlain TCP; PLC and SDP readiness injected; no real TLS / PnC."];
+ owner -> mapping [dir=both, label="pending requests / checked results"];
+ mapping -> facade [dir=both];
+ facade -> codecs [dir=both];
+ codecs -> tx [style=invis]; codecs -> rx [style=invis];
+ facade -> tx [label="encoded EXI"];
+ rx -> facade [label="decode", constraint=false];
+ tx -> io;
+ io -> rx [constraint=false];
+ rx -> io [style=invis];
+ io -> station [dir=both, label="TCP bytes"];
+ station -> note [style=invis];
+}

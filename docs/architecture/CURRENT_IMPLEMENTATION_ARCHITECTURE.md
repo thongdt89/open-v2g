@@ -10,6 +10,18 @@ code, opt-in; **OPEN** = production integration/evidence unavailable.
 Solid edges describe the current host paths. Dotted edges describe dependencies,
 configuration or future integration, not implemented production wiring.
 
+## Rendered images
+
+These PNG images display in viewers that do not render Mermaid.
+
+![Current EVCC host architecture](diagrams/current-overview.png)
+
+![Generated EXI and network path](diagrams/current-wire-path.png)
+
+SVG copies and editable Graphviz `.dot` sources are in `diagrams/`. Regenerate
+an image with `dot -Tpng -Gdpi=120 diagrams/current-overview.dot -o diagrams/current-overview.png`
+from this document's directory. The detailed Mermaid views below remain editable.
+
 ## 1. System and composition view
 
 ```mermaid

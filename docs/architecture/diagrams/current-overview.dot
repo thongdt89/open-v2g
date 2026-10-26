@@ -1,0 +1,28 @@
+digraph Architecture {
+ graph [rankdir=TB, bgcolor="white", pad="0.35", nodesep="0.35", ranksep="0.5", fontname="DejaVu Sans", fontsize=20, label="Current EVCC host architecture", labelloc=t];
+ node [shape=box, style="rounded,filled", fillcolor="#edf5fc", color="#8ca8bd", fontname="DejaVu Sans", fontsize=14, margin="0.18,0.15"];
+ edge [color="#526779", fontname="DejaVu Sans", fontsize=11, arrowsize=0.75];
+ inputs [label="SIM providers\nQualified CP/PP + energy snapshots", fillcolor="#fff0d8", color="#c79c54"];
+ cc [label="ChargingCoordinator — HOST\nChargeStateMachine · PermissionManager\nFaultCoordinator · BPT guards (disabled)"];
+ hlc [label="ISO15118Chrg — HOST\nHLC facade / supervisor · SAP\nOne active DIN / ISO-2 semantic adapter\nTCP lifecycle · V2GTP receive parser"];
+ {rank=same; cc; hlc;}
+ plc [label="PlcLinkManager — HOST\nSIM modem / SLAC / link readiness", fillcolor="#fff0d8", color="#c79c54"];
+ hw [label="Hardware adapter — SIM\nCorrelated measured-feedback fake", fillcolor="#fff0d8", color="#c79c54"];
+ {rank=same; plc; hw;}
+ runner [label="Linux wire runner — HOST\nDTO mapping · local pending correlation\nNonblocking I/O · coordinator supervision"];
+ codec [label="Concrete ExiCodec + SchemaRegistry\nSeparate SAP / DIN / ISO-2 backends\nCANDIDATE: opt-in pinned libcbv2g", fillcolor="#eee8f8", color="#a393c0"];
+ socket [label="POSIX TCP — HOST\nActual IPv4 loopback bytes · plaintext"];
+ station [label="Separate station process — SIM\nGenerated SAP + DIN / ISO-2 EXI in V2GTP\nClosed DC EIM test profile", fillcolor="#fff0d8", color="#c79c54"];
+ note [shape=note, fillcolor="#f3f4f6", color="#aeb8c3", fontsize=12, label="HOST = implemented logic     SIM = surrounding model\nOnly the coordinator commands hardware.\nRTE-style wiring + OS / clock / service stubs are host-only.\nSupplier AUTOSAR, licensed provenance and vehicle safety remain open."];
+ inputs -> cc [label="evidence"];
+ cc -> hlc [dir=both, label="lifecycle / permission\nstatus / requests / evidence"];
+ cc -> plc [dir=both, label="control / readiness"];
+ cc -> hw [dir=both, label="commands / feedback"];
+ hlc -> runner [dir=both, label="pending DTOs / decoded results"];
+ hw -> runner [style=invis];
+ runner -> codec [dir=both, label="explicit schema"];
+ runner -> socket [dir=both, label="TX through TCP session\nRX through HLC guard"];
+ codec -> socket [style=invis];
+ socket -> station [dir=both, label="TCP"];
+ station -> note [style=invis];
+}
