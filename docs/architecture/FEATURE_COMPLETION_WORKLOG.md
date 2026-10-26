@@ -85,3 +85,25 @@ artifacts listed above. No disabled feature has been represented as implemented.
   1504/2592 branches; project EXI adapters: 969/979 lines, 805/1244 branches;
   generated codec: 10343/32715 lines, 4602/19824 branches. These are exercised
   code counts, not percentages of supported protocol features.
+
+## IPv6 platform increment — 26/10/2026
+
+Added a real, nonblocking IPv6 UDP SDP provider and server fixture under
+`simulation/linux/src/sdp6.c`, plus IPv6 loopback TCP helpers. Jobs retain owner
+generation/request/deadline, validate exact packet shape/security/source and
+publish only current responses. Tests discover a real TCP listener and exchange
+data, plus reject malformed packets, downgrade/mismatch, expired and stale jobs.
+See [provider details and source reference](../../simulation/linux/SDP_IPV6.md).
+
+The provider is integrated into `station6`/`evcc6`: real discovery precedes
+IPv6 TCP and SAP/EXI for both protocols. Multicast/link-local discovery, retry
+policy and TLS remain open. SDP's TLS bit is not proof
+of cryptography or a negotiated TLS version. The original coverage JSON above
+records the earlier increment and excludes this new network provider.
+
+IPv6 increment verification: normal suite **25/25**, ASan/UBSan suite **24/24**,
+default-codec-OFF suite **20/20** passed. Final focused discovery/wire checks were
+also rerun after timeout/completion cleanup changes. Wire regression now includes
+**35** two-process sessions (two additional full IPv6 discovery sessions).
+Actual `station6`/`evcc6` CLI smoke runs for DIN and ISO-2 each exited 0 at both
+ends and completed 15 protocol exchanges. This is host evidence only.

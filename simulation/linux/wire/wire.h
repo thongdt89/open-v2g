@@ -57,6 +57,7 @@ typedef struct {
     uint8_t evse_id[OPENV2G_EXI_DC_ID_MAX];
     uint16_t evse_id_length;
     uint8_t wire_ids[OPENV2G_EXI_SAP_OFFERS_MAX];
+    uint16_t discovery_port;
     uint16_t service_id;
     uint8_t schedule_id;
     OpenV2g_PowerLimits peer_limits;
@@ -82,6 +83,8 @@ bool OvWireIo_Exchange(OvWireIo *io, const uint8_t *frame, size_t length,
 bool OvWireIo_Receive(OvWireIo *io, OpenV2g_V2gtpFrameView *frame, OpenV2g_TimeUs deadline);
 bool OvWireIo_Write(OvWireIo *io, const uint8_t *frame, size_t length, OpenV2g_TimeUs deadline);
 bool OvWireClient_Init(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol, bool freeze_energy);
+bool OvWireClient_InitDiscovery(OvWireClient *client, OpenV2g_ProtocolId protocol, uint16_t discovery_port);
 bool OvWireClient_Run(OvWireClient *client);
+bool OvWireStation_RunDiscovered(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol);
 bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario scenario);
 #endif

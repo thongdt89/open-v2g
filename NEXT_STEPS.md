@@ -105,3 +105,11 @@ Continue the remaining ordered implementation inventory in
 [FEATURE_COMPLETION_WORKLOG.md](docs/architecture/FEATURE_COMPLETION_WORKLOG.md).
 Do not interpret this increment or existing passing tests as full AC/PnC/ISO-20/
 BPT/security/session-resumption support.
+
+A standalone real IPv6 UDP SDP provider and IPv6 TCP follow-up now exist with
+host tests (`simulation/linux/SDP_IPV6.md`). Next network step is asynchronous
+integration into the EXI runner, then scoped multicast/link-local and TLS.
+
+The `station6`/`evcc6` runner now integrates real UDP discovery before IPv6 TCP
+and SAP/EXI, for both DIN and ISO-2. This supersedes the preceding pending-runner
+integration note. Multicast/link-local interface handling, retries and TLS remain.

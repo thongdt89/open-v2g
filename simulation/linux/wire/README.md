@@ -159,3 +159,14 @@ python3 tools/coverage_report.py build-exi --output /tmp/openv2g-coverage.json
 
 Use a fresh build directory for each measurement to avoid accumulating prior
 execution counters. Coverage percentages do not establish protocol conformance.
+
+## Real IPv6 SDP path — Draft 0.3, 26/10/2026
+
+`station6 PORT din|iso2` and `evcc6 PORT din|iso2` add real unicast IPv6 UDP
+SDP before IPv6 TCP connection and the same generated-EXI flow. This removes
+endpoint injection for the IPv6 path. Cooperative coordinator supervision also
+runs while discovery is pending. The CLI uses UDP and TCP on `::1:PORT`; the
+station advertises its TCP endpoint. [Detailed provider/run guide](../SDP_IPV6.md).
+Both protocols have complete IPv6 discovery/socket regression sessions, in
+addition to the legacy IPv4/fault scenarios (35 wire sessions total).
+Multicast/link-local, physical PLC and actual TLS remain open.

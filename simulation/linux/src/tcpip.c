@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <limits.h>
 #include <poll.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -111,4 +112,35 @@ OpenV2g_TcpTxCsPort Ov2g_TcpTxPort(int *fd)
 {
     OpenV2g_TcpTxCsPort port = {fd, transmit};
     return port;
+}
+
+int Ov2g_Tcp6Listen(uint16_t port, uint16_t *bound_port)
+{
+    int fd = socket(AF_INET6, SOCK_STREAM, 0);
+    struct sockaddr_in6 address = {0};
+    socklen_t length = sizeof(address);
+    address.sin6_family = AF_INET6; address.sin6_addr = in6addr_loopback;
+    address.sin6_port = htons(port);
+    if (fd < 0 || fcntl(fd, F_SETFL, O_NONBLOCK) < 0 ||
+        bind(fd, (struct sockaddr *)&address, sizeof(address)) < 0 || listen(fd, 1) < 0 ||
+        getsockname(fd, (struct sockaddr *)&address, &length) < 0) { Ov2g_TcpClose(&fd); return -1; }
+    if (bound_port != NULL) { *bound_port = ntohs(address.sin6_port); }
+    return fd;
+}
+int Ov2g_Tcp6Connect(const OpenV2g_Endpoint *endpoint, OpenV2g_TimeUs deadline)
+{
+    int fd, error = 0;
+    socklen_t length = sizeof(error);
+    struct sockaddr_in6 address = {0};
+    if (endpoint == NULL || endpoint->port == 0u || deadline <= Ov2g_OsNow() || endpoint->transport != OPENV2G_TRANSPORT_TCP) { return -1; }
+    (void)memcpy(&address.sin6_addr, endpoint->address, 16u);
+    if (!IN6_IS_ADDR_LOOPBACK(&address.sin6_addr)) { return -1; }
+    address.sin6_family = AF_INET6; address.sin6_port = htons(endpoint->port);
+    fd = socket(AF_INET6, SOCK_STREAM, 0);
+    if (fd < 0 || fcntl(fd, F_SETFL, O_NONBLOCK) < 0) { Ov2g_TcpClose(&fd); return -1; }
+    if (connect(fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        if (errno != EINPROGRESS || !wait_fd(fd, POLLOUT, deadline) ||
+            getsockopt(fd, SOL_SOCKET, SO_ERROR, &error, &length) < 0 || error != 0) { Ov2g_TcpClose(&fd); }
+    }
+    return fd;
 }

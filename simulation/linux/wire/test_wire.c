@@ -1,5 +1,6 @@
 #include "wire.h"
 #include "test.h"
+#include "openv2g/linux/sdp6.h"
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -37,6 +38,30 @@ static int run(OpenV2g_ProtocolId protocol, OvWireScenario scenario)
     if (scenario == OV_WIRE_FREEZE_ENERGY) { TEST_ASSERT(client.energy_started && client.ticks > 5u); }
     return 0;
 }
+static int discovered_session(OpenV2g_ProtocolId protocol)
+{
+    uint16_t tcp_port, udp_port;
+    int listener = Ov2g_Tcp6Listen(0u, &tcp_port), udp = Ov2g_Sdp6Listen(0u, &udp_port);
+    pid_t child;
+    int status;
+    bool success;
+    OvWireClient client;
+    TEST_ASSERT(listener >= 0 && udp >= 0);
+    child = fork(); TEST_ASSERT(child >= 0);
+    if (child == 0) {
+        bool served = OvWireStation_RunDiscovered(listener, udp, tcp_port, protocol);
+        Ov2g_TcpClose(&listener); Ov2g_TcpClose(&udp); _exit(served ? 0 : 1);
+    }
+    Ov2g_TcpClose(&listener); Ov2g_TcpClose(&udp);
+    TEST_ASSERT(OvWireClient_InitDiscovery(&client, protocol, udp_port));
+    success = OvWireClient_Run(&client);
+    TEST_ASSERT(waitpid(child, &status, 0) == child);
+    TEST_ASSERT(success && WIFEXITED(status) && WEXITSTATUS(status) == 0);
+    TEST_ASSERT(client.io.fd == -1 && client.messages == 15u && client.energy_started);
+    TEST_ASSERT(client.environment.rte.hlc.sdp_client.endpoint.port == tcp_port);
+    TEST_ASSERT(client.environment.rte.coordinator.permission_manager.current.decision == OPENV2G_PERMISSION_DENY);
+    return 0;
+}
 static int assessment_guards(void)
 {
     OpenV2g_ChargingCoordinator coordinator = {0};
@@ -65,6 +90,8 @@ int main(void)
 {
     unsigned scenario;
     TEST_ASSERT(assessment_guards() == 0);
+    TEST_ASSERT(discovered_session(OPENV2G_PROTOCOL_DIN_70121) == 0);
+    TEST_ASSERT(discovered_session(OPENV2G_PROTOCOL_ISO_15118_2) == 0);
     TEST_ASSERT(run(OPENV2G_PROTOCOL_DIN_70121, OV_WIRE_NORMAL) == 0);
     TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2, OV_WIRE_NORMAL) == 0);
     TEST_ASSERT(run(OPENV2G_PROTOCOL_DIN_70121, OV_WIRE_MINOR_DEVIATION) == 0);

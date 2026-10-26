@@ -119,3 +119,10 @@ This original custom-frame smoke fixture is retained. The separate
 using generated SAP/DIN/ISO-2 EXI in V2GTP, with nonblocking supervision and
 coordinator-owned protocol stopping. Use `openv2g_linux_exi` for that path;
 `openv2g_linux_stub` remains the simpler custom-frame example described above.
+
+## IPv6 discovery provider — 26/10/2026
+
+A separate [nonblocking IPv6 UDP SDP provider](SDP_IPV6.md) and IPv6 loopback TCP
+helpers now exist and have real-socket tests. The EXI runner supports real
+discovery via `station6`/`evcc6` for both protocols. TLS, multicast/link-local
+and PLC integration remain open. SDP security-field tests do not establish TLS sessions.

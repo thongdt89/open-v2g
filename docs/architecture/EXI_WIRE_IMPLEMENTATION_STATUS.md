@@ -105,3 +105,8 @@ See [the feature work log](FEATURE_COMPLETION_WORKLOG.md) for exact restrictions
 verification and remaining implementation. This supplement supersedes the old
 single-flat-schedule/no-ServiceDetail scope above; the overall completion request
 is still in progress. Production closure gates remain unchanged.
+
+The subsequent IPv6 increment adds `station6`/`evcc6`: actual unicast IPv6 UDP SDP
+before IPv6 TCP and the same SAP/DIN/ISO-2 EXI sessions. Legacy IPv4 mode still
+injects its endpoint. See [IPv6 provider details](../../simulation/linux/SDP_IPV6.md).
+TLS, multicast/link-local and physical PLC remain outside the delivered profile.

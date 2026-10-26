@@ -1,5 +1,7 @@
 #include "wire.h"
 #include <stdio.h>
+#include <poll.h>
+#include "openv2g/linux/sdp6.h"
 #include <string.h>
 
 static bool ok(OpenV2g_Result result)
@@ -88,6 +90,36 @@ bool OvWireClient_Init(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol
     tx = OvWireIo_TxPort(&client->io);
     return OpenV2g_TcpTlsSession_BindTcpTxPort(client->io.transport, &tx) == OPENV2G_RESULT_OK;
 }
+bool OvWireClient_InitDiscovery(OvWireClient *client, OpenV2g_ProtocolId protocol, uint16_t discovery_port)
+{
+    if (discovery_port == 0u || !OvWireClient_Init(client, -1, protocol, false)) { return false; }
+    client->discovery_port = discovery_port; return true;
+}
+static OpenV2g_Result discovered(void *context, uint32_t generation, const OpenV2g_Endpoint *endpoint)
+{
+    OvWireClient *client = context;
+    return OpenV2g_Iso15118Chrg_OnSdpComplete(&client->environment.rte.hlc, generation, Ov2g_OsNow(), endpoint);
+}
+static bool discover(OvWireClient *client)
+{
+    OpenV2g_HostSimulation *sim = &client->environment.rte;
+    Ov2g_Sdp6Job job;
+    OpenV2g_Endpoint server = {0};
+    OpenV2g_Result result;
+    Ov2g_Sdp6Init(&job); job.complete = discovered; job.completion_context = client;
+    server.address[15] = 1u; server.port = client->discovery_port;
+    server.transport = OPENV2G_TRANSPORT_TCP; server.security = OPENV2G_SECURITY_NONE;
+    if (Ov2g_Sdp6Begin(&job, &sim->hlc.sdp_client, &server, Ov2g_OsNow() + OV_WIRE_TIMEOUT_US) != OPENV2G_RESULT_ACCEPTED) { return false; }
+    do {
+        struct pollfd descriptor = {job.fd, POLLIN, 0};
+        if (!supervise(client, Ov2g_OsNow())) { Ov2g_Sdp6Cancel(&job); return false; }
+        result = Ov2g_Sdp6Pump(&job, Ov2g_OsNow());
+        if (result == OPENV2G_RESULT_BUSY) { (void)poll(&descriptor, 1u, 1); }
+    } while (result == OPENV2G_RESULT_BUSY);
+    if (!ok(result)) { Ov2g_Sdp6Cancel(&job); return false; }
+    client->io.fd = Ov2g_Tcp6Connect(&sim->hlc.sdp_client.endpoint, Ov2g_OsNow() + OV_WIRE_TIMEOUT_US);
+    return client->io.fd >= 0;
+}
 static bool sap(OvWireClient *client)
 {
     OpenV2g_HostSimulation *sim = &client->environment.rte;
@@ -100,8 +132,9 @@ static bool sap(OvWireClient *client)
     size_t length;
     size_t index;
     if (!ok(OpenV2g_HostSimulation_InjectCpPp(sim, &cp, now)) ||
-        !ok(OpenV2g_HostSimulation_AdvancePlcToReady(sim, now)) ||
-        !ok(OpenV2g_Iso15118Chrg_OnSdpComplete(&sim->hlc, sim->coordinator.generation, Ov2g_OsNow() + 10u, &sim->config.peer_endpoint))) { return false; }
+        !ok(OpenV2g_HostSimulation_AdvancePlcToReady(sim, now))) { return false; }
+    if (client->discovery_port != 0u) { if (!discover(client)) { return false; } }
+    else if (!ok(OpenV2g_Iso15118Chrg_OnSdpComplete(&sim->hlc, sim->coordinator.generation, Ov2g_OsNow() + 10u, &sim->config.peer_endpoint))) { return false; }
     client->io.connection = sim->hlc.tcp_tls_session.status.connection_id;
     if (!ok(OpenV2g_Iso15118Chrg_OnTransportReady(&sim->hlc, client->io.generation, client->io.connection, Ov2g_OsNow() + 10u)) ||
         !ok(OpenV2g_Iso15118Chrg_TakeSapRequest(&sim->hlc, client->io.generation, &client->pending_sap))) { return false; }
@@ -250,6 +283,7 @@ bool OvWireClient_Run(OvWireClient *client)
 stop:
     (void)OpenV2g_HostSimulation_Stop(sim, Ov2g_OsNow() + 100u, success ? OPENV2G_REASON_CANCELLED : OPENV2G_REASON_PRECONDITION);
     Ov2g_OsCancel(&client->environment.os, 0u);
+    if (client->discovery_port != 0u) { Ov2g_TcpClose(&client->io.fd); }
     (void)OpenV2g_ExiCodec_Stop(&client->codec.codec, client->io.generation);
     client->io.queued = false; client->io.pending.data = NULL;
     return success;

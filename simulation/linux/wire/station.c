@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "wire.h"
 #include <poll.h>
+#include "openv2g/linux/sdp6.h"
 #include <string.h>
 
 static const OpenV2g_ProtocolMessageKind sequence[] = {
@@ -114,4 +115,19 @@ bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario
 stop:
     Ov2g_TcpClose(&fd);
     return success;
+}
+
+bool OvWireStation_RunDiscovered(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol)
+{
+    OpenV2g_Endpoint advertised = {0};
+    OpenV2g_TimeUs deadline = Ov2g_OsNow() + 30000000u;
+    OpenV2g_Result result;
+    advertised.address[15] = 1u; advertised.port = tcp_port;
+    advertised.transport = OPENV2G_TRANSPORT_TCP; advertised.security = OPENV2G_SECURITY_NONE;
+    do {
+        struct pollfd descriptor = {udp, POLLIN, 0};
+        result = Ov2g_Sdp6ServeOnce(udp, &advertised);
+        if (result == OPENV2G_RESULT_BUSY) { (void)poll(&descriptor, 1u, 1); }
+    } while (result == OPENV2G_RESULT_BUSY && Ov2g_OsNow() < deadline);
+    return result == OPENV2G_RESULT_OK && OvWireStation_Run(listener, protocol, OV_WIRE_NORMAL);
 }
