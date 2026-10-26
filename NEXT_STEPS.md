@@ -96,3 +96,12 @@ license provenance and editions (OP-006/007), supplier ARXML/BSW signatures
 safety/physical sequencing (OP-005). None is frozen by this host implementation.
 Independent host extensions can broaden services/schedules, UDP/IPv6 SDP and
 coverage-guided fuzzing; current support is the documented closed DC EIM profile.
+
+## Feature-completion request — 26/10/2026, in progress
+
+Assessment gating, ServiceDetail, pending CPD, minor-deviation policy, bounded
+schedule lists and dynamic-limit enforcement now extend the host profile.
+Continue the remaining ordered implementation inventory in
+[FEATURE_COMPLETION_WORKLOG.md](docs/architecture/FEATURE_COMPLETION_WORKLOG.md).
+Do not interpret this increment or existing passing tests as full AC/PnC/ISO-20/
+BPT/security/session-resumption support.

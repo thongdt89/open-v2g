@@ -1,4 +1,4 @@
-add_library(openv2g_linux_wire STATIC codec.c io.c client.c station.c)
+add_library(openv2g_linux_wire STATIC codec.c io.c client.c station.c assessment.c)
 target_include_directories(openv2g_linux_wire PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(openv2g_linux_wire PUBLIC openv2g_linux_bsw openv2g_exi_cbv2g_sap)
 openv2g_enable_strict_warnings(openv2g_linux_wire)

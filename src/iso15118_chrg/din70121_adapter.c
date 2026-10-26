@@ -148,6 +148,7 @@ static OpenV2g_Result advance_after_response(
         next_state = OPENV2G_PROTOCOL_STATE_SERVICE_DISCOVERY;
         next_kind = OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY;
         break;
+    case OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL:
     case OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY:
         next_state = OPENV2G_PROTOCOL_STATE_SERVICE_SELECTION;
         next_kind = OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION;
@@ -233,6 +234,9 @@ static OpenV2g_Result din_message(
             message->correlation_id,
             OPENV2G_REASON_PEER_REJECT);
         return OPENV2G_RESULT_REJECTED;
+    }
+    if (completed_kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY && message->request_service_detail) {
+        return send_request(adapter, OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL, message->now);
     }
     if (message->ongoing) {
         return send_request(adapter, completed_kind, message->now);

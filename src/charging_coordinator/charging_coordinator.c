@@ -1,6 +1,7 @@
 #include "openv2g/charging_coordinator/charging_coordinator.h"
 
 #include <string.h>
+#include "openv2g/common/validation.h"
 
 static bool config_is_valid(const OpenV2g_CoordinatorConfig *config)
 {
@@ -91,6 +92,8 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnQualifiedCpPp(
     }
 
     if (coordinator->state_machine.state == OPENV2G_COORDINATOR_UNPLUGGED) {
+        (void)memset(&coordinator->precharge_assessment, 0, sizeof(coordinator->precharge_assessment));
+        (void)memset(&coordinator->welding_assessment, 0, sizeof(coordinator->welding_assessment));
         coordinator->generation = next_generation(coordinator->generation);
         coordinator->teardown_started = false;
         coordinator->has_hlc_event = false;
@@ -370,6 +373,26 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_EvaluatePermission(
     return result;
 }
 
+OpenV2g_Result OpenV2g_ChargingCoordinator_ApplyAssessment(
+    OpenV2g_ChargingCoordinator *coordinator, const OpenV2g_PhysicalAssessment *assessment,
+    uint32_t expected_correlation_id, OpenV2g_TimeUs now)
+{
+    OpenV2g_PhysicalAssessment *target;
+    if (coordinator == NULL || assessment == NULL || coordinator->teardown_started ||
+        expected_correlation_id == 0u || assessment->correlation_id != expected_correlation_id ||
+        !coordinator->has_hardware || coordinator->config.assessment_max_age_us == 0u ||
+        !OpenV2g_EnvelopeIsCurrent(&coordinator->hardware.env, coordinator->generation, now,
+            coordinator->config.permission.hardware_max_age_us) ||
+        assessment->hardware_sequence == 0u || assessment->hardware_sequence != coordinator->hardware.env.sequence_counter ||
+        !OpenV2g_EnvelopeIsCurrent(&assessment->env, coordinator->generation, now,
+            coordinator->config.assessment_max_age_us)) { return OPENV2G_RESULT_REJECTED; }
+    if (assessment->kind == OPENV2G_ASSESS_PRECHARGE) { target = &coordinator->precharge_assessment; }
+    else if (assessment->kind == OPENV2G_ASSESS_WELDING) { target = &coordinator->welding_assessment; }
+    else { return OPENV2G_RESULT_REJECTED; }
+    *target = *assessment;
+    return assessment->passed ? OPENV2G_RESULT_OK : OPENV2G_RESULT_REJECTED;
+}
+
 OpenV2g_Result OpenV2g_ChargingCoordinator_RequestEnergyTransfer(
     OpenV2g_ChargingCoordinator *coordinator,
     OpenV2g_TimeUs now)
@@ -381,6 +404,14 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_RequestEnergyTransfer(
         return OPENV2G_RESULT_REJECTED;
     }
 
+    if (coordinator->config.require_physical_assessment &&
+        (!coordinator->precharge_assessment.passed ||
+         coordinator->config.assessment_max_age_us == 0u ||
+         coordinator->precharge_assessment.hardware_sequence != coordinator->hardware.env.sequence_counter ||
+         !OpenV2g_EnvelopeIsCurrent(&coordinator->precharge_assessment.env,
+             coordinator->generation, now, coordinator->config.assessment_max_age_us))) {
+        return OPENV2G_RESULT_REJECTED;
+    }
     result = OpenV2g_ChargingCoordinator_EvaluatePermission(coordinator, now);
     if ((result != OPENV2G_RESULT_OK) ||
         (coordinator->state_machine.state != OPENV2G_COORDINATOR_READY_FOR_ENERGY)) {

@@ -7,7 +7,13 @@
 /* Project DTO IDs: request kind, or kind + response offset. Not wire tags. */
 #define OPENV2G_EXI_DC_RESPONSE_OFFSET 100u
 #define OPENV2G_EXI_DC_ID_MAX 32u
-/* Bounded DC EIM host profile: one charge service and one flat schedule.
+#define OPENV2G_EXI_PARAMETER_MAX 5u
+typedef struct { int16_t set_id; char name[32]; uint16_t name_length; bool is_string; int32_t integer_value; char text[32]; uint16_t text_length; } OpenV2g_ExiParameter;
+#define OPENV2G_EXI_SCHEDULE_MAX 3u
+#define OPENV2G_EXI_SCHEDULE_POINTS_MAX 5u
+typedef struct { uint32_t start_s; uint32_t duration_s; int32_t power_w; } OpenV2g_ExiSchedulePoint;
+typedef struct { uint8_t id; uint8_t count; OpenV2g_ExiSchedulePoint points[OPENV2G_EXI_SCHEDULE_POINTS_MAX]; } OpenV2g_ExiSchedule;
+/* Bounded host data model; capacities are explicit, not imported ABI.
  * No imported/generated type is exported. Physical fields use project SI units.
  */
 typedef struct {
@@ -18,6 +24,25 @@ typedef struct {
     bool ongoing;
     bool ready;
     bool isolation_valid;
+    bool resumed_session;
+    bool pause_session;
+    bool charging_complete;
+    bool waiting_for_customer;
+    bool omit_pending_parameters;
+    bool omit_pending_schedules;
+    uint32_t min_voltage_mv;
+    int32_t min_current_ma;
+    uint16_t raw_response_code;
+    bool has_max_voltage;
+    bool has_max_current;
+    bool has_max_power;
+    bool voltage_limit_achieved;
+    bool current_limit_achieved;
+    bool power_limit_achieved;
+    uint8_t parameter_count;
+    OpenV2g_ExiParameter parameters[OPENV2G_EXI_PARAMETER_MAX];
+    uint8_t schedule_count;
+    OpenV2g_ExiSchedule schedules[OPENV2G_EXI_SCHEDULE_MAX];
     uint8_t session_id[8];
     uint8_t evcc_id[6];
     uint8_t evse_id[OPENV2G_EXI_DC_ID_MAX];

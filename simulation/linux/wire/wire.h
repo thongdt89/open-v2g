@@ -41,7 +41,8 @@ typedef enum {
     OV_WIRE_TIMEOUT = 3, OV_WIRE_DISCONNECT = 4, OV_WIRE_WRONG_SESSION = 5,
     OV_WIRE_NEGATIVE = 6, OV_WIRE_WRONG_MESSAGE = 7, OV_WIRE_FREEZE_ENERGY = 8,
     OV_WIRE_REPLAY_SAP = 9, OV_WIRE_WRONG_SCHEDULE = 10,
-    OV_WIRE_WRONG_EVSE = 11, OV_WIRE_WRONG_SCHEMA = 12
+    OV_WIRE_WRONG_EVSE = 11, OV_WIRE_WRONG_SCHEMA = 12,
+    OV_WIRE_ZERO_PRECHARGE = 13, OV_WIRE_WELDED = 14, OV_WIRE_MINOR_DEVIATION = 15, OV_WIRE_PENDING = 16, OV_WIRE_DYNAMIC_LIMIT = 17
 } OvWireScenario;
 
 typedef struct {
@@ -64,8 +65,11 @@ typedef struct {
     unsigned ticks;
     bool energy_started;
     bool freeze_energy;
+    bool allow_sap_minor_deviation;
+    OpenV2g_PhysicalAssessmentCsPort assessment_port;
 } OvWireClient;
 
+OpenV2g_PhysicalAssessmentCsPort OvWireHostAssessmentPort(void);
 bool OvWireCodec_Init(OvWireCodec *codec, uint32_t generation);
 bool OvWireEncode(OvWireCodec *codec, uint32_t generation, OpenV2g_SchemaId schema,
     uint16_t id, const void *object, size_t size, uint8_t *frame, size_t *length);

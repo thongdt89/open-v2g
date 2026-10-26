@@ -183,6 +183,7 @@ OpenV2g_HostSimulationConfig OpenV2g_HostSimulation_DefaultConfig(void)
     OpenV2g_HostSimulationConfig config;
 
     (void)memset(&config, 0, sizeof(config));
+    config.coordinator.assessment_max_age_us = 100000u;
     config.coordinator.permission.cp_pp_max_age_us = 1000000u;
     config.coordinator.permission.energy_max_age_us = 1000000u;
     config.coordinator.permission.link_max_age_us = 1000000u;

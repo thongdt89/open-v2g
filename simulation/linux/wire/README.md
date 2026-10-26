@@ -127,3 +127,35 @@ The full local suite passes 24/24 with the optional external oracle configured;
 expanded malformed corpus. Remote CI is configured; no remote run is claimed.
 See [verification/provenance record](../../../docs/architecture/EXI_WIRE_IMPLEMENTATION_STATUS.md)
 for evidence and external closure requirements.
+
+## Feature increment — Draft 0.2, 26/10/2026
+
+The current normal session adds ServiceDetail after discovery: **15 exchanges**
+after SAP, with three CurrentDemand loops. Pending-CPD regression adds a repeated
+CPD exchange. Separate DIN/ISO-2 mapping now retains bounded multi-interval
+schedules and minimum/dynamic limits. The host intersects reductions and clamps
+subsequent targets against current and power limits. SAP minor deviation is an
+explicit compatibility policy (`allow_sap_minor_deviation`).
+
+Wire sessions require a coordinator-owned physical assessment before transfer.
+The surrounding assessment provider is a deterministic fixture: nonzero target
+matching peer precharge voltage plus READY state; zero peer/local voltage/current
+and open contactors for welding. It is not an independent inlet/battery voltage
+measurement model or an approved vehicle safety decision. Assessment evidence
+must match generation, correlation, freshness and current hardware sequence.
+Legacy semantic fixtures leave this new opt-in gate disabled.
+
+ServiceDetail currently accepts up to five parameter sets, each containing one
+integer or string parameter. ISO-2 pause/resume and customer-waiting fields are
+preserved by the mapper; retained-session resume is not implemented. Full scope
+and remaining work: [feature work log](../../../docs/architecture/FEATURE_COMPLETION_WORKLOG.md).
+
+For GCC line/branch coverage configure `-DOPENV2G_ENABLE_COVERAGE=ON`, build and
+run CTest, then run:
+
+```sh
+python3 tools/coverage_report.py build-exi --output /tmp/openv2g-coverage.json
+```
+
+Use a fresh build directory for each measurement to avoid accumulating prior
+execution counters. Coverage percentages do not establish protocol conformance.

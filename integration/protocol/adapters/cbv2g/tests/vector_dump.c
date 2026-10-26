@@ -41,6 +41,8 @@ int main(void)
             if (kind == 10u || kind == 11u) { continue; }
             for (response = 0u; response < 2u; ++response) {
                 OpenV2g_ExiDcDocument document = OpenV2g_ExiDc_Default((OpenV2g_ProtocolMessageKind)kind, response != 0u);
+                /* Historical differential fixture predates zero-voltage welding plant. */
+                if (kind == OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION) { document.voltage_mv = 400000u; }
                 OpenV2g_ExiResult result;
                 OpenV2g_ExiEncodeRequest request = {
                     schema == 0u ? OPENV2G_SCHEMA_DIN_70121 : OPENV2G_SCHEMA_ISO_15118_2,

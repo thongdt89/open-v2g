@@ -208,3 +208,13 @@ Important test gaps:
 Sources: Atomic Rev.3 §§18–23 and acceptance/open items; feature gates; project
 FSMs, generated-code mappers, runner and tests. No imported ABI, safety allocation,
 standard timer or external approval has been invented or changed.
+
+## Post-audit implementation increment — 26/10/2026
+
+The preceding matrix records the audit baseline at `0b79f7e`. Selected gaps have
+since been implemented: assessment gating, ServiceDetail, pending CPD, SAP minor
+deviation, bounded schedules, minimum/dynamic limits and preservation of selected
+session/completion fields. See [the work log](FEATURE_COMPLETION_WORKLOG.md) for
+precise implementation/test scope and remaining work. The overall request to
+implement all missing features remains in progress; this is not full protocol
+coverage or closure of the external production gates.

@@ -60,8 +60,9 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
 {
     struct iso2_BodyType *body = &generated->V2G_Message.Body;
     iso2_responseCodeType code = value->accepted ?
-        (value->new_session ? iso2_responseCodeType_OK_NewSessionEstablished : iso2_responseCodeType_OK) : iso2_responseCodeType_FAILED;
+        (value->new_session ? iso2_responseCodeType_OK_NewSessionEstablished : (value->resumed_session ? iso2_responseCodeType_OK_OldSessionJoined : iso2_responseCodeType_OK)) : iso2_responseCodeType_FAILED;
     if (value->soc_permille > 1000u || value->voltage_mv > INT32_MAX || value->max_voltage_mv > INT32_MAX ||
+        value->min_voltage_mv > INT32_MAX || value->min_current_ma < 0 ||
         value->current_ma < 0 || value->max_current_ma < 0 || value->max_power_w < 0 || value->schedule_power_w < 0) { return false; }
     generated->V2G_Message.Header.SessionID.bytesLen = 8u;
     (void)memcpy(generated->V2G_Message.Header.SessionID.bytes, value->session_id, 8u);
@@ -71,6 +72,8 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
             body->SessionSetupReq_isUsed = 1u;
             body->SessionSetupReq.EVCCID.bytesLen = 6u;
             (void)memcpy(body->SessionSetupReq.EVCCID.bytes, value->evcc_id, 6u); break;
+        case OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL:
+            body->ServiceDetailReq_isUsed = 1u; body->ServiceDetailReq.ServiceID = value->service_id; break;
         case OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY:
             body->ServiceDiscoveryReq_isUsed = 1u; break;
         case OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION:
@@ -107,14 +110,14 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
             ev_status(&body->PowerDeliveryReq.DC_EVPowerDeliveryParameter.DC_EVStatus, value);
             body->PowerDeliveryReq.DC_EVPowerDeliveryParameter.ChargingComplete = value->kind == OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_STOP; break;
         case OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND:
-            body->CurrentDemandReq_isUsed = 1u; ev_status(&body->CurrentDemandReq.DC_EVStatus, value);
+            body->CurrentDemandReq_isUsed = 1u; body->CurrentDemandReq.ChargingComplete = value->charging_complete; ev_status(&body->CurrentDemandReq.DC_EVStatus, value);
             OUT_PHYS(body->CurrentDemandReq.EVTargetVoltage, value->voltage_mv, V);
             OUT_PHYS(body->CurrentDemandReq.EVTargetCurrent, value->current_ma, A); break;
         case OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION:
             body->WeldingDetectionReq_isUsed = 1u; ev_status(&body->WeldingDetectionReq.DC_EVStatus, value); break;
         case OPENV2G_PROTOCOL_MESSAGE_SESSION_STOP:
             body->SessionStopReq_isUsed = 1u;
-            body->SessionStopReq.ChargingSession = iso2_chargingSessionType_Terminate;
+            body->SessionStopReq.ChargingSession = value->pause_session ? iso2_chargingSessionType_Pause : iso2_chargingSessionType_Terminate;
             break;
         default: return false;
         }
@@ -125,6 +128,29 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
             REQUIRE(value->evse_id_length > 0u && value->evse_id_length <= sizeof(value->evse_id) && value->evse_id_length < sizeof(body->SessionSetupRes.EVSEID.characters));
             body->SessionSetupRes.EVSEID.charactersLen = value->evse_id_length;
             (void)memcpy(body->SessionSetupRes.EVSEID.characters, value->evse_id, value->evse_id_length); break;
+        case OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL: {
+            unsigned i;
+            body->ServiceDetailRes_isUsed = 1u; body->ServiceDetailRes.ResponseCode = code;
+            body->ServiceDetailRes.ServiceID = value->service_id;
+            REQUIRE(value->parameter_count <= OPENV2G_EXI_PARAMETER_MAX);
+            body->ServiceDetailRes.ServiceParameterList_isUsed = value->parameter_count != 0u;
+            body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen = value->parameter_count;
+            for (i = 0u; i < value->parameter_count; ++i) {
+                const OpenV2g_ExiParameter *source = &value->parameters[i];
+                struct iso2_ParameterSetType *set = &body->ServiceDetailRes.ServiceParameterList.ParameterSet.array[i];
+                struct iso2_ParameterType *parameter = &set->Parameter.array[0];
+                set->ParameterSetID = source->set_id; set->Parameter.arrayLen = 1u;
+                REQUIRE(source->name_length > 0u && source->name_length <= sizeof(source->name) && source->name_length < sizeof(parameter->Name.characters));
+                parameter->Name.charactersLen = source->name_length;
+                (void)memcpy(parameter->Name.characters, source->name, source->name_length);
+                if (source->is_string) {
+                    REQUIRE(source->text_length <= sizeof(source->text) && source->text_length < sizeof(parameter->stringValue.characters));
+                    parameter->stringValue_isUsed = 1u; parameter->stringValue.charactersLen = source->text_length;
+                    (void)memcpy(parameter->stringValue.characters, source->text, source->text_length);
+                } else { parameter->intValue_isUsed = 1u; parameter->intValue = source->integer_value; }
+            }
+            break;
+        }
         case OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY:
             body->ServiceDiscoveryRes_isUsed = 1u; body->ServiceDiscoveryRes.ResponseCode = code;
             body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.arrayLen = 1u;
@@ -138,28 +164,48 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
             body->PaymentServiceSelectionRes_isUsed = 1u; body->PaymentServiceSelectionRes.ResponseCode = code; break;
         case OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION:
             body->AuthorizationRes_isUsed = 1u; body->AuthorizationRes.ResponseCode = code;
-            body->AuthorizationRes.EVSEProcessing = value->ongoing ? iso2_EVSEProcessingType_Ongoing : iso2_EVSEProcessingType_Finished; break;
+            body->AuthorizationRes.EVSEProcessing = value->waiting_for_customer ? iso2_EVSEProcessingType_Ongoing_WaitingForCustomerInteraction : (value->ongoing ? iso2_EVSEProcessingType_Ongoing : iso2_EVSEProcessingType_Finished); break;
         case OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER: {
             struct iso2_DC_EVSEChargeParameterType *parameters = &body->ChargeParameterDiscoveryRes.DC_EVSEChargeParameter;
-            struct iso2_SAScheduleTupleType *tuple = &body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.array[0];
             body->ChargeParameterDiscoveryRes_isUsed = 1u; body->ChargeParameterDiscoveryRes.ResponseCode = code;
             body->ChargeParameterDiscoveryRes.EVSEProcessing = value->ongoing ? iso2_EVSEProcessingType_Ongoing : iso2_EVSEProcessingType_Finished;
+            REQUIRE(value->ongoing || (!value->omit_pending_parameters && !value->omit_pending_schedules));
             body->ChargeParameterDiscoveryRes.DC_EVSEChargeParameter_isUsed = 1u;
             evse_status(&parameters->DC_EVSEStatus, value);
             OUT_PHYS(parameters->EVSEMaximumVoltageLimit, value->max_voltage_mv, V);
             OUT_PHYS(parameters->EVSEMaximumCurrentLimit, value->max_current_ma, A);
             OUT_PHYS(parameters->EVSEMaximumPowerLimit, (int64_t)value->max_power_w * 1000, W);
-            OUT_PHYS(parameters->EVSEMinimumVoltageLimit, 0, V);
-            OUT_PHYS(parameters->EVSEMinimumCurrentLimit, 0, A);
+            OUT_PHYS(parameters->EVSEMinimumVoltageLimit, value->min_voltage_mv, V);
+            OUT_PHYS(parameters->EVSEMinimumCurrentLimit, value->min_current_ma, A);
             OUT_PHYS(parameters->EVSEPeakCurrentRipple, 0, A);
             body->ChargeParameterDiscoveryRes.SAScheduleList_isUsed = 1u;
-            body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.arrayLen = 1u;
-            tuple->SAScheduleTupleID = value->schedule_id;
-            tuple->PMaxSchedule.PMaxScheduleEntry.arrayLen = 1u;
-            tuple->PMaxSchedule.PMaxScheduleEntry.array[0].RelativeTimeInterval_isUsed = 1u;
-            tuple->PMaxSchedule.PMaxScheduleEntry.array[0].RelativeTimeInterval.duration_isUsed = 1u;
-            tuple->PMaxSchedule.PMaxScheduleEntry.array[0].RelativeTimeInterval.duration = value->schedule_duration_s;
-            OUT_PHYS(tuple->PMaxSchedule.PMaxScheduleEntry.array[0].PMax, (int64_t)value->schedule_power_w * 1000, W);
+            {
+                unsigned i, j, count = value->schedule_count != 0u ? value->schedule_count : 1u;
+                REQUIRE(count <= OPENV2G_EXI_SCHEDULE_MAX);
+                body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.arrayLen = (uint16_t)count;
+                for (i = 0u; i < count; ++i) {
+                    OpenV2g_ExiSchedule fallback = {0};
+                    const OpenV2g_ExiSchedule *schedule = &value->schedules[i];
+                    struct iso2_SAScheduleTupleType *tuple = &body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.array[i];
+                    uint32_t end = 0u;
+                    if (value->schedule_count == 0u) { fallback.id = value->schedule_id; fallback.count = 1u; fallback.points[0].duration_s = value->schedule_duration_s; fallback.points[0].power_w = value->schedule_power_w; schedule = &fallback; }
+                    REQUIRE(schedule->id != 0u && schedule->count > 0u && schedule->count <= OPENV2G_EXI_SCHEDULE_POINTS_MAX);
+                    for (j = 0u; j < i; ++j) { REQUIRE(schedule->id != value->schedules[j].id); }
+                    tuple->SAScheduleTupleID = schedule->id;
+                    tuple->PMaxSchedule.PMaxScheduleEntry.arrayLen = schedule->count;
+                    for (j = 0u; j < schedule->count; ++j) {
+                        const OpenV2g_ExiSchedulePoint *point = &schedule->points[j];
+                        struct iso2_PMaxScheduleEntryType *entry = &tuple->PMaxSchedule.PMaxScheduleEntry.array[j];
+                        REQUIRE(point->start_s == end && point->duration_s > 0u && point->duration_s <= UINT32_MAX - end && point->power_w >= 0);
+                        end += point->duration_s;
+                        entry->RelativeTimeInterval_isUsed = 1u; entry->RelativeTimeInterval.start = point->start_s;
+                        entry->RelativeTimeInterval.duration_isUsed = 1u; entry->RelativeTimeInterval.duration = point->duration_s;
+                        OUT_PHYS(entry->PMax, (int64_t)point->power_w * 1000, W);
+                    }
+                }
+            }
+            if (value->omit_pending_parameters) { body->ChargeParameterDiscoveryRes.DC_EVSEChargeParameter_isUsed = 0u; }
+            if (value->omit_pending_schedules) { body->ChargeParameterDiscoveryRes.SAScheduleList_isUsed = 0u; }
             break;
         }
         case OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK:
@@ -184,6 +230,15 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
             body->CurrentDemandRes.EVSEID.charactersLen = value->evse_id_length;
             (void)memcpy(body->CurrentDemandRes.EVSEID.characters, value->evse_id, value->evse_id_length);
             body->CurrentDemandRes.SAScheduleTupleID = value->schedule_id;
+            body->CurrentDemandRes.EVSEMaximumVoltageLimit_isUsed = value->has_max_voltage;
+            body->CurrentDemandRes.EVSEMaximumCurrentLimit_isUsed = value->has_max_current;
+            body->CurrentDemandRes.EVSEMaximumPowerLimit_isUsed = value->has_max_power;
+            if (value->has_max_voltage) { OUT_PHYS(body->CurrentDemandRes.EVSEMaximumVoltageLimit, value->max_voltage_mv, V); }
+            if (value->has_max_current) { OUT_PHYS(body->CurrentDemandRes.EVSEMaximumCurrentLimit, value->max_current_ma, A); }
+            if (value->has_max_power) { OUT_PHYS(body->CurrentDemandRes.EVSEMaximumPowerLimit, (int64_t)value->max_power_w * 1000, W); }
+            body->CurrentDemandRes.EVSECurrentLimitAchieved = value->current_limit_achieved;
+            body->CurrentDemandRes.EVSEVoltageLimitAchieved = value->voltage_limit_achieved;
+            body->CurrentDemandRes.EVSEPowerLimitAchieved = value->power_limit_achieved;
             break;
         case OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION:
             body->WeldingDetectionRes_isUsed = 1u; body->WeldingDetectionRes.ResponseCode = code;
@@ -210,10 +265,41 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
     }
     if (body->SessionSetupRes_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_SESSION_SETUP; value->response = true;
         value->accepted = body->SessionSetupRes.ResponseCode == iso2_responseCodeType_OK || body->SessionSetupRes.ResponseCode == iso2_responseCodeType_OK_NewSessionEstablished;
+        value->resumed_session = body->SessionSetupRes.ResponseCode == iso2_responseCodeType_OK_OldSessionJoined;
+        value->accepted = value->accepted || value->resumed_session;
+        value->raw_response_code = (uint16_t)body->SessionSetupRes.ResponseCode;
         value->new_session = body->SessionSetupRes.ResponseCode == iso2_responseCodeType_OK_NewSessionEstablished;
         REQUIRE(body->SessionSetupRes.EVSEID.charactersLen > 0u && body->SessionSetupRes.EVSEID.charactersLen <= sizeof(value->evse_id));
         value->evse_id_length = body->SessionSetupRes.EVSEID.charactersLen;
         (void)memcpy(value->evse_id, body->SessionSetupRes.EVSEID.characters, value->evse_id_length);
+    }
+    if (body->ServiceDetailReq_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL; value->response = false;
+        value->service_id = body->ServiceDetailReq.ServiceID;
+    }
+    if (body->ServiceDetailRes_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL; value->response = true;
+        unsigned i;
+        value->accepted = body->ServiceDetailRes.ResponseCode == iso2_responseCodeType_OK;
+        value->service_id = body->ServiceDetailRes.ServiceID;
+        if (body->ServiceDetailRes.ServiceParameterList_isUsed) {
+            REQUIRE(body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen > 0u && body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen <= OPENV2G_EXI_PARAMETER_MAX);
+            value->parameter_count = (uint8_t)body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen;
+            for (i = 0u; i < value->parameter_count; ++i) {
+                const struct iso2_ParameterSetType *set = &body->ServiceDetailRes.ServiceParameterList.ParameterSet.array[i];
+                const struct iso2_ParameterType *parameter = &set->Parameter.array[0];
+                OpenV2g_ExiParameter *source = &value->parameters[i];
+                REQUIRE(set->Parameter.arrayLen == 1u);
+                REQUIRE(!parameter->boolValue_isUsed && !parameter->byteValue_isUsed && !parameter->shortValue_isUsed && !parameter->physicalValue_isUsed);
+                REQUIRE((unsigned)parameter->intValue_isUsed + (unsigned)parameter->stringValue_isUsed == 1u);
+                source->set_id = set->ParameterSetID; source->is_string = parameter->stringValue_isUsed;
+
+                REQUIRE(parameter->Name.charactersLen > 0u && parameter->Name.charactersLen <= sizeof(source->name));
+                source->name_length = parameter->Name.charactersLen; (void)memcpy(source->name, parameter->Name.characters, source->name_length);
+                if (source->is_string) {
+                    REQUIRE(parameter->stringValue.charactersLen <= sizeof(source->text));
+                    source->text_length = parameter->stringValue.charactersLen; (void)memcpy(source->text, parameter->stringValue.characters, source->text_length);
+                } else { source->integer_value = parameter->intValue; }
+            }
+        }
     }
     if (body->ServiceDiscoveryReq_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY; value->response = false;
         REQUIRE(!body->ServiceDiscoveryReq.ServiceScope_isUsed && !body->ServiceDiscoveryReq.ServiceCategory_isUsed);
@@ -238,7 +324,8 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
     }
     if (body->AuthorizationRes_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION; value->response = true;
         value->accepted = body->AuthorizationRes.ResponseCode == iso2_responseCodeType_OK;
-        REQUIRE(body->AuthorizationRes.EVSEProcessing == iso2_EVSEProcessingType_Finished || body->AuthorizationRes.EVSEProcessing == iso2_EVSEProcessingType_Ongoing);
+        REQUIRE(body->AuthorizationRes.EVSEProcessing == iso2_EVSEProcessingType_Finished || body->AuthorizationRes.EVSEProcessing == iso2_EVSEProcessingType_Ongoing || body->AuthorizationRes.EVSEProcessing == iso2_EVSEProcessingType_Ongoing_WaitingForCustomerInteraction);
+        value->waiting_for_customer = body->AuthorizationRes.EVSEProcessing == iso2_EVSEProcessingType_Ongoing_WaitingForCustomerInteraction;
         value->ongoing = body->AuthorizationRes.EVSEProcessing != iso2_EVSEProcessingType_Finished;
     }
     if (body->ChargeParameterDiscoveryReq_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER; value->response = false;
@@ -254,26 +341,55 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
         value->accepted = body->ChargeParameterDiscoveryRes.ResponseCode == iso2_responseCodeType_OK;
         REQUIRE(body->ChargeParameterDiscoveryRes.EVSEProcessing == iso2_EVSEProcessingType_Finished || body->ChargeParameterDiscoveryRes.EVSEProcessing == iso2_EVSEProcessingType_Ongoing);
         value->ongoing = body->ChargeParameterDiscoveryRes.EVSEProcessing != iso2_EVSEProcessingType_Finished;
-        REQUIRE(body->ChargeParameterDiscoveryRes.DC_EVSEChargeParameter_isUsed && !body->ChargeParameterDiscoveryRes.AC_EVSEChargeParameter_isUsed && !body->ChargeParameterDiscoveryRes.EVSEChargeParameter_isUsed && !body->ChargeParameterDiscoveryRes.SASchedules_isUsed);
+        REQUIRE(!body->ChargeParameterDiscoveryRes.AC_EVSEChargeParameter_isUsed && (value->ongoing || (!body->ChargeParameterDiscoveryRes.EVSEChargeParameter_isUsed && !body->ChargeParameterDiscoveryRes.SASchedules_isUsed)));
+        value->omit_pending_parameters = !body->ChargeParameterDiscoveryRes.DC_EVSEChargeParameter_isUsed;
+        value->omit_pending_schedules = !body->ChargeParameterDiscoveryRes.SAScheduleList_isUsed;
+        REQUIRE(value->ongoing || (!value->omit_pending_parameters && !value->omit_pending_schedules));
+        if (!value->omit_pending_parameters) {
         REQUIRE(status_in(&body->ChargeParameterDiscoveryRes.DC_EVSEChargeParameter.DC_EVSEStatus, value));
-        IN_PHYS(body->ChargeParameterDiscoveryRes.DC_EVSEChargeParameter.EVSEMinimumVoltageLimit, V, physical); REQUIRE(physical == 0);
-        IN_PHYS(body->ChargeParameterDiscoveryRes.DC_EVSEChargeParameter.EVSEMinimumCurrentLimit, A, physical); REQUIRE(physical == 0);
+        IN_PHYS(body->ChargeParameterDiscoveryRes.DC_EVSEChargeParameter.EVSEMinimumVoltageLimit, V, physical); value->min_voltage_mv = (uint32_t)physical;
+        IN_PHYS(body->ChargeParameterDiscoveryRes.DC_EVSEChargeParameter.EVSEMinimumCurrentLimit, A, value->min_current_ma);
         REQUIRE(!body->ChargeParameterDiscoveryRes.DC_EVSEChargeParameter.EVSECurrentRegulationTolerance_isUsed);
         REQUIRE(!body->ChargeParameterDiscoveryRes.DC_EVSEChargeParameter.EVSEEnergyToBeDelivered_isUsed);
         IN_PHYS(body->ChargeParameterDiscoveryRes.DC_EVSEChargeParameter.EVSEMaximumVoltageLimit, V, physical); value->max_voltage_mv = (uint32_t)physical;
         IN_PHYS(body->ChargeParameterDiscoveryRes.DC_EVSEChargeParameter.EVSEMaximumCurrentLimit, A, value->max_current_ma);
         IN_PHYS(body->ChargeParameterDiscoveryRes.DC_EVSEChargeParameter.EVSEMaximumPowerLimit, W, physical); REQUIRE(physical % 1000 == 0); value->max_power_w = physical / 1000;
-        REQUIRE(body->ChargeParameterDiscoveryRes.SAScheduleList_isUsed && body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.arrayLen == 1u);
-        REQUIRE(body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.array[0].PMaxSchedule.PMaxScheduleEntry.arrayLen == 1u);
-        REQUIRE(!body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.array[0].SalesTariff_isUsed);
-        REQUIRE(body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.array[0].SAScheduleTupleID > 0 && body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.array[0].SAScheduleTupleID <= UINT8_MAX);
-        value->schedule_id = (uint8_t)body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.array[0].SAScheduleTupleID;
-        REQUIRE(body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.array[0].PMaxSchedule.PMaxScheduleEntry.array[0].RelativeTimeInterval_isUsed);
-        REQUIRE(!body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.array[0].PMaxSchedule.PMaxScheduleEntry.array[0].TimeInterval_isUsed);
-        REQUIRE(body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.array[0].PMaxSchedule.PMaxScheduleEntry.array[0].RelativeTimeInterval.start == 0u);
-        REQUIRE(body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.array[0].PMaxSchedule.PMaxScheduleEntry.array[0].RelativeTimeInterval.duration_isUsed);
-        value->schedule_duration_s = body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.array[0].PMaxSchedule.PMaxScheduleEntry.array[0].RelativeTimeInterval.duration;
-        IN_PHYS(body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.array[0].PMaxSchedule.PMaxScheduleEntry.array[0].PMax, W, physical); REQUIRE(physical % 1000 == 0); value->schedule_power_w = physical / 1000;
+        }
+        if (!value->omit_pending_schedules) {
+        unsigned i, j;
+        unsigned count = body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.arrayLen;
+        REQUIRE(count > 0u && count <= OPENV2G_EXI_SCHEDULE_MAX);
+        value->schedule_count = (uint8_t)count;
+        for (i = 0u; i < count; ++i) {
+            const struct iso2_SAScheduleTupleType *tuple = &body->ChargeParameterDiscoveryRes.SAScheduleList.SAScheduleTuple.array[i];
+            OpenV2g_ExiSchedule *schedule = &value->schedules[i];
+            uint32_t end = 0u;
+            REQUIRE(!tuple->SalesTariff_isUsed && tuple->SAScheduleTupleID > 0 && tuple->SAScheduleTupleID <= UINT8_MAX);
+            schedule->id = (uint8_t)tuple->SAScheduleTupleID;
+            for (j = 0u; j < i; ++j) { REQUIRE(schedule->id != value->schedules[j].id); }
+            REQUIRE(tuple->PMaxSchedule.PMaxScheduleEntry.arrayLen > 0u && tuple->PMaxSchedule.PMaxScheduleEntry.arrayLen <= OPENV2G_EXI_SCHEDULE_POINTS_MAX);
+            schedule->count = (uint8_t)tuple->PMaxSchedule.PMaxScheduleEntry.arrayLen;
+            for (j = 0u; j < schedule->count; ++j) {
+                const struct iso2_PMaxScheduleEntryType *entry = &tuple->PMaxSchedule.PMaxScheduleEntry.array[j];
+                OpenV2g_ExiSchedulePoint *point = &schedule->points[j];
+                REQUIRE(entry->RelativeTimeInterval_isUsed && !entry->TimeInterval_isUsed && entry->RelativeTimeInterval.duration_isUsed);
+                point->start_s = entry->RelativeTimeInterval.start; point->duration_s = entry->RelativeTimeInterval.duration;
+                REQUIRE(point->start_s == end && point->duration_s > 0u && point->duration_s <= UINT32_MAX - end);
+                end += point->duration_s;
+                IN_PHYS(entry->PMax, W, physical); REQUIRE(physical % 1000 == 0); point->power_w = physical / 1000;
+            }
+        }
+        /* Host selection policy: first offered tuple, conservative minimum power
+         * throughout its full contiguous duration. All offered tuples retained. */
+        value->schedule_id = value->schedules[0].id;
+        value->schedule_power_w = value->schedules[0].points[0].power_w;
+        value->schedule_duration_s = 0u;
+        for (j = 0u; j < value->schedules[0].count; ++j) {
+            const OpenV2g_ExiSchedulePoint *point = &value->schedules[0].points[j];
+            value->schedule_duration_s += point->duration_s;
+            if (point->power_w < value->schedule_power_w) { value->schedule_power_w = point->power_w; }
+        }
+        }
     }
     if (body->CableCheckReq_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK; value->response = false;
         REQUIRE(request_status_in(&body->CableCheckReq.DC_EVStatus, value));
@@ -309,6 +425,7 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
     }
     if (body->CurrentDemandReq_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND; value->response = false;
         REQUIRE(request_status_in(&body->CurrentDemandReq.DC_EVStatus, value));
+        value->charging_complete = body->CurrentDemandReq.ChargingComplete;
         IN_PHYS(body->CurrentDemandReq.EVTargetVoltage, V, physical); value->voltage_mv = (uint32_t)physical;
         IN_PHYS(body->CurrentDemandReq.EVTargetCurrent, A, value->current_ma);
     }
@@ -317,8 +434,15 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
         REQUIRE(status_in(&body->CurrentDemandRes.DC_EVSEStatus, value));
         IN_PHYS(body->CurrentDemandRes.EVSEPresentVoltage, V, physical); value->voltage_mv = (uint32_t)physical;
         IN_PHYS(body->CurrentDemandRes.EVSEPresentCurrent, A, value->current_ma);
-        REQUIRE(!body->CurrentDemandRes.EVSEMaximumVoltageLimit_isUsed && !body->CurrentDemandRes.EVSEMaximumCurrentLimit_isUsed && !body->CurrentDemandRes.EVSEMaximumPowerLimit_isUsed);
-        REQUIRE(!body->CurrentDemandRes.EVSECurrentLimitAchieved && !body->CurrentDemandRes.EVSEVoltageLimitAchieved && !body->CurrentDemandRes.EVSEPowerLimitAchieved);
+        value->has_max_voltage = body->CurrentDemandRes.EVSEMaximumVoltageLimit_isUsed;
+        value->has_max_current = body->CurrentDemandRes.EVSEMaximumCurrentLimit_isUsed;
+        value->has_max_power = body->CurrentDemandRes.EVSEMaximumPowerLimit_isUsed;
+        if (value->has_max_voltage) { IN_PHYS(body->CurrentDemandRes.EVSEMaximumVoltageLimit, V, physical); value->max_voltage_mv = (uint32_t)physical; }
+        if (value->has_max_current) { IN_PHYS(body->CurrentDemandRes.EVSEMaximumCurrentLimit, A, value->max_current_ma); }
+        if (value->has_max_power) { IN_PHYS(body->CurrentDemandRes.EVSEMaximumPowerLimit, W, physical); REQUIRE(physical % 1000 == 0); value->max_power_w = physical / 1000; }
+        value->current_limit_achieved = body->CurrentDemandRes.EVSECurrentLimitAchieved;
+        value->voltage_limit_achieved = body->CurrentDemandRes.EVSEVoltageLimitAchieved;
+        value->power_limit_achieved = body->CurrentDemandRes.EVSEPowerLimitAchieved;
         REQUIRE(!body->CurrentDemandRes.MeterInfo_isUsed && (!body->CurrentDemandRes.ReceiptRequired_isUsed || !body->CurrentDemandRes.ReceiptRequired));
         value->schedule_id = body->CurrentDemandRes.SAScheduleTupleID;
         REQUIRE(body->CurrentDemandRes.EVSEID.charactersLen > 0u && body->CurrentDemandRes.EVSEID.charactersLen <= sizeof(value->evse_id));
@@ -334,6 +458,7 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
         IN_PHYS(body->WeldingDetectionRes.EVSEPresentVoltage, V, physical); value->voltage_mv = (uint32_t)physical;
     }
     if (body->SessionStopReq_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_SESSION_STOP; value->response = false;
+        value->pause_session = body->SessionStopReq.ChargingSession == iso2_chargingSessionType_Pause;
     }
     if (body->SessionStopRes_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_SESSION_STOP; value->response = true;
         value->accepted = body->SessionStopRes.ResponseCode == iso2_responseCodeType_OK;

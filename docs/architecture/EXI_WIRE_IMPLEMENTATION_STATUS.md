@@ -94,3 +94,14 @@ expand the currently bounded service/schedule model, add UDP/IPv6 discovery,
 exercise an independently implemented EVSE, add coverage-guided fuzzing and
 measure host resources. Such expansion needs explicit profile/evidence updates;
 it is not silently represented as already implemented by this record.
+
+## Feature increment — 26/10/2026
+
+Selected audit gaps now have host implementations: coordinator physical-assessment
+port/gate, ServiceDetail, pending CPD, explicit SAP minor-deviation policy, bounded
+multi-tuple/interval schedules, minimum/dynamic limits, and preservation of selected
+ISO-2 session fields. Normal wire sessions now exchange 15 protocol messages.
+See [the feature work log](FEATURE_COMPLETION_WORKLOG.md) for exact restrictions,
+verification and remaining implementation. This supplement supersedes the old
+single-flat-schedule/no-ServiceDetail scope above; the overall completion request
+is still in progress. Production closure gates remain unchanged.

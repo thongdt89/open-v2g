@@ -28,7 +28,8 @@ typedef enum {
     OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT = 11,
     OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_STOP = 12,
     OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION = 13,
-    OPENV2G_PROTOCOL_MESSAGE_SESSION_STOP = 14
+    OPENV2G_PROTOCOL_MESSAGE_SESSION_STOP = 14,
+    OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL = 15
 } OpenV2g_ProtocolMessageKind;
 
 typedef enum {
@@ -85,6 +86,7 @@ typedef struct {
     OpenV2g_ProtocolMessageKind kind;
     bool accepted;
     bool ongoing;
+    bool request_service_detail;
     bool metering_receipt_required;
     OpenV2g_ProtocolMeteringEvidence metering_evidence;
     OpenV2g_AllowedAction requested_action;

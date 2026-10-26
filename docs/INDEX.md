@@ -59,3 +59,9 @@ verification and external production boundaries, based on commit `70ced6a`.
 [Protocol-feature coverage audit](architecture/PROTOCOL_FEATURE_COVERAGE_AUDIT.md),
 Draft 0.1: separates semantic, generated-code and socket coverage; records current
 profile exclusions, confirmed probe results, test gaps and proposed completion order.
+
+## Feature implementation increment — 26/10/2026
+
+[Feature completion work log](architecture/FEATURE_COMPLETION_WORKLOG.md) records
+implemented host increments, precise verification scope and the remaining
+implementation versus external evidence. Overall feature completion is in progress.

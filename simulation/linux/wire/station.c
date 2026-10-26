@@ -4,7 +4,7 @@
 #include <string.h>
 
 static const OpenV2g_ProtocolMessageKind sequence[] = {
-    OPENV2G_PROTOCOL_MESSAGE_SESSION_SETUP, OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY,
+    OPENV2G_PROTOCOL_MESSAGE_SESSION_SETUP, OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY, OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL,
     OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION, OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION,
     OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER, OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK,
     OPENV2G_PROTOCOL_MESSAGE_PRECHARGE, OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START,
@@ -31,6 +31,7 @@ bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario
     int fd = Ov2g_TcpAccept(listener, Ov2g_OsNow() + 30000000u);
     bool success = false;
     size_t index;
+    bool pending_sent = false;
     if (fd < 0 || !OvWireCodec_Init(&codec, 1u)) { goto stop; }
     OvWireIo_Init(&io, fd, 1u);
     if (!OvWireIo_Receive(&io, &received, Ov2g_OsNow() + OV_WIRE_TIMEOUT_US) ||
@@ -46,7 +47,7 @@ bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario
     }
     (void)memset(&sap_response, 0, sizeof(sap_response));
     sap_response.message_type_id = OPENV2G_EXI_SAP_RESPONSE;
-    sap_response.body.response.code = OPENV2G_EXI_SAP_SUCCESS;
+    sap_response.body.response.code = scenario == OV_WIRE_MINOR_DEVIATION ? OPENV2G_EXI_SAP_MINOR_DEVIATION : OPENV2G_EXI_SAP_SUCCESS;
     sap_response.body.response.has_schema_id = true;
     sap_response.body.response.wire_schema_id = scenario == OV_WIRE_UNOFFERED ? 250u : sap_request.body.request.offers[0].wire_schema_id;
     if (!OvWireEncode(&codec, 1u, OPENV2G_SCHEMA_SAP, OPENV2G_EXI_SAP_RESPONSE, &sap_response, sizeof(sap_response), bytes, &length)) { goto stop; }
@@ -64,7 +65,16 @@ bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario
         if (index == 0u && scenario == OV_WIRE_REPLAY_SAP) {
             success = send_fragmented(&io, sap_frame, sap_length); goto stop;
         }
+        if (sequence[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL) {
+            response.parameter_count = 1u;
+            response.parameters[0].set_id = 1; response.parameters[0].name_length = 4u;
+            (void)memcpy(response.parameters[0].name, "host", 4u); response.parameters[0].integer_value = 1;
+        }
         (void)memcpy(response.session_id, session_id, 8u);
+        if (scenario == OV_WIRE_PENDING && sequence[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER && !pending_sent) {
+            response.ongoing = true; response.omit_pending_parameters = true; response.omit_pending_schedules = true;
+        }
+
         if (scenario == OV_WIRE_WRONG_SESSION && index == 1u) { response.session_id[0] ^= 0xffu; }
         if (scenario == OV_WIRE_NEGATIVE && index == 0u) { response.accepted = false; }
         if (scenario == OV_WIRE_WRONG_MESSAGE && index == 0u) {
@@ -72,9 +82,18 @@ bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario
             response_id = (uint16_t)((unsigned)response.kind + OPENV2G_EXI_DC_RESPONSE_OFFSET);
         }
         if (sequence[index] == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND) {
+            if (scenario == OV_WIRE_DYNAMIC_LIMIT) {
+                if (index > 9u && (request.current_ma > 25000 || request.voltage_mv > 400000u)) { goto stop; }
+                response.has_max_current = true; response.max_current_ma = 30000;
+                response.has_max_power = true; response.max_power_w = 10000;
+                response.current_limit_achieved = true;
+            }
+
             if (scenario == OV_WIRE_WRONG_SCHEDULE) { response.schedule_id = 99u; }
             if (scenario == OV_WIRE_WRONG_EVSE) { response.evse_id[0] = 'X'; }
         }
+        if (scenario == OV_WIRE_ZERO_PRECHARGE && sequence[index] == OPENV2G_PROTOCOL_MESSAGE_PRECHARGE) { response.voltage_mv = 0u; }
+        if (scenario == OV_WIRE_WELDED && sequence[index] == OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION) { response.voltage_mv = 400000u; }
         if (!OvWireEncode(&codec, 1u,
             scenario == OV_WIRE_WRONG_SCHEMA && index == 0u ? OPENV2G_SCHEMA_DIN_70121 : schema,
             response_id, &response, sizeof(response), bytes, &length)) { goto stop; }
@@ -83,7 +102,10 @@ bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario
             (void)send_fragmented(&io, bytes, length); success = true; goto stop;
         }
         if (!send_fragmented(&io, bytes, length)) { goto stop; }
-        if ((scenario == OV_WIRE_WRONG_SCHEMA && index == 0u) ||
+        if (response.ongoing) { pending_sent = true; --index; continue; }
+        if ((scenario == OV_WIRE_ZERO_PRECHARGE && sequence[index] == OPENV2G_PROTOCOL_MESSAGE_PRECHARGE) ||
+            (scenario == OV_WIRE_WELDED && sequence[index] == OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION) ||
+            (scenario == OV_WIRE_WRONG_SCHEMA && index == 0u) ||
             ((scenario == OV_WIRE_WRONG_SCHEDULE || scenario == OV_WIRE_WRONG_EVSE) && sequence[index] == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND) ||
             (scenario == OV_WIRE_WRONG_SESSION && index == 1u) ||
             ((scenario == OV_WIRE_NEGATIVE || scenario == OV_WIRE_WRONG_MESSAGE) && index == 0u)) { success = true; goto stop; }

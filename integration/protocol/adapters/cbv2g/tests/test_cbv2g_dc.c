@@ -3,7 +3,7 @@
 #include <string.h>
 
 static const OpenV2g_ProtocolMessageKind kinds[] = {
-    OPENV2G_PROTOCOL_MESSAGE_SESSION_SETUP, OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY,
+    OPENV2G_PROTOCOL_MESSAGE_SESSION_SETUP, OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY, OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL,
     OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION, OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION,
     OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER, OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK,
     OPENV2G_PROTOCOL_MESSAGE_PRECHARGE, OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START,
@@ -36,13 +36,86 @@ static int test_schema(OpenV2g_SchemaId schema)
             if (document.response && document.kind == OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_STOP) {
                 decode.expected_message_type_id = OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START + OPENV2G_EXI_DC_RESPONSE_OFFSET;
             }
+            if (document.kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL && document.response) {
+                document.parameter_count = 2u;
+                document.parameters[0].set_id = 1; document.parameters[0].name_length = 3u;
+                (void)memcpy(document.parameters[0].name, "int", 3u); document.parameters[0].integer_value = -17;
+                document.parameters[1].set_id = 2; document.parameters[1].name_length = 3u;
+                (void)memcpy(document.parameters[1].name, "str", 3u); document.parameters[1].is_string = true;
+                document.parameters[1].text_length = 4u; (void)memcpy(document.parameters[1].text, "host", 4u);
+            }
+            if (document.kind == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND) {
+                document.charging_complete = true;
+                if (document.response) {
+                    document.has_max_voltage = document.has_max_current = document.has_max_power = true;
+                    document.max_voltage_mv = 390000u; document.max_current_ma = 70000; document.max_power_w = 24000;
+                    document.current_limit_achieved = document.voltage_limit_achieved = document.power_limit_achieved = true;
+                }
+            }
+            if (schema == OPENV2G_SCHEMA_ISO_15118_2) {
+                if (document.kind == OPENV2G_PROTOCOL_MESSAGE_SESSION_STOP) { document.pause_session = true; }
+                if (document.kind == OPENV2G_PROTOCOL_MESSAGE_SESSION_SETUP && document.response) { document.new_session = false; document.resumed_session = true; }
+                if (document.kind == OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION && document.response) { document.waiting_for_customer = true; }
+            }
             TEST_ASSERT(OpenV2g_ExiCodec_Encode(&codec, 1u, &encode, &result) == OPENV2G_RESULT_OK);
             length = result.encoded_length; decode.input_length = length;
             if (OpenV2g_ExiCodec_Decode(&codec, 1u, &decode, &result) != OPENV2G_RESULT_OK) {
                 (void)fprintf(stderr, "DC decode failed schema=%d kind=%d response=%u\n", (int)schema, (int)document.kind, response); return 1;
             }
             TEST_ASSERT(output.response == document.response);
+            if (document.kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL && document.response) {
+                TEST_ASSERT(output.parameter_count == 2u && output.parameters[0].integer_value == -17);
+                TEST_ASSERT(output.parameters[1].is_string && output.parameters[1].text_length == 4u && memcmp(output.parameters[1].text, "host", 4u) == 0);
+            }
+
+            if (document.kind == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND) {
+                if (!document.response) { TEST_ASSERT(output.charging_complete); }
+                else {
+                    TEST_ASSERT(output.has_max_voltage && output.has_max_current && output.has_max_power);
+                    TEST_ASSERT(output.max_voltage_mv == 390000u && output.max_current_ma == 70000 && output.max_power_w == 24000);
+                    TEST_ASSERT(output.current_limit_achieved && output.voltage_limit_achieved && output.power_limit_achieved);
+                }
+            }
+            if (schema == OPENV2G_SCHEMA_ISO_15118_2) {
+                if (document.kind == OPENV2G_PROTOCOL_MESSAGE_SESSION_STOP && !document.response) { TEST_ASSERT(output.pause_session); }
+                if (document.kind == OPENV2G_PROTOCOL_MESSAGE_SESSION_SETUP && document.response) { TEST_ASSERT(output.accepted && output.resumed_session && !output.new_session); }
+                if (document.kind == OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION && document.response) { TEST_ASSERT(output.ongoing && output.waiting_for_customer); }
+            }
+
             TEST_ASSERT(output.kind == document.kind || (document.response && document.kind == OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_STOP && output.kind == OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START));
+            if (document.kind == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER && document.response) {
+                document.ongoing = true; document.omit_pending_parameters = true; document.omit_pending_schedules = true;
+                TEST_ASSERT(OpenV2g_ExiCodec_Encode(&codec, 1u, &encode, &result) == OPENV2G_RESULT_OK);
+                decode.input_length = result.encoded_length;
+                TEST_ASSERT(OpenV2g_ExiCodec_Decode(&codec, 1u, &decode, &result) == OPENV2G_RESULT_OK);
+                TEST_ASSERT(output.ongoing && output.omit_pending_parameters && output.omit_pending_schedules);
+                document.ongoing = false;
+                TEST_ASSERT(OpenV2g_ExiCodec_Encode(&codec, 1u, &encode, &result) == OPENV2G_RESULT_REJECTED);
+                document.omit_pending_parameters = false; document.omit_pending_schedules = false;
+                document.min_voltage_mv = 100000u; document.min_current_ma = 1000;
+                TEST_ASSERT(OpenV2g_ExiCodec_Encode(&codec, 1u, &encode, &result) == OPENV2G_RESULT_OK);
+                decode.input_length = result.encoded_length;
+                TEST_ASSERT(OpenV2g_ExiCodec_Decode(&codec, 1u, &decode, &result) == OPENV2G_RESULT_OK);
+                TEST_ASSERT(output.min_voltage_mv == 100000u && output.min_current_ma == 1000);
+                document.schedule_count = 2u;
+                document.schedules[0].id = 1u; document.schedules[0].count = 2u;
+                document.schedules[0].points[0] = (OpenV2g_ExiSchedulePoint){0u, 10u, 20000};
+                document.schedules[0].points[1] = (OpenV2g_ExiSchedulePoint){10u, 20u, 10000};
+                document.schedules[1].id = 2u; document.schedules[1].count = 1u;
+                document.schedules[1].points[0] = (OpenV2g_ExiSchedulePoint){0u, 30u, 15000};
+                TEST_ASSERT(OpenV2g_ExiCodec_Encode(&codec, 1u, &encode, &result) == OPENV2G_RESULT_OK);
+                decode.input_length = result.encoded_length;
+                TEST_ASSERT(OpenV2g_ExiCodec_Decode(&codec, 1u, &decode, &result) == OPENV2G_RESULT_OK);
+                TEST_ASSERT(output.schedule_count == 2u && output.schedules[0].count == 2u && output.schedules[1].id == 2u);
+                TEST_ASSERT(output.schedule_duration_s == 30u && output.schedule_power_w == 10000);
+                document.schedules[1].id = 1u;
+                TEST_ASSERT(OpenV2g_ExiCodec_Encode(&codec, 1u, &encode, &result) == OPENV2G_RESULT_REJECTED);
+                document.schedules[1].id = 2u; document.schedules[0].points[1].start_s = 11u;
+                TEST_ASSERT(OpenV2g_ExiCodec_Encode(&codec, 1u, &encode, &result) == OPENV2G_RESULT_REJECTED);
+                document.schedules[0].points[1].start_s = 10u;
+                TEST_ASSERT(OpenV2g_ExiCodec_Encode(&codec, 1u, &encode, &result) == OPENV2G_RESULT_OK);
+                length = result.encoded_length;
+            }
             for (decode.input_length = 1u; decode.input_length < length; ++decode.input_length) {
                 OpenV2g_ExiDcDocument before;
                 (void)memset(&output, 0xa5, sizeof(output)); (void)memcpy(&before, &output, sizeof(before));

@@ -8,6 +8,7 @@
 #include "openv2g/charging_coordinator/charge_state_machine.h"
 #include "openv2g/charging_coordinator/fault_coordinator.h"
 #include "openv2g/charging_coordinator/permission_manager.h"
+#include "openv2g/charging_coordinator/physical_assessment.h"
 #include "openv2g/common/result.h"
 #include "openv2g/common/types.h"
 #include "openv2g/iso15118_chrg/iso15118_chrg.h"
@@ -26,6 +27,8 @@ typedef struct {
 
 typedef struct {
     OpenV2g_PermissionConfig permission;
+    bool require_physical_assessment;
+    OpenV2g_TimeUs assessment_max_age_us;
 } OpenV2g_CoordinatorConfig;
 
 typedef struct {
@@ -62,6 +65,8 @@ typedef struct {
     OpenV2g_TimeUs hlc_event_overflow_time;
     bool has_hardware;
     bool teardown_started;
+    OpenV2g_PhysicalAssessment precharge_assessment;
+    OpenV2g_PhysicalAssessment welding_assessment;
 } OpenV2g_ChargingCoordinator;
 
 OpenV2g_Result OpenV2g_ChargingCoordinator_Init(
@@ -111,6 +116,10 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_RequestEnergyTransfer(
  * for the protocol's bounded stop/welding/session-stop exchange. The caller
  * must subsequently call Stop on completion, timeout or fault.
  */
+OpenV2g_Result OpenV2g_ChargingCoordinator_ApplyAssessment(
+    OpenV2g_ChargingCoordinator *coordinator, const OpenV2g_PhysicalAssessment *assessment,
+    uint32_t expected_correlation_id, OpenV2g_TimeUs now);
+
 OpenV2g_Result OpenV2g_ChargingCoordinator_BeginProtocolStop(
     OpenV2g_ChargingCoordinator *coordinator, OpenV2g_TimeUs now);
 
