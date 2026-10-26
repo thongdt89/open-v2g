@@ -47,3 +47,9 @@ Các hình kiến trúc được giữ tại `assets/EVCC_AUTOSAR_Charging_Archi
 ## Current DC wire implementation — 26/10/2026
 
 [EXI wire implementation status](architecture/EXI_WIRE_IMPLEMENTATION_STATUS.md), Draft 0.1: current host implementation of all five requested work streams, verification evidence and explicit external closure inventory. [Linux wire run guide](../simulation/linux/wire/README.md) distinguishes the new real EXI executable from the older custom-frame smoke fixture.
+
+## Current architecture diagrams — 26/10/2026
+
+[Current implementation architecture](architecture/CURRENT_IMPLEMENTATION_ARCHITECTURE.md),
+Draft 0.1: composition view, concrete EXI/network path, runtime/stop sequence,
+verification and external production boundaries, based on commit `70ced6a`.
