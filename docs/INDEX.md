@@ -53,3 +53,9 @@ Các hình kiến trúc được giữ tại `assets/EVCC_AUTOSAR_Charging_Archi
 [Current implementation architecture](architecture/CURRENT_IMPLEMENTATION_ARCHITECTURE.md),
 Draft 0.1: composition view, concrete EXI/network path, runtime/stop sequence,
 verification and external production boundaries, based on commit `70ced6a`.
+
+## Protocol-feature coverage audit — 26/10/2026
+
+[Protocol-feature coverage audit](architecture/PROTOCOL_FEATURE_COVERAGE_AUDIT.md),
+Draft 0.1: separates semantic, generated-code and socket coverage; records current
+profile exclusions, confirmed probe results, test gaps and proposed completion order.
