@@ -42,3 +42,42 @@ jobs:
 
       - name: Run host/SIL tests
         run: cmake -E chdir build-ci ctest -C Debug --output-on-failure
+
+  sap-exi-candidate:
+    name: Linux / pinned SAP EXI candidate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+      - name: Check out pinned generated-code candidate
+        uses: actions/checkout@v4
+        with:
+          repository: EVerest/libcbv2g
+          ref: 03350be048b35b179905129005a97144a4bdcf93
+          path: out/deps/libcbv2g
+          persist-credentials: false
+      - name: Configure SAP candidate and host tests
+        run: >-
+          cmake -S . -B build-sap
+          -DCMAKE_BUILD_TYPE=Debug
+          -DOPENV2G_ENABLE_CBV2G_SAP_POC=ON
+          -DOPENV2G_CBV2G_SOURCE_DIR=${{ github.workspace }}/out/deps/libcbv2g
+          -DOPENV2G_WARNINGS_AS_ERRORS=ON
+      - name: Build and test host candidate
+        run: |
+          cmake --build build-sap --parallel
+          ctest --test-dir build-sap --output-on-failure
+      - name: Configure generated decoder sanitizers
+        run: >-
+          cmake -S . -B build-sap-sanitize
+          -DCMAKE_BUILD_TYPE=Debug
+          -DOPENV2G_ENABLE_CBV2G_SAP_POC=ON
+          -DOPENV2G_CBV2G_SOURCE_DIR=${{ github.workspace }}/out/deps/libcbv2g
+          -DOPENV2G_BUILD_SIMULATION=OFF
+          -DOPENV2G_BUILD_EXAMPLES=OFF
+          -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+      - name: Run SAP malformed-input corpus with sanitizers
+        run: |
+          cmake --build build-sap-sanitize --target openv2g_test_cbv2g_sap --parallel
+          ctest --test-dir build-sap-sanitize -R cbv2g_sap --output-on-failure

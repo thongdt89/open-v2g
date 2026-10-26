@@ -31,9 +31,19 @@ target-power projection, correlated metering evidence and controlled-stop action
 coordinator internals, CP/PP, energy, PLC, hardware, SDP, TCP/TLS, V2GTP and the
 HLC façade. Passing it proves host connection semantics only, not generated RTE.
 
+`openv2g_test_host_simulation` verifies the reusable host-only surrounding
+component simulator. It injects CP/PP and energy samples through S/R providers,
+drives PLC/SDP/TCP/SAP callbacks, accepts a correlated protocol request, reaches
+energy transfer through the permission/hardware path, rejects a stale-generation
+energy sample and checks revoke/safe-state/HLC/link stop ordering.
+
 Remaining extensions requiring more implementation or G2/G3 inputs:
 
 - generated SoAd/TcpIp/PduR adapter mapping for the host-tested bounded transport TX/RX seams;
 - malformed EXI and unoffered schema using licensed/generated backends and golden vectors;
 - edition-specific DIN/ISO-2 response-code, timer and generated-message mapping;
 - BPT capability/limit integration while the feature remains disabled.
+
+Linux simulation builds also register `openv2g_test_linux_bsw`, covering bounded OS/service stubs and local socket nominal/reject/stale/disconnect flows. See `simulation/linux/README.md` for the exact smoke scope. Socket tests require local network permissions.
+
+With `OPENV2G_ENABLE_CBV2G_SAP_POC=ON` and a verified external checkout, `openv2g_test_cbv2g_sap` executes generated SAP EXI request/response encoding and decoding against fixed upstream vectors plus malformed/mutation corpora. These are host regression references from the same codec, not independent conformance vectors.

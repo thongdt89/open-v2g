@@ -1,10 +1,20 @@
 add_library(openv2g_test_support STATIC test_support.c)
 target_link_libraries(openv2g_test_support PUBLIC openv2g_core)
 target_include_directories(openv2g_test_support PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+openv2g_enable_strict_warnings(openv2g_test_support)
 
 function(add_openv2g_test target source)
     add_executable(${target} ${source})
     target_link_libraries(${target} PRIVATE openv2g_test_support)
+    openv2g_enable_strict_warnings(${target})
+    add_test(NAME ${target} COMMAND ${target})
+endfunction()
+
+function(add_openv2g_simulation_test target source)
+    add_executable(${target} ${source})
+    target_link_libraries(${target} PRIVATE openv2g_host_sim)
+    target_include_directories(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    openv2g_enable_strict_warnings(${target})
     add_test(NAME ${target} COMMAND ${target})
 endfunction()
 
@@ -25,3 +35,9 @@ add_openv2g_test(openv2g_test_protocol_data_flow unit/test_protocol_data_flow.c)
 add_openv2g_test(openv2g_test_asr_style_ports unit/test_asr_style_ports.c)
 add_openv2g_test(openv2g_test_public_headers unit/test_public_headers.c)
 add_openv2g_test(openv2g_test_nominal_flow integration/test_nominal_flow.c)
+
+if(TARGET openv2g_host_sim)
+    add_openv2g_simulation_test(
+        openv2g_test_host_simulation
+        integration/test_host_simulation.c)
+endif()

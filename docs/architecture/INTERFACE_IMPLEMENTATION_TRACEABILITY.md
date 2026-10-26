@@ -1,6 +1,6 @@
 # Ma trận truy vết interface tới host/SIL implementation
 
-**Revision:** Draft 0.11 — 20/09/2026
+**Revision:** Draft 0.12 — 15/10/2026
 **Status:** `VERIFIED_HOST_MAPPING` — không phải ARXML/RTE, target build hoặc bằng chứng conformance
 
 ## 1. Phạm vi kiểm kê
@@ -65,6 +65,7 @@ Ma trận dưới đây bao phủ toàn bộ các dải ID đó theo subcomponen
 | `EvEnergyDataProvider` | atomic energy snapshot S/R copy port into coordinator/permission | nominal flow, permission, ASR-style ports | real BMS/OBC/inverter data, E2E/freshness budget |
 | `PlcLinkManager` | C/S control/callback port and S/R status for modem-ready → SLAC → association → IPv6 | nominal flow, ASR-style ports | modem/raw MME/PEV capability and TcpIp/SoAd binding |
 | `ChargeHardwareAdapter` | C/S permission-gated control; provisional command IDs/results; separately applied S/R-style measured status with stale-correlation rejection and contactor/lock mismatch fault | hardware gate, nominal flow, ASR-style ports | HARA-derived electrical criteria/deadlines, coordinator result consumption, real physical feedback and target drivers |
+| Host surrounding simulation | Composition fixture drives existing C/S/S/R boundaries and injects CP/PP, energy, PLC, EVSE response, link loss and measured hardware feedback | host simulation integration test and flow simulator | Host-only test utility; does not replace RTE/BSW, generated protocol mapping or physical plant models |
 | Platform services | clock/diagnostic/crypto function-port seams | header compile | OS/RTE/Dem/Csm/KeyM/NvM generated configuration |
 
 ## 6. Compatibility conclusion
@@ -86,4 +87,21 @@ cmake -S . -B build-host -A x64
 cmake --build build-host --config Debug
 ```
 
-Clean MSVC `/W4 /WX` build passed and all 17 host test executables passed on 20/09/2026. This includes DIN/ISO-2 data-flow projection, complete DC EIM semantic request/response loops, TCP/TLS cancel/reconnect and bounded TX correlation, fake-backend EXI and cross-library ASR-style port tests and is `VERIFIED_HOST` evidence only.
+Clean MSVC `/W4 /WX` build passed and all 18 host test executables passed on 15/10/2026. The added simulation test drives the port-connected composition, rejects stale-generation energy data, injects measured hardware mismatch and checks revoke/safe-state/HLC/link stop behavior. This remains `VERIFIED_HOST` evidence only. The Windows GCC helper was syntax/tool-discovery checked, but no GCC toolchain was installed in that review environment, so a Windows-GCC pass is not claimed here.
+
+
+## SAP EXI host candidate supplement — 26/10/2026
+
+For `EXI-IF-001…007` and `SCH-IF-001…004`, an opt-in SAP backend now calls pinned
+external libcbv2g generated encode/decode functions using bounded project DTOs,
+private generated types, source-checksum gates and no-partial-publication checks.
+`openv2g_test_cbv2g_sap` adds fixed upstream-vector, bounds, truncation and mutation
+coverage; ASan/UBSan/LSan execution passes. All 20 enabled host test executables
+pass locally. A dedicated pinned-candidate CI job is configured; no remote CI
+run is claimed by this edit.
+
+This supplements the `PARTIAL_HOST` classification; it does not close
+`BLOCKED_G2`, make DIN/ISO-2 codecs available or replace the HLC lifecycle
+placeholder. Schema provenance, independent golden vectors, generated protocol
+mapping, supplier ABI and target evidence remain open. See
+[adapter evidence](../../integration/protocol/adapters/cbv2g/README.md).

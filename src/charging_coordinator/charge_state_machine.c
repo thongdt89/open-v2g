@@ -1,5 +1,7 @@
 #include "openv2g/charging_coordinator/charge_state_machine.h"
 
+#include <stddef.h>
+
 void OpenV2g_ChargeStateMachine_Init(OpenV2g_ChargeStateMachine *machine)
 {
     if (machine != NULL) {

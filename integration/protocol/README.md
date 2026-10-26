@@ -2,7 +2,7 @@
 
 Status: `BLOCKED_FOR_TARGET` under the provisional baseline.
 
-This directory is reserved for licensed/generated SAP, DIN 70121, ISO 15118-2 and later ISO 15118-20 artifacts. The repository currently contains no licensed schema package or generated protocol implementation.
+This directory is reserved for licensed/generated SAP, DIN 70121, ISO 15118-2 and later ISO 15118-20 artifacts. The repository contains no licensed schema package or production generated protocol implementation. An opt-in external SAP generated-code host candidate is now available; see below.
 
 The project-side typed `SchemaRegistry` and `ExiCodec` callback boundary is now
 implemented and host-tested with a fake backend. See
@@ -43,3 +43,7 @@ transport-byte intake connected to that parser. A typed host-only `TcpTlsSession
 models immutable SDP endpoint selection, connection generation, TLS handshake and
 no-downgrade failure behavior. Binding these seams to actual
 SoAd/TcpIp/PduR callbacks and proving protocol conformance remain G2 work.
+
+## SAP host candidate — 26/10/2026
+
+[libcbv2g SAP backend](adapters/cbv2g/README.md) implements real generated encode/decode behind the existing codec C/S interface, with project-neutral objects and pinned external source/hash checks. This is host-only SAP evidence. DIN/ISO-2 backends, independent golden vectors, schema provenance/legal acceptance and target integration remain open.

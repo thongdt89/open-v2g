@@ -7,7 +7,22 @@ project(open_v2g_evcc
 
 option(OPENV2G_BUILD_TESTS "Build host-only unit and integration tests" ON)
 option(OPENV2G_BUILD_EXAMPLES "Build host-only examples" ON)
+option(OPENV2G_BUILD_SIMULATION "Build host-only surrounding-component simulators" ON)
 option(OPENV2G_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
+
+function(openv2g_enable_strict_warnings target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4)
+        if(OPENV2G_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE /WX)
+        endif()
+    else()
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+        if(OPENV2G_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE -Werror)
+        endif()
+    endif()
+endfunction()
 
 add_library(openv2g_core STATIC
     src/common/validation.c
@@ -37,17 +52,10 @@ add_library(openv2g_core STATIC
 target_include_directories(openv2g_core PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 target_compile_features(openv2g_core PUBLIC c_std_11)
+openv2g_enable_strict_warnings(openv2g_core)
 
-if(MSVC)
-    target_compile_options(openv2g_core PRIVATE /W4)
-    if(OPENV2G_WARNINGS_AS_ERRORS)
-        target_compile_options(openv2g_core PRIVATE /WX)
-    endif()
-else()
-    target_compile_options(openv2g_core PRIVATE -Wall -Wextra -Wpedantic)
-    if(OPENV2G_WARNINGS_AS_ERRORS)
-        target_compile_options(openv2g_core PRIVATE -Werror)
-    endif()
+if(OPENV2G_BUILD_SIMULATION)
+    add_subdirectory(simulation)
 endif()
 
 if(OPENV2G_BUILD_TESTS)
@@ -58,4 +66,19 @@ endif()
 
 if(OPENV2G_BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+# POSIX stubs are isolated from portable core and Windows builds.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND OPENV2G_BUILD_SIMULATION)
+    option(OPENV2G_BUILD_LINUX_STUBS "Build Linux OS/RTE/TCP/IP stub environment" ON)
+    if(OPENV2G_BUILD_LINUX_STUBS)
+        add_subdirectory(simulation/linux)
+    endif()
+endif()
+
+# Optional host candidate; no third-party source downloads in configure/build.
+option(OPENV2G_ENABLE_CBV2G_SAP_POC "Build pinned libcbv2g SAP EXI host candidate" OFF)
+set(OPENV2G_CBV2G_SOURCE_DIR "" CACHE PATH "External pinned libcbv2g checkout")
+if(OPENV2G_ENABLE_CBV2G_SAP_POC)
+    add_subdirectory(integration/protocol/adapters/cbv2g)
 endif()

@@ -1,7 +1,7 @@
 # Đề xuất triển khai EXI cho EVCC
 
-**Revision:** Draft 0.2 — 11/09/2026
-**Status:** `PROPOSED_WITH_VERIFIED_HOST_BOUNDARY` — chưa phải lựa chọn supplier, schema license hoặc bằng chứng conformance
+**Revision:** Draft 0.3 — 26/10/2026
+**Status:** `PROPOSED_WITH_VERIFIED_SAP_HOST_CANDIDATE` — chưa phải lựa chọn supplier, schema license hoặc bằng chứng conformance
 
 ## 1. Quyết định tạm
 
@@ -128,3 +128,35 @@ Chỉ khi các điều kiện này đạt mới có thể thay lifecycle placeho
 - [EXIficient Java](https://exificient.github.io/java/)
 
 Các nguồn này chứng minh có candidate/reference implementation; chúng không chứng minh selected supplier baseline, license approval hoặc target suitability.
+
+
+## 9. SAP host candidate implemented — 26/10/2026
+
+Revision note (Draft 0.3): started the generated integration with an opt-in,
+externally pinned libcbv2g SAP backend, following the SAP-first order in §5.
+The earlier fake boundary tests remain; the new backend executes actual generated
+EXI encoding/decoding. No target or production acceptance is implied.
+
+- Adapter: `integration/protocol/adapters/cbv2g/exi_cbv2g_sap.c`.
+- Public objects: bounded project-neutral SAP request/response DTOs; generated
+  structures stay private. Wire SchemaID remains distinct from project SchemaId.
+- Pin: `03350be048b35b179905129005a97144a4bdcf93`, with selected source hashes and
+  manifest under `integration/protocol/generated/libcbv2g/`.
+- Build is opt-in (`OPENV2G_ENABLE_CBV2G_SAP_POC`), offline after an explicit
+  external checkout. No generator is run and no schema/generated C is vendored.
+- Bounds follow the actual generated decoder: five offers, 99 namespace bytes;
+  one-extra-byte bitstream access is contained by guarded staging storage and
+  consumed-length checks. See adapter README for exact limitations.
+- Host evidence: 20/20 tests; fixed upstream request/response vectors, truncation,
+  bounds, mismatch and malformed corpus; SAP ASan/UBSan/LSan pass.
+
+Step 1 remains OPEN for schema provenance/legal/production rights. Step 2 pins
+the host generated-code snapshot but does not recover the full original
+schema/generator input chain. Step 3 now has host regression-vector evidence;
+independent golden/differential evidence remains OPEN. DIN/ISO-2 backends,
+message slices, session-wire mapping and target gates are still pending.
+The ISO15118Chrg lifecycle placeholder and Linux semantic socket smoke flow are
+not silently replaced by this candidate.
+
+Build/run instructions and evidence:
+[cbv2g SAP candidate](../../integration/protocol/adapters/cbv2g/README.md).

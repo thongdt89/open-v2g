@@ -1,5 +1,7 @@
 #include "openv2g/iso15118_chrg/subsystems.h"
 
+#include <stddef.h>
+
 void OpenV2g_Subsystem_Init(OpenV2g_Subsystem *subsystem, const char *name, bool enabled)
 {
     if (subsystem != NULL) {

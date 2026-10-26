@@ -42,6 +42,8 @@ Không tự coi các imported AUTOSAR types hoặc safety timing là đã freeze
 | `integration/` | Điểm tích hợp bị chặn cho AUTOSAR/supplier và protocol-generated artifacts |
 | `tests/` | Unit/integration tests cho các hard invariant ở G1 |
 | `examples/host_demo/` | Ví dụ hiển thị feature baseline provisional |
+| `simulation/` | Host-only surrounding-component simulator để bơm CP/PP, energy, PLC, EVSE/HLC và hardware feedback |
+| `scripts/build_gcc_windows.ps1` | Build/test bằng MinGW-w64 GCC trên Windows |
 
 ## Bộ khung G1 host/SIL
 
@@ -57,6 +59,23 @@ cmake -E chdir build-host ctest -C Debug --output-on-failure
 
 Các lệnh trên chỉ tạo host/SIL artifacts. Chúng không generate RTE/ARXML và không chứng minh target, HIL, timing, safety hoặc protocol conformance.
 
+Build bằng GCC/MinGW-w64 trên Windows và chạy cả simulator/test suite:
+
+```powershell
+.\scripts\build_gcc_windows.ps1
+```
+
+Nếu Windows chặn script chưa ký, dùng một process PowerShell riêng:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build_gcc_windows.ps1
+```
+
+Sau khi build, chạy `openv2g_flow_simulator` trong thư mục
+`build-gcc-windows/examples/` để xem trace của luồng CP/PP → PLC → HLC →
+permission → hardware → coordinated stop. Xem [simulation/README.md](simulation/README.md)
+để tùy biến dữ liệu đầu vào và giới hạn evidence.
+
 ## Trạng thái bàn giao
 
 - Đã có tài liệu thiết kế chi tiết hai composition chính, atomic interfaces và project datatype catalogue.
@@ -64,3 +83,15 @@ Các lệnh trên chỉ tạo host/SIL artifacts. Chúng không generate RTE/ARX
 - Chưa có bằng chứng cho target build, RTE generation, HIL/conformance, timing/WCET hoặc phê duyệt safety.
 - Checkbox hoàn tất trong tài liệu nguồn là trạng thái do tài liệu đó khai báo; đợt xuất này không tái chứng nhận tính đầy đủ kỹ thuật.
 - Snapshot tài liệu không tự cập nhật khi các cuộc chat hoặc repository thay đổi. Khi có quyết định mới, cập nhật context, decision log và tài liệu liên quan cùng nhau.
+
+## Linux RTE/OS/TCP/IP stub environment — 26/10/2026
+
+A generic C11/POSIX environment now wraps the host core, with bounded OS events,
+project RTE wiring, loopback TCP station/EVCC processes, diagnostics, RAM NvM and
+fail-closed crypto seams. See [Linux stub build/run and boundary coverage](simulation/linux/README.md).
+The socket example exchanges a project semantic SessionSetup envelope; it does
+not implement real DIN/ISO EXI communication or a complete charging session.
+
+## SAP EXI host candidate — 26/10/2026
+
+An opt-in real SAP EXI backend using pinned external libcbv2g is available. See [build instructions and limits](integration/protocol/adapters/cbv2g/README.md). DIN/ISO-2 EXI message backends and session/socket mapping are not yet implemented.

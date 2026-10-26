@@ -2,6 +2,12 @@
 
 Trạng thái: PROPOSED — kế hoạch tiếp tục từ bộ tài liệu hiện có. Không thay thế release/WP plan gốc.
 
+## Bổ sung host simulation — 15/10/2026
+
+- Đã thêm `openv2g_host_sim` để ghép các project-side components qua C/S/S/R ports và inject CP/PP, energy, PLC, EVSE protocol response, link loss và measured hardware feedback.
+- Đã thêm flow simulator có ordered trace và integration test cho nominal transfer, stale generation, hardware mismatch và coordinated stop; tổng cộng 18 host tests pass bằng MSVC `/W4 /WX`.
+- Đã thêm helper build MinGW-w64 GCC trên Windows. Môi trường review ngày 15/10 không có GCC cài sẵn, nên chưa tuyên bố bằng chứng chạy Windows-GCC; helper sẽ fail-fast và chỉ build khi tìm thấy GCC cùng Ninja hoặc `mingw32-make`.
+
 ## Cập nhật thực thi G1 — 15/09/2026
 
 Phần có thể hoàn thành độc lập với target/supplier trong baseline tạm đã được triển khai và host-verified:
@@ -66,3 +72,11 @@ Kết quả mong đợi: consistency report, issue list có source section/ID v�
 ## 5. Đóng WP0/R0
 
 Theo Overview: không có interface không có owner; không có direct HLC→actuator path; ICD/ARXML draft sẵn sàng. Bổ sung evidence index và decision status rõ để biết phần nào chỉ thiết kế, phần nào đã generated, compiled, tested hoặc approved.
+
+## Linux stub update — 26/10/2026
+
+Implemented a generic C11/POSIX surrounding environment at `simulation/linux/`, with a separate TCP station process and OS/RTE/service stubs. See its README for coverage and limits. The smoke flow exchanges only SessionSetup semantics and exercises host permission/hardware/stop. Full continuous socket protocol flow still requires nonblocking cyclic scheduling integration and generated EXI mapping; OP-001…OP-011 remain open.
+
+## SAP EXI update — 26/10/2026
+
+Implemented an opt-in pinned libcbv2g SAP host backend with bounded neutral objects and fixed upstream-vector/malformed-input tests. See `integration/protocol/adapters/cbv2g/README.md`. Next: recover exact schema/generator provenance and independent vectors; then add separate DIN/ISO-2 message backends and wire mapping. Target/legal/safety gates remain open.

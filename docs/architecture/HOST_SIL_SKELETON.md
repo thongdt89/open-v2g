@@ -1,6 +1,6 @@
 # G1 host/SIL skeleton architecture
 
-**Revision:** Draft 0.13 — 20/09/2026
+**Revision:** Draft 0.14 — 15/10/2026
 
 **Status:** `PROPOSED_IMPLEMENTATION` — host/SIL only, not AUTOSAR production evidence
 
@@ -32,10 +32,13 @@ src/
 integration/
   autosar/                future RTE/BSW/supplier bindings
   protocol/               future licensed/generated protocol artifacts
+simulation/               host-only surrounding-component composition fixture
+scripts/                  reproducible host build helpers
 tests/
   unit/
   integration/
 examples/host_demo/
+examples/flow_simulator/
 ```
 
 ## 3. Ownership and communication
@@ -83,6 +86,7 @@ flowchart LR
 - `ProtocolDataFlow` là rule source dùng chung cho DIN/ISO-2: kiểm tra mode/message applicability, required availability bits, target/permission limit intersection, semantic action/power và correlated metering evidence.
 - `EvEnergySnapshot` host type đã khớp catalogue Rev.3 với target voltage/current và project semantic availability bits; đây vẫn không phải supplier/generated ABI.
 - ISO-20/PnC/BPT không được quảng bá là active feature.
+- `openv2g_host_sim` ghép CP/PP, energy, PLC, HLC, coordinator và hardware fake qua chính C/S/S/R contracts; test có thể inject custom evidence, link loss, peer response và measured hardware feedback mà không thêm đường điều khiển HLC→actuator.
 
 ## 5. Deliberately provisional or stubbed
 
@@ -124,6 +128,7 @@ flowchart LR
 | `openv2g_test_asr_style_ports` | C/S and S/R port bindings across coordinator internals, CP/PP, energy, PLC, hardware, SDP, TCP/TLS, V2GTP and HLC façade |
 | `openv2g_test_public_headers` | Public C header self-containment and compile surface |
 | `openv2g_test_nominal_flow` | CpPp/Energy provider→coordinator→link→HLC→permission→hardware và revoke-before-teardown order |
+| `openv2g_test_host_simulation` | Reusable surrounding-component fixture, custom data injection, stale-generation rejection, measured hardware mismatch và ordered coordinated stop |
 
 Passing host tests is `VERIFIED_HOST` evidence only. It is not target, safety, interoperability or conformance evidence.
 
@@ -151,3 +156,8 @@ Passing host tests is `VERIFIED_HOST` evidence only. It is not target, safety, i
 | Draft 0.11 | 20/09/2026 | Added bounded transport TX descriptors, fixed-capacity outstanding-request tracking, lower send seam, request/result/deadline correlation, backpressure and cancel cleanup; real SoAd/TcpIp/PduR binding remains G2. |
 | Draft 0.12 | 20/09/2026 | Added DIN/ISO-2 DC expiry-matrix regression for precharge, power start, first energy loop and ongoing energy-loop renewal; each dependent request re-reads current permission and fails closed. |
 | Draft 0.13 | 20/09/2026 | Added provisional hardware command IDs/results and independently applied measured feedback; correlated lock/contactor mismatch enters hardware fault and clears accepted permission, while stale command feedback cannot affect the active command. |
+| Draft 0.14 | 15/10/2026 | Added a reusable host-only surrounding-component simulator, injectable CP/PP/energy/link/EVSE/hardware inputs, ordered trace, flow example, Windows GCC build helper and an 18th integration test. |
+
+## Linux surrounding environment supplement — 26/10/2026
+
+Added `simulation/linux/` as a generic C11/POSIX host boundary around existing project ports. It provides OS events/alarms, loopback TCP with correlated transport TX completion, a semantic SessionSetup station smoke exchange, bounded diagnostics, RAM NvM and fail-closed crypto seams. See [Linux build/run and coverage](../../simulation/linux/README.md). GCC portability fixes add explicit `<stddef.h>` includes in the state-machine and subsystem lifecycle sources. Linux GCC 13.3 Debug strict-warning build and 19/19 host test executables passed. No supplier ABI, full wire protocol, sustained charging loop or target evidence is implied.
