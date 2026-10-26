@@ -44,6 +44,8 @@ typedef struct {
     uint32_t pending_command_id;
     uint32_t accepted_permission_id;
     OpenV2g_HardwareState expected_state;
+    OpenV2g_ChargeMode prepared_mode;
+    bool host_ac_enabled; /* Simulation capability only; default false. */
     bool host_fake;
     bool auto_feedback;
 } OpenV2g_ChargeHardwareAdapter;

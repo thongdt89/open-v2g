@@ -1,5 +1,10 @@
 # EXI and Linux wire implementation status
 
+Current scope and remaining work: [feature completion status](INCOMPLETE_ITEMS.md).
+The latest increment includes gated single-phase AC EIM and unsigned host
+metering. Earlier sections below describe their dated implementation snapshots.
+
+
 Revision: Draft 0.1 — 26/10/2026. Classification: `VERIFIED_HOST` only.
 This record distinguishes the requested implementation steps from external
 approval/qualification gates. No open point is declared formally frozen.

@@ -135,5 +135,19 @@ int main(void)
                     &mismatch_adapter, &feedback) == OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(mismatch_adapter.status.state == OPENV2G_HW_FAULT);
     TEST_ASSERT(mismatch_adapter.accepted_permission_id == 0u);
+    /* Host AC capability is off by default; permission mode must match prepare. */
+    OpenV2g_ChargeHardwareAdapter_InitHostFake(&adapter);
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_Prepare(&adapter, 8u, 500u, OPENV2G_MODE_AC) == OPENV2G_RESULT_REJECTED);
+    adapter.host_ac_enabled = true;
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_Prepare(&adapter, 8u, 500u, OPENV2G_MODE_AC) == OPENV2G_RESULT_ACCEPTED);
+    (void)memset(&permission, 0, sizeof(permission));
+    permission.env.session_generation = 8u; permission.env.quality = OPENV2G_QUALITY_VALID;
+    permission.permission_id = 1u; permission.decision = OPENV2G_PERMISSION_ALLOW;
+    permission.action = OPENV2G_ACTION_ENERGIZE; permission.direction = OPENV2G_DIRECTION_IMPORT_TO_EV;
+    permission.valid_until = 600u; permission.mode = OPENV2G_MODE_DC;
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_Enable(&adapter, &permission, 501u) == OPENV2G_RESULT_REJECTED);
+    permission.mode = OPENV2G_MODE_AC;
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_Enable(&adapter, &permission, 501u) == OPENV2G_RESULT_ACCEPTED);
+    TEST_ASSERT(adapter.status.state == OPENV2G_HW_ENERGIZED);
     return 0;
 }

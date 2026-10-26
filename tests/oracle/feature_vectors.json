@@ -1,0 +1,103 @@
+{
+  "date": "2026-10-26",
+  "candidate_codec_commit": "03350be048b35b179905129005a97144a4bdcf93",
+  "oracle_commit": "733d4f43cb6579c705d59c7386786ce12a0a0026",
+  "method": "Candidate-constructed bounded AC and unsigned metering DTOs, independently decoded/re-encoded byte-identically by the separate pinned OpenV2G iso1 model. Differential regression, not independently authored standards vectors. Profile labels iso2-ac and iso2-meter select the same explicit ISO-2 schema.",
+  "vectors": [
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 2,
+      "hex": "809802000000000000000011b8"
+    },
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 102,
+      "hex": "809802000000000000000011c0012004828024"
+    },
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 15,
+      "hex": "809802000000000000000011900400"
+    },
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 115,
+      "hex": "809802000000000000000011a00004000806686f73746008a0"
+    },
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 5,
+      "hex": "8098020000000000000000109402218241380440a8c301000c203e8040030f02e000"
+    },
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 105,
+      "hex": "809802000000000000000010a00000000000240700c50d8360a80000002206c59808006101f40200"
+    },
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 8,
+      "hex": "80980200000000000000001150000600"
+    },
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 108,
+      "hex": "8098020000000000000000116000000000"
+    },
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 10,
+      "hex": "809802000000000000000010b0"
+    },
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 110,
+      "hex": "809802000000000000000010c00021213d4d50c0c40008109a8aa88aa4620b9601004101c59f540c08000000"
+    },
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 11,
+      "hex": "809802000000000000000010f41000000000000000000000109a8aa88aa4620b9601004101c59f540c00"
+    },
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 111,
+      "hex": "8098020000000000000000110000000000"
+    },
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 12,
+      "hex": "80980200000000000000001151000600"
+    },
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 112,
+      "hex": "8098020000000000000000116000000000"
+    },
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 14,
+      "hex": "809802000000000000000011f000"
+    },
+    {
+      "schema": "iso2-ac",
+      "message_type_id": 114,
+      "hex": "8098020000000000000000120000"
+    },
+    {
+      "schema": "iso2-meter",
+      "message_type_id": 109,
+      "hex": "809802000000000000000010e00000002040840a01f010c2209c000608484f535430310000084d455445523105cb00802080e2cfaa060400"
+    },
+    {
+      "schema": "iso2-meter",
+      "message_type_id": 11,
+      "hex": "809802000000000000000010f41000000000000000000000109a8aa88aa4620b9601004101c59f540c00"
+    },
+    {
+      "schema": "iso2-meter",
+      "message_type_id": 111,
+      "hex": "809802000000000000000011000400001020"
+    }
+  ]
+}

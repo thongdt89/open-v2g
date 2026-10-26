@@ -11,6 +11,7 @@ typedef struct {
     OpenV2g_TimeUs hlc_max_age_us;
     OpenV2g_TimeUs hardware_max_age_us;
     OpenV2g_TimeUs permission_validity_us;
+    bool allow_ac_eim; /* Explicit host capability; default false. */
 } OpenV2g_PermissionConfig;
 
 typedef struct {

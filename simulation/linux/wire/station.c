@@ -33,6 +33,15 @@ bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario
     bool success = false;
     size_t index;
     bool pending_sent = false;
+    bool ac_mode = scenario >= OV_WIRE_AC && scenario <= OV_WIRE_AC_WRONG_MODE;
+    OpenV2g_ProtocolMessageKind steps[sizeof(sequence) / sizeof(sequence[0])];
+    (void)memcpy(steps, sequence, sizeof(steps));
+    if (ac_mode) {
+        if (protocol != OPENV2G_PROTOCOL_ISO_15118_2) { goto stop; }
+        for (index = 0u; index < sizeof(steps) / sizeof(steps[0]); ++index) {
+            if (steps[index] == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND || steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS) { steps[index] = OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS; }
+        }
+    }
     if (fd < 0 || !OvWireCodec_Init(&codec, 1u)) { goto stop; }
     OvWireIo_Init(&io, fd, 1u);
     if (!OvWireIo_Receive(&io, &received, Ov2g_OsNow() + OV_WIRE_TIMEOUT_US) ||
@@ -58,21 +67,30 @@ bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario
     if (scenario == OV_WIRE_UNOFFERED || scenario == OV_WIRE_MALFORMED) { success = true; goto stop; }
     for (index = 0u; index < sizeof(sequence) / sizeof(sequence[0]); ++index) {
         OpenV2g_ExiDcDocument request;
-        OpenV2g_ExiDcDocument response = OpenV2g_ExiDc_Default(sequence[index], true);
+        if (ac_mode && (steps[index] == OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK || steps[index] == OPENV2G_PROTOCOL_MESSAGE_PRECHARGE ||
+            steps[index] == OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION)) { continue; }
+        OpenV2g_ExiDcDocument response = OpenV2g_ExiDc_Default(steps[index], true);
+        response.ac_mode = ac_mode;
+        if (ac_mode) {
+            response.voltage_mv = 230000u; response.max_voltage_mv = 250000u; response.max_current_ma = 32000;
+            response.max_power_w = 7360; response.schedule_power_w = 7000;
+            if (scenario == OV_WIRE_AC_WRONG_MODE && steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER) { response.ac_mode = false; }
+            if (scenario == OV_WIRE_AC_RCD && steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS) { response.rcd_fault = true; }
+        }
         uint16_t response_id = (uint16_t)((unsigned)response.kind + OPENV2G_EXI_DC_RESPONSE_OFFSET);
         if (!OvWireIo_Receive(&io, &received, Ov2g_OsNow() + OV_WIRE_TIMEOUT_US) ||
-            !OvWireDecode(&codec, 1u, schema, (uint16_t)sequence[index], &received, &request, sizeof(request))) { goto stop; }
+            !OvWireDecode(&codec, 1u, schema, (uint16_t)steps[index], &received, &request, sizeof(request))) { goto stop; }
         if (index != 0u && memcmp(request.session_id, session_id, 8u) != 0) { goto stop; }
         if (index == 0u && scenario == OV_WIRE_REPLAY_SAP) {
             success = send_fragmented(&io, sap_frame, sap_length); goto stop;
         }
-        if (sequence[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL) {
+        if (steps[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL) {
             response.parameter_count = 1u;
             response.parameters[0].set_id = 1; response.parameters[0].name_length = 4u;
             (void)memcpy(response.parameters[0].name, "host", 4u); response.parameters[0].integer_value = 1;
         }
         (void)memcpy(response.session_id, session_id, 8u);
-        if (scenario == OV_WIRE_PENDING && sequence[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER && !pending_sent) {
+        if (scenario == OV_WIRE_PENDING && steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER && !pending_sent) {
             response.ongoing = true; response.omit_pending_parameters = true; response.omit_pending_schedules = true;
         }
 
@@ -82,7 +100,16 @@ bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario
             response.kind = OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY;
             response_id = (uint16_t)((unsigned)response.kind + OPENV2G_EXI_DC_RESPONSE_OFFSET);
         }
-        if (sequence[index] == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND) {
+        if (steps[index] == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND || steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS) {
+            if (scenario == OV_WIRE_METERING || scenario == OV_WIRE_SIGNED_METER || scenario == OV_WIRE_AC_METERING || scenario == OV_WIRE_RECEIPT_POLICY) {
+                response.has_meter_info = true; response.receipt_required = true;
+                response.meter_info.id_length = 6u; (void)memcpy(response.meter_info.id, "METER1", 6u);
+                response.meter_info.has_reading = true; response.meter_info.reading_wh = 10000u + index;
+                response.meter_info.has_time = true; response.meter_info.time_s = 1700000000;
+                if (scenario == OV_WIRE_SIGNED_METER) { response.meter_info.signature_length = 1u; response.meter_info.signature[0] = 1u; }
+            }
+
+            if (ac_mode) { response.has_max_current = true; response.max_current_ma = 16000; }
             if (scenario == OV_WIRE_DYNAMIC_LIMIT) {
                 if (index > 9u && (request.current_ma > 25000 || request.voltage_mv > 400000u)) { goto stop; }
                 response.has_max_current = true; response.max_current_ma = 30000;
@@ -93,21 +120,35 @@ bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario
             if (scenario == OV_WIRE_WRONG_SCHEDULE) { response.schedule_id = 99u; }
             if (scenario == OV_WIRE_WRONG_EVSE) { response.evse_id[0] = 'X'; }
         }
-        if (scenario == OV_WIRE_ZERO_PRECHARGE && sequence[index] == OPENV2G_PROTOCOL_MESSAGE_PRECHARGE) { response.voltage_mv = 0u; }
-        if (scenario == OV_WIRE_WELDED && sequence[index] == OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION) { response.voltage_mv = 400000u; }
+        if (scenario == OV_WIRE_ZERO_PRECHARGE && steps[index] == OPENV2G_PROTOCOL_MESSAGE_PRECHARGE) { response.voltage_mv = 0u; }
+        if (scenario == OV_WIRE_WELDED && steps[index] == OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION) { response.voltage_mv = 400000u; }
         if (!OvWireEncode(&codec, 1u,
             scenario == OV_WIRE_WRONG_SCHEMA && index == 0u ? OPENV2G_SCHEMA_DIN_70121 : schema,
             response_id, &response, sizeof(response), bytes, &length)) { goto stop; }
-        if (sequence[index] == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND && scenario == OV_WIRE_FREEZE_ENERGY) {
+        if (steps[index] == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND && scenario == OV_WIRE_FREEZE_ENERGY) {
             (void)poll(NULL, 0u, 100); /* client must supervise stale energy while waiting */
             (void)send_fragmented(&io, bytes, length); success = true; goto stop;
         }
         if (!send_fragmented(&io, bytes, length)) { goto stop; }
+        if ((scenario == OV_WIRE_AC_RCD && steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS) ||
+            (scenario == OV_WIRE_AC_WRONG_MODE && steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER)) { success = true; goto stop; }
+        if (response.receipt_required) {
+            OpenV2g_ExiDcDocument receipt, acknowledgement = OpenV2g_ExiDc_Default(OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT, true);
+            if (scenario == OV_WIRE_SIGNED_METER || scenario == OV_WIRE_RECEIPT_POLICY) { success = true; goto stop; }
+            if (!OvWireIo_Receive(&io, &received, Ov2g_OsNow() + OV_WIRE_TIMEOUT_US) ||
+                !OvWireDecode(&codec, 1u, schema, OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT, &received, &receipt, sizeof(receipt)) ||
+                memcmp(receipt.session_id, session_id, 8u) != 0 || receipt.schedule_id != response.schedule_id ||
+                !receipt.has_meter_info || memcmp(&receipt.meter_info, &response.meter_info, sizeof(receipt.meter_info)) != 0) { goto stop; }
+            acknowledgement.ac_mode = ac_mode;
+            (void)memcpy(acknowledgement.session_id, session_id, 8u);
+            if (!OvWireEncode(&codec, 1u, schema, OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT + OPENV2G_EXI_DC_RESPONSE_OFFSET,
+                &acknowledgement, sizeof(acknowledgement), bytes, &length) || !send_fragmented(&io, bytes, length)) { goto stop; }
+        }
         if (response.ongoing) { pending_sent = true; --index; continue; }
-        if ((scenario == OV_WIRE_ZERO_PRECHARGE && sequence[index] == OPENV2G_PROTOCOL_MESSAGE_PRECHARGE) ||
-            (scenario == OV_WIRE_WELDED && sequence[index] == OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION) ||
+        if ((scenario == OV_WIRE_ZERO_PRECHARGE && steps[index] == OPENV2G_PROTOCOL_MESSAGE_PRECHARGE) ||
+            (scenario == OV_WIRE_WELDED && steps[index] == OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION) ||
             (scenario == OV_WIRE_WRONG_SCHEMA && index == 0u) ||
-            ((scenario == OV_WIRE_WRONG_SCHEDULE || scenario == OV_WIRE_WRONG_EVSE) && sequence[index] == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND) ||
+            ((scenario == OV_WIRE_WRONG_SCHEDULE || scenario == OV_WIRE_WRONG_EVSE) && steps[index] == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND) ||
             (scenario == OV_WIRE_WRONG_SESSION && index == 1u) ||
             ((scenario == OV_WIRE_NEGATIVE || scenario == OV_WIRE_WRONG_MESSAGE) && index == 0u)) { success = true; goto stop; }
     }
@@ -117,7 +158,7 @@ stop:
     return success;
 }
 
-bool OvWireStation_RunDiscovered(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol)
+bool OvWireStation_RunDiscoveredMode(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol, bool ac_mode)
 {
     OpenV2g_Endpoint advertised = {0};
     OpenV2g_TimeUs deadline = Ov2g_OsNow() + 30000000u;
@@ -129,5 +170,10 @@ bool OvWireStation_RunDiscovered(int listener, int udp, uint16_t tcp_port, OpenV
         result = Ov2g_Sdp6ServeOnce(udp, &advertised);
         if (result == OPENV2G_RESULT_BUSY) { (void)poll(&descriptor, 1u, 1); }
     } while (result == OPENV2G_RESULT_BUSY && Ov2g_OsNow() < deadline);
-    return result == OPENV2G_RESULT_OK && OvWireStation_Run(listener, protocol, OV_WIRE_NORMAL);
+    return result == OPENV2G_RESULT_OK && OvWireStation_Run(listener, protocol, ac_mode ? OV_WIRE_AC : OV_WIRE_NORMAL);
+}
+
+bool OvWireStation_RunDiscovered(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol)
+{
+    return OvWireStation_RunDiscoveredMode(listener, udp, tcp_port, protocol, false);
 }

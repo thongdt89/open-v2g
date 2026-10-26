@@ -22,7 +22,8 @@ static int run(OpenV2g_ProtocolId protocol, OvWireScenario scenario)
     Ov2g_TcpClose(&listener);
     fd = Ov2g_TcpConnect(port, Ov2g_OsNow() + 1000000u);
     TEST_ASSERT(fd >= 0);
-    TEST_ASSERT(OvWireClient_Init(&client, fd, protocol, scenario == OV_WIRE_FREEZE_ENERGY));
+    TEST_ASSERT(OvWireClient_InitMode(&client, fd, protocol, scenario == OV_WIRE_FREEZE_ENERGY, scenario >= OV_WIRE_AC && scenario <= OV_WIRE_AC_WRONG_MODE));
+    client.allow_unsigned_receipts = scenario == OV_WIRE_METERING || scenario == OV_WIRE_AC_METERING || scenario == OV_WIRE_SIGNED_METER;
     success = OvWireClient_Run(&client); Ov2g_TcpClose(&fd);
     TEST_ASSERT(waitpid(child, &status, 0) == child);
     if (!success && scenario == OV_WIRE_NORMAL) {
@@ -31,14 +32,22 @@ static int run(OpenV2g_ProtocolId protocol, OvWireScenario scenario)
             (int)client.environment.rte.coordinator.permission_manager.current.env.reason, status);
     }
     TEST_ASSERT(WIFEXITED(status) && WEXITSTATUS(status) == 0);
-    TEST_ASSERT(success == (scenario == OV_WIRE_NORMAL || scenario == OV_WIRE_MINOR_DEVIATION || scenario == OV_WIRE_PENDING || scenario == OV_WIRE_DYNAMIC_LIMIT));
+    TEST_ASSERT(success == (scenario == OV_WIRE_NORMAL || scenario == OV_WIRE_MINOR_DEVIATION || scenario == OV_WIRE_PENDING || scenario == OV_WIRE_DYNAMIC_LIMIT || scenario == OV_WIRE_METERING || scenario == OV_WIRE_AC || scenario == OV_WIRE_AC_METERING));
     TEST_ASSERT(client.environment.rte.coordinator.permission_manager.current.decision == OPENV2G_PERMISSION_DENY);
     TEST_ASSERT(!client.io.queued && client.environment.os.count == 0u);
-    if (success) { TEST_ASSERT(client.messages == (scenario == OV_WIRE_PENDING ? 16u : 15u) && client.loops == 3u && client.energy_started); }
+    if (success) { TEST_ASSERT(client.messages == (scenario == OV_WIRE_AC ? 12u : (scenario == OV_WIRE_METERING ? 18u : (scenario == OV_WIRE_PENDING ? 16u : 15u))) && client.loops == 3u && client.energy_started); }
+    if (scenario == OV_WIRE_AC || scenario == OV_WIRE_AC_METERING) { TEST_ASSERT(client.peer_limits.max_charge_current_ma == 16000); }
+    if (scenario == OV_WIRE_AC_RCD) {
+        TEST_ASSERT(client.energy_started && client.environment.rte.hardware.status.state == OPENV2G_HW_SAFE);
+        TEST_ASSERT(!client.environment.rte.hardware.status.positive_contactor_closed && !client.environment.rte.hardware.status.negative_contactor_closed);
+    }
+    if (scenario == OV_WIRE_AC_WRONG_MODE) { TEST_ASSERT(!client.energy_started); }
+    if (scenario == OV_WIRE_METERING || scenario == OV_WIRE_AC_METERING) { TEST_ASSERT(client.receipts == 3u && client.meter_correlation == 0u); }
+    if (scenario == OV_WIRE_SIGNED_METER || scenario == OV_WIRE_RECEIPT_POLICY) { TEST_ASSERT(client.receipts == 0u && client.energy_started); }
     if (scenario == OV_WIRE_FREEZE_ENERGY) { TEST_ASSERT(client.energy_started && client.ticks > 5u); }
     return 0;
 }
-static int discovered_session(OpenV2g_ProtocolId protocol)
+static int discovered_session(OpenV2g_ProtocolId protocol, bool ac_mode)
 {
     uint16_t tcp_port, udp_port;
     int listener = Ov2g_Tcp6Listen(0u, &tcp_port), udp = Ov2g_Sdp6Listen(0u, &udp_port);
@@ -49,15 +58,15 @@ static int discovered_session(OpenV2g_ProtocolId protocol)
     TEST_ASSERT(listener >= 0 && udp >= 0);
     child = fork(); TEST_ASSERT(child >= 0);
     if (child == 0) {
-        bool served = OvWireStation_RunDiscovered(listener, udp, tcp_port, protocol);
+        bool served = OvWireStation_RunDiscoveredMode(listener, udp, tcp_port, protocol, ac_mode);
         Ov2g_TcpClose(&listener); Ov2g_TcpClose(&udp); _exit(served ? 0 : 1);
     }
     Ov2g_TcpClose(&listener); Ov2g_TcpClose(&udp);
-    TEST_ASSERT(OvWireClient_InitDiscovery(&client, protocol, udp_port));
+    TEST_ASSERT(OvWireClient_InitDiscoveryMode(&client, protocol, udp_port, ac_mode));
     success = OvWireClient_Run(&client);
     TEST_ASSERT(waitpid(child, &status, 0) == child);
     TEST_ASSERT(success && WIFEXITED(status) && WEXITSTATUS(status) == 0);
-    TEST_ASSERT(client.io.fd == -1 && client.messages == 15u && client.energy_started);
+    TEST_ASSERT(client.io.fd == -1 && client.messages == (ac_mode ? 12u : 15u) && client.energy_started);
     TEST_ASSERT(client.environment.rte.hlc.sdp_client.endpoint.port == tcp_port);
     TEST_ASSERT(client.environment.rte.coordinator.permission_manager.current.decision == OPENV2G_PERMISSION_DENY);
     return 0;
@@ -90,8 +99,16 @@ int main(void)
 {
     unsigned scenario;
     TEST_ASSERT(assessment_guards() == 0);
-    TEST_ASSERT(discovered_session(OPENV2G_PROTOCOL_DIN_70121) == 0);
-    TEST_ASSERT(discovered_session(OPENV2G_PROTOCOL_ISO_15118_2) == 0);
+    TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2, OV_WIRE_AC) == 0);
+    TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2, OV_WIRE_AC_METERING) == 0);
+    TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2, OV_WIRE_AC_RCD) == 0);
+    TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2, OV_WIRE_AC_WRONG_MODE) == 0);
+    TEST_ASSERT(discovered_session(OPENV2G_PROTOCOL_ISO_15118_2, true) == 0);
+    TEST_ASSERT(discovered_session(OPENV2G_PROTOCOL_DIN_70121, false) == 0);
+    TEST_ASSERT(discovered_session(OPENV2G_PROTOCOL_ISO_15118_2, false) == 0);
+    TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2, OV_WIRE_METERING) == 0);
+    TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2, OV_WIRE_SIGNED_METER) == 0);
+    TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2, OV_WIRE_RECEIPT_POLICY) == 0);
     TEST_ASSERT(run(OPENV2G_PROTOCOL_DIN_70121, OV_WIRE_NORMAL) == 0);
     TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2, OV_WIRE_NORMAL) == 0);
     TEST_ASSERT(run(OPENV2G_PROTOCOL_DIN_70121, OV_WIRE_MINOR_DEVIATION) == 0);

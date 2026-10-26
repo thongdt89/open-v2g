@@ -84,7 +84,9 @@ static bool evidence_is_complete(
     }
 
     if ((evidence->hlc->state != OPENV2G_HLC_PROTOCOL_SESSION) ||
-        (evidence->hlc->selected_mode != OPENV2G_MODE_DC) ||
+        ((evidence->hlc->selected_mode != OPENV2G_MODE_DC) &&
+         !(config->allow_ac_eim && evidence->hlc->selected_mode == OPENV2G_MODE_AC &&
+           evidence->hlc->protocol == OPENV2G_PROTOCOL_ISO_15118_2)) ||
         (((evidence->hlc->protocol == OPENV2G_PROTOCOL_DIN_70121) &&
           (evidence->hlc->schema != OPENV2G_SCHEMA_DIN_70121)) ||
          ((evidence->hlc->protocol == OPENV2G_PROTOCOL_ISO_15118_2) &&
@@ -154,7 +156,7 @@ OpenV2g_Result OpenV2g_PermissionManager_Evaluate(
          (evidence->hardware->state == OPENV2G_HW_ENERGIZED))
             ? OPENV2G_ACTION_ENERGIZE
             : OPENV2G_ACTION_PREPARE;
-    manager->current.mode = OPENV2G_MODE_DC;
+    manager->current.mode = evidence->hlc->selected_mode;
     manager->current.direction = OPENV2G_DIRECTION_IMPORT_TO_EV;
     manager->current.limits = evidence->energy->limits;
     manager->current.valid_until = now + config->permission_validity_us;

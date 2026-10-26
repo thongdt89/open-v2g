@@ -125,5 +125,18 @@ int main(void)
                 OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(manager.current.decision == OPENV2G_PERMISSION_DENY);
     TEST_ASSERT(manager.current.env.sequence_counter == 5u);
+    /* AC needs explicit vehicle policy and retains all freshness/schema guards. */
+    OpenV2g_FaultCoordinator_ClearOnUnplug(&fault_coordinator, 100u);
+    OpenV2g_FaultCoordinator_BeginSession(&fault_coordinator, generation, 100u);
+    hlc.selected_mode = OPENV2G_MODE_AC;
+    TEST_ASSERT(OpenV2g_PermissionManager_Evaluate(&manager, &config, &evidence, now) == OPENV2G_RESULT_REJECTED);
+    config.allow_ac_eim = true;
+    TEST_ASSERT(OpenV2g_PermissionManager_Evaluate(&manager, &config, &evidence, now) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(manager.current.mode == OPENV2G_MODE_AC && manager.current.decision == OPENV2G_PERMISSION_ALLOW);
+    hlc.protocol = OPENV2G_PROTOCOL_DIN_70121; hlc.schema = OPENV2G_SCHEMA_DIN_70121;
+    TEST_ASSERT(OpenV2g_PermissionManager_Evaluate(&manager, &config, &evidence, now) == OPENV2G_RESULT_REJECTED);
+    hlc.protocol = OPENV2G_PROTOCOL_ISO_15118_2; hlc.schema = OPENV2G_SCHEMA_ISO_15118_2;
+    energy.env.timestamp = 1u;
+    TEST_ASSERT(OpenV2g_PermissionManager_Evaluate(&manager, &config, &evidence, now) == OPENV2G_RESULT_REJECTED);
     return 0;
 }

@@ -42,7 +42,8 @@ typedef enum {
     OV_WIRE_NEGATIVE = 6, OV_WIRE_WRONG_MESSAGE = 7, OV_WIRE_FREEZE_ENERGY = 8,
     OV_WIRE_REPLAY_SAP = 9, OV_WIRE_WRONG_SCHEDULE = 10,
     OV_WIRE_WRONG_EVSE = 11, OV_WIRE_WRONG_SCHEMA = 12,
-    OV_WIRE_ZERO_PRECHARGE = 13, OV_WIRE_WELDED = 14, OV_WIRE_MINOR_DEVIATION = 15, OV_WIRE_PENDING = 16, OV_WIRE_DYNAMIC_LIMIT = 17
+    OV_WIRE_ZERO_PRECHARGE = 13, OV_WIRE_WELDED = 14, OV_WIRE_MINOR_DEVIATION = 15, OV_WIRE_PENDING = 16, OV_WIRE_DYNAMIC_LIMIT = 17, OV_WIRE_METERING = 18, OV_WIRE_SIGNED_METER = 19,
+    OV_WIRE_AC = 20, OV_WIRE_AC_METERING = 21, OV_WIRE_AC_RCD = 22, OV_WIRE_AC_WRONG_MODE = 23, OV_WIRE_RECEIPT_POLICY = 24
 } OvWireScenario;
 
 typedef struct {
@@ -61,12 +62,17 @@ typedef struct {
     uint16_t service_id;
     uint8_t schedule_id;
     OpenV2g_PowerLimits peer_limits;
+    OpenV2g_ExiMeterInfo meter_info;
+    uint32_t meter_correlation;
+    unsigned receipts;
     unsigned loops;
     unsigned messages;
     unsigned ticks;
+    bool ac_mode;
     bool energy_started;
     bool freeze_energy;
     bool allow_sap_minor_deviation;
+    bool allow_unsigned_receipts; /* Explicit development-fixture policy, default false. */
     OpenV2g_PhysicalAssessmentCsPort assessment_port;
 } OvWireClient;
 
@@ -83,8 +89,11 @@ bool OvWireIo_Exchange(OvWireIo *io, const uint8_t *frame, size_t length,
 bool OvWireIo_Receive(OvWireIo *io, OpenV2g_V2gtpFrameView *frame, OpenV2g_TimeUs deadline);
 bool OvWireIo_Write(OvWireIo *io, const uint8_t *frame, size_t length, OpenV2g_TimeUs deadline);
 bool OvWireClient_Init(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol, bool freeze_energy);
+bool OvWireClient_InitMode(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol, bool freeze_energy, bool ac_mode);
+bool OvWireClient_InitDiscoveryMode(OvWireClient *client, OpenV2g_ProtocolId protocol, uint16_t discovery_port, bool ac_mode);
 bool OvWireClient_InitDiscovery(OvWireClient *client, OpenV2g_ProtocolId protocol, uint16_t discovery_port);
 bool OvWireClient_Run(OvWireClient *client);
+bool OvWireStation_RunDiscoveredMode(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol, bool ac_mode);
 bool OvWireStation_RunDiscovered(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol);
 bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario scenario);
 #endif

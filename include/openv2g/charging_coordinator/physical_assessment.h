@@ -3,7 +3,7 @@
 #include "openv2g/common/types.h"
 #include "openv2g/common/result.h"
 /* PROJECT evidence; thresholds are caller/vehicle configuration, never normative defaults. */
-typedef enum { OPENV2G_ASSESS_PRECHARGE = 1, OPENV2G_ASSESS_WELDING = 2 } OpenV2g_AssessmentKind;
+typedef enum { OPENV2G_ASSESS_PRECHARGE = 1, OPENV2G_ASSESS_WELDING = 2, OPENV2G_ASSESS_AC_READINESS = 3 } OpenV2g_AssessmentKind;
 typedef struct {
     OpenV2g_CommEnvelope env;
     OpenV2g_AssessmentKind kind;

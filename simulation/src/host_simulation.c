@@ -265,6 +265,7 @@ OpenV2g_Result OpenV2g_HostSimulation_Init(
     }
 
     OpenV2g_ChargeHardwareAdapter_InitHostFake(&simulation->hardware);
+    simulation->hardware.host_ac_enabled = selected.features.iso_15118_2_ac_eim;
     if ((OpenV2g_ChargeHardwareAdapter_CreateControlClientServerPort(
              &simulation->hardware,
              &simulation->hardware_control_port) != OPENV2G_RESULT_OK) ||

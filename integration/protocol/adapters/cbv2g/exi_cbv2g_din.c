@@ -63,6 +63,7 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct din_exiDocum
     struct din_BodyType *body = &generated->V2G_Message.Body;
     din_responseCodeType code = value->accepted ?
         (value->new_session ? din_responseCodeType_OK_NewSessionEstablished : din_responseCodeType_OK) : din_responseCodeType_FAILED;
+    if (value->ac_mode || value->has_meter_info || value->receipt_required) { return false; }
     if (value->soc_permille > 1000u || value->voltage_mv > INT32_MAX || value->max_voltage_mv > INT32_MAX ||
         value->min_voltage_mv > INT32_MAX || value->min_current_ma < 0 ||
         value->current_ma < 0 || value->max_current_ma < 0 || value->max_power_w < 0 || value->schedule_power_w < 0) { return false; }

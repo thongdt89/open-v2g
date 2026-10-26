@@ -42,3 +42,12 @@ prove untested branches, selected licensed schema provenance, full protocol
 conformance or interoperability with a physical EVSE. The external oracle is
 used only on well-formed fixture inputs; candidate malformed-input tests do not
 feed arbitrary hostile bytes into an unaudited reference process.
+
+## AC and metering extension — 26/10/2026
+
+`feature_vectors.json` adds 19 candidate-constructed AC/metering examples. They
+were decoded and re-encoded byte-identically by the same separate pinned oracle.
+Test profile labels `iso2-ac` and `iso2-meter` map explicitly to oracle `iso2`
+(the external iso1 model); they do not introduce new production schema IDs.
+The original 50-vector corpus is unchanged. These are differential regression
+vectors, not independently authored standards vectors or signature evidence.

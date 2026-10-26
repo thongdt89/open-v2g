@@ -170,3 +170,24 @@ station advertises its TCP endpoint. [Detailed provider/run guide](../SDP_IPV6.m
 Both protocols have complete IPv6 discovery/socket regression sessions, in
 addition to the legacy IPv4/fault scenarios (35 wire sessions total).
 Multicast/link-local, physical PLC and actual TLS remain open.
+
+## Gated AC EIM and unsigned metering — Draft 0.4, 26/10/2026
+
+Use `iso2-ac` instead of `iso2` for the explicit single-phase AC host profile,
+with either `station`/`evcc` or `station6`/`evcc6`. It exchanges AC charge
+parameters, PowerDelivery, three ChargingStatus loops and controlled SessionStop
+(12 protocol exchanges). Runtime permission/hardware AC capabilities are enabled
+only for this profile; global default features remain DC. Local AC readiness,
+RCD rejection, mode consistency and reduced current permissions are checked.
+This is a deterministic OBC/hardware fixture, not vehicle AC qualification.
+
+The shared ISO-2 codec now maps bounded MeterInfo and MeteringReceipt messages.
+Positive AC/DC socket tests opt in to unsigned development receipts with
+`allow_unsigned_receipts`; it is false by default. A required receipt with no
+explicit unsigned fixture policy, or an unverified meter signature, stops the
+session. Signed headers remain rejected. No XMLDSIG, PKI or PnC capability is
+implied. Meter records are copied, correlated, used once and cleared on teardown.
+
+[Current incomplete items](../../../docs/architecture/INCOMPLETE_ITEMS.md) separates
+these delivered host paths from TLS, signed metering, three-phase AC, retained
+sessions, ISO-20/BPT and target work still to implement.

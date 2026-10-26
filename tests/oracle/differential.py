@@ -22,7 +22,8 @@ for line in subprocess.check_output([args.candidate], text=True, timeout=10).spl
 assert actual == expected, "Candidate differs from saved differential references"
 if args.oracle:
     for (schema, message), payload in actual.items():
-        result = subprocess.run([args.oracle, schema], input=payload, capture_output=True,
+        oracle_schema = {"iso2-ac": "iso2", "iso2-meter": "iso2"}.get(schema, schema)
+        result = subprocess.run([args.oracle, oracle_schema], input=payload, capture_output=True,
                                 timeout=5, check=True)
         assert result.stdout == payload, f"Differential mismatch: {schema}/{message}"
 print(f"PASS: {len(actual)} fixed reference vectors" +

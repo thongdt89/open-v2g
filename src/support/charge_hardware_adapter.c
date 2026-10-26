@@ -112,12 +112,13 @@ OpenV2g_Result OpenV2g_ChargeHardwareAdapter_Prepare(
     OpenV2g_ChargeMode mode)
 {
     if ((adapter == NULL) || !adapter->host_fake || (generation == 0u) ||
-        (mode != OPENV2G_MODE_DC) ||
+        (mode != OPENV2G_MODE_DC && !(adapter->host_ac_enabled && mode == OPENV2G_MODE_AC)) ||
         ((adapter->status.state != OPENV2G_HW_SAFE) &&
          (adapter->status.state != OPENV2G_HW_READY))) {
         return OPENV2G_RESULT_REJECTED;
     }
     adapter->generation = generation;
+    adapter->prepared_mode = mode;
     update_status(adapter, now, OPENV2G_HW_PREPARING, OPENV2G_REASON_NONE);
     (void)start_command(adapter, now, OPENV2G_HW_READY);
     if (adapter->auto_feedback &&
@@ -138,7 +139,8 @@ OpenV2g_Result OpenV2g_ChargeHardwareAdapter_Enable(
         (permission->decision != OPENV2G_PERMISSION_ALLOW) ||
         (permission->permission_id == 0u) ||
         (permission->action != OPENV2G_ACTION_ENERGIZE) ||
-        (permission->mode != OPENV2G_MODE_DC) ||
+        (permission->mode != adapter->prepared_mode) ||
+        (permission->mode != OPENV2G_MODE_DC && !(adapter->host_ac_enabled && permission->mode == OPENV2G_MODE_AC)) ||
         (permission->direction != OPENV2G_DIRECTION_IMPORT_TO_EV) ||
         (permission->valid_until <= now) ||
         (adapter->status.state != OPENV2G_HW_READY)) {

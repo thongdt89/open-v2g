@@ -21,6 +21,10 @@ static OpenV2g_Result assess(void *context, OpenV2g_AssessmentKind kind,
     if (kind == OPENV2G_ASSESS_PRECHARGE) {
         evidence->passed = target_voltage_mv != 0u && peer_voltage_mv == target_voltage_mv &&
             hardware->state == OPENV2G_HW_READY;
+    } else if (kind == OPENV2G_ASSESS_AC_READINESS) {
+        /* Deterministic host OBC readiness; real vehicle supplies assessment. */
+        evidence->passed = hardware->state == OPENV2G_HW_READY && hardware->connector_locked &&
+            !hardware->positive_contactor_closed && !hardware->negative_contactor_closed && hardware->measured_current_ma == 0;
     } else if (kind == OPENV2G_ASSESS_WELDING) {
         evidence->passed = peer_voltage_mv == 0u && hardware->measured_voltage_mv == 0u &&
             hardware->measured_current_ma == 0 && hardware->state == OPENV2G_HW_SAFE &&

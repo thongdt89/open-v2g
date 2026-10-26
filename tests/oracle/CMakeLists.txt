@@ -46,3 +46,17 @@ if(OPENV2G_ORACLE_SOURCE_DIR)
             --vectors ${CMAKE_CURRENT_SOURCE_DIR}/independent_vectors.json)
     set_tests_properties(openv2g_test_exi_differential PROPERTIES TIMEOUT 30)
 endif()
+
+if(TARGET openv2g_exi_feature_vector_dump)
+    add_test(NAME openv2g_test_exi_feature_references
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/differential.py
+            --candidate $<TARGET_FILE:openv2g_exi_feature_vector_dump>
+            --vectors ${CMAKE_CURRENT_SOURCE_DIR}/feature_vectors.json)
+    if(TARGET openv2g_independent_oracle)
+        add_test(NAME openv2g_test_exi_feature_differential
+            COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/differential.py
+                --candidate $<TARGET_FILE:openv2g_exi_feature_vector_dump>
+                --oracle $<TARGET_FILE:openv2g_independent_oracle>
+                --vectors ${CMAKE_CURRENT_SOURCE_DIR}/feature_vectors.json)
+    endif()
+endif()

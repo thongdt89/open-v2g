@@ -65,6 +65,7 @@ typedef struct {
     OpenV2g_TimeUs hlc_event_overflow_time;
     bool has_hardware;
     bool teardown_started;
+    /* Legacy field name: slot holds PRECHARGE or AC_READINESS for current mode. */
     OpenV2g_PhysicalAssessment precharge_assessment;
     OpenV2g_PhysicalAssessment welding_assessment;
 } OpenV2g_ChargingCoordinator;

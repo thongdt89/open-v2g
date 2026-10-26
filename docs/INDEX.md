@@ -65,3 +65,10 @@ profile exclusions, confirmed probe results, test gaps and proposed completion o
 [Feature completion work log](architecture/FEATURE_COMPLETION_WORKLOG.md) records
 implemented host increments, precise verification scope and the remaining
 implementation versus external evidence. Overall feature completion is in progress.
+
+
+## Current incomplete items — 26/10/2026
+
+[Current feature completion status](architecture/INCOMPLETE_ITEMS.md), Draft 0.1:
+new single-phase AC and unsigned metering host coverage; exact remaining work,
+capability/security gates and external production evidence.

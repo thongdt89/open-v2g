@@ -1,5 +1,10 @@
 # Protocol-feature coverage audit
 
+Current post-audit scope: [feature completion status](INCOMPLETE_ITEMS.md).
+The audit findings below are historical; AC and unsigned host metering now have
+bounded wire implementations and tests with explicit restrictions.
+
+
 Revision: Draft 0.1 — 26/10/2026. Inspected project commit: `8bc49b2`.
 Result: **the nominal closed DC EIM host sequence is implemented; complete
 DIN SPEC 70121 / ISO 15118-2 feature coverage is not established**.

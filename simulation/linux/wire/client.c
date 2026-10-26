@@ -27,6 +27,10 @@ static bool refresh(OvWireClient *client, OpenV2g_TimeUs now)
     OpenV2g_HostSimulation *sim = &client->environment.rte;
     OpenV2g_QualifiedCpPp cp = OpenV2g_HostSimulation_DefaultCpPp(sim, now);
     OpenV2g_EvEnergySnapshot energy = OpenV2g_HostSimulation_DefaultEnergy(sim, now);
+    if (client->ac_mode) {
+        energy.limits.max_voltage_mv = 250000u; energy.limits.max_charge_current_ma = 32000;
+        energy.limits.max_import_power_w = 7360; energy.target_voltage_mv = 230000u; energy.target_current_ma = 16000;
+    }
     if (!ok(OpenV2g_HostSimulation_InjectCpPp(sim, &cp, now))) { return false; }
     /* Explicit surrounding-component sample, not freshness restamping of a
      * cached sample. freeze_energy intentionally stops this provider. */
@@ -66,15 +70,19 @@ static bool supervise(void *context, OpenV2g_TimeUs now)
     }
     return true;
 }
-bool OvWireClient_Init(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol, bool freeze_energy)
+bool OvWireClient_InitMode(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol, bool freeze_energy, bool ac_mode)
 {
     OpenV2g_HostSimulationConfig config = OpenV2g_HostSimulation_DefaultConfig();
     OpenV2g_TcpTxCsPort tx;
     (void)memset(client, 0, sizeof(*client));
     if (protocol != OPENV2G_PROTOCOL_DIN_70121 && protocol != OPENV2G_PROTOCOL_ISO_15118_2) { return false; }
+    if (ac_mode && protocol != OPENV2G_PROTOCOL_ISO_15118_2) { return false; }
+    client->ac_mode = ac_mode;
     if (!Ov2g_EnvironmentInit(&client->environment)) { return false; }
     config.features.din_70121_dc_eim = protocol == OPENV2G_PROTOCOL_DIN_70121;
-    config.features.iso_15118_2_dc_eim = protocol == OPENV2G_PROTOCOL_ISO_15118_2;
+    config.features.iso_15118_2_dc_eim = protocol == OPENV2G_PROTOCOL_ISO_15118_2 && !ac_mode;
+    config.features.iso_15118_2_ac_eim = ac_mode;
+    config.coordinator.permission.allow_ac_eim = ac_mode;
     config.coordinator.permission.energy_max_age_us = 50000u;
     config.coordinator.require_physical_assessment = true;
     client->assessment_port = OvWireHostAssessmentPort();
@@ -90,10 +98,18 @@ bool OvWireClient_Init(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol
     tx = OvWireIo_TxPort(&client->io);
     return OpenV2g_TcpTlsSession_BindTcpTxPort(client->io.transport, &tx) == OPENV2G_RESULT_OK;
 }
+bool OvWireClient_InitDiscoveryMode(OvWireClient *client, OpenV2g_ProtocolId protocol, uint16_t discovery_port, bool ac_mode)
+{
+    if (discovery_port == 0u || !OvWireClient_InitMode(client, -1, protocol, false, ac_mode)) { return false; }
+    client->discovery_port = discovery_port; return true;
+}
+bool OvWireClient_Init(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol, bool freeze_energy)
+{
+    return OvWireClient_InitMode(client, fd, protocol, freeze_energy, false);
+}
 bool OvWireClient_InitDiscovery(OvWireClient *client, OpenV2g_ProtocolId protocol, uint16_t discovery_port)
 {
-    if (discovery_port == 0u || !OvWireClient_Init(client, -1, protocol, false)) { return false; }
-    client->discovery_port = discovery_port; return true;
+    return OvWireClient_InitDiscoveryMode(client, protocol, discovery_port, false);
 }
 static OpenV2g_Result discovered(void *context, uint32_t generation, const OpenV2g_Endpoint *endpoint)
 {
@@ -187,6 +203,7 @@ static bool exchange_protocol(OvWireClient *client)
             sim->coordinator.permission_manager.current.decision != OPENV2G_PERMISSION_DENY) { return false; }
     }
     request = OpenV2g_ExiDc_Default(pending->kind, false);
+    request.ac_mode = client->ac_mode; request.ac_energy_wh = client->ac_mode ? 1000u : 0u;
     (void)memcpy(request.session_id, client->session_id, 8u);
     request.service_id = client->service_id != 0u ? client->service_id : 1u;
     request.schedule_id = client->schedule_id != 0u ? client->schedule_id : 1u;
@@ -196,6 +213,14 @@ static bool exchange_protocol(OvWireClient *client)
         request.max_current_ma = pending->energy.limits.max_charge_current_ma;
         request.max_power_w = pending->energy.limits.max_import_power_w;
         request.voltage_mv = pending->energy.target_voltage_mv; request.current_ma = pending->energy.target_current_ma;
+    }
+    if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT) {
+        if (!client->allow_unsigned_receipts || !pending->has_metering_evidence || client->meter_correlation == 0u ||
+            pending->metering_evidence.generation != client->io.generation ||
+            pending->metering_evidence.evidence_id != client->meter_correlation ||
+            pending->metering_evidence.source_correlation_id != client->meter_correlation ||
+            pending->metering_evidence.signature_required) { return false; }
+        request.has_meter_info = true; request.meter_info = client->meter_info;
     }
     response_id = (uint16_t)((unsigned)(pending->kind == OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_STOP ? OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START : pending->kind) + OPENV2G_EXI_DC_RESPONSE_OFFSET);
     if (!OvWireEncode(&client->codec, client->io.generation, pending->schema, (uint16_t)pending->kind, &request, sizeof(request), bytes, &length) ||
@@ -211,11 +236,12 @@ static bool exchange_protocol(OvWireClient *client)
     now = Ov2g_OsNow();
     if (!supervise(client, now)) { return false; }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY) {
+        if (response.ac_mode != client->ac_mode) { return false; }
         if (response.service_id == 0u) { return false; } client->service_id = response.service_id;
     }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL && response.service_id != client->service_id) { return false; }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER && !response.ongoing) {
-        if (!response.ready || !response.isolation_valid || response.max_voltage_mv == 0u || response.max_current_ma <= 0 ||
+        if (response.ac_mode != client->ac_mode || !response.ready || (!client->ac_mode && !response.isolation_valid) || response.max_voltage_mv == 0u || response.max_current_ma <= 0 ||
             response.min_voltage_mv > request.voltage_mv || response.min_current_ma > request.current_ma ||
             response.max_power_w <= 0 || response.schedule_power_w <= 0 || response.schedule_duration_s == 0u) { return false; }
         client->schedule_id = response.schedule_id;
@@ -227,15 +253,20 @@ static bool exchange_protocol(OvWireClient *client)
         if (response.schedule_power_w < client->peer_limits.max_import_power_w) { client->peer_limits.max_import_power_w = response.schedule_power_w; }
         if (!refresh(client, now)) { return false; }
     }
-    if (pending->kind >= OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK && pending->kind <= OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND &&
+    if (!client->ac_mode && pending->kind >= OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK && pending->kind <= OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND &&
         (!response.ready || !response.isolation_valid)) { return false; }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK && !response.ongoing) {
         if (!ok(OpenV2g_HostSimulation_PrepareEnergyTransfer(sim, now))) { return false; }
     }
-    if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_PRECHARGE || pending->kind == OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION) {
+    if (client->ac_mode && pending->kind == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER && !response.ongoing) {
+        if (!ok(OpenV2g_HostSimulation_PrepareEnergyTransfer(sim, now))) { return false; }
+    }
+    if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_PRECHARGE || pending->kind == OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION ||
+        (client->ac_mode && pending->kind == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER && !response.ongoing)) {
         OpenV2g_PhysicalAssessment assessment;
         OpenV2g_ChargeHardwareStatus hardware;
-        OpenV2g_AssessmentKind kind = pending->kind == OPENV2G_PROTOCOL_MESSAGE_PRECHARGE ? OPENV2G_ASSESS_PRECHARGE : OPENV2G_ASSESS_WELDING;
+        OpenV2g_AssessmentKind kind = client->ac_mode ? OPENV2G_ASSESS_AC_READINESS :
+            (pending->kind == OPENV2G_PROTOCOL_MESSAGE_PRECHARGE ? OPENV2G_ASSESS_PRECHARGE : OPENV2G_ASSESS_WELDING);
         if (client->assessment_port.assess == NULL ||
             sim->hardware_status_port.read(sim->hardware_status_port.context, &hardware) != OPENV2G_RESULT_OK ||
             !ok(OpenV2g_ChargingCoordinator_OnHardwareStatus(&sim->coordinator, &hardware)) ||
@@ -244,6 +275,7 @@ static bool exchange_protocol(OvWireClient *client)
             !ok(OpenV2g_ChargingCoordinator_ApplyAssessment(&sim->coordinator, &assessment, pending->correlation_id, now))) { return false; }
     }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START) {
+        if (response.ac_mode != client->ac_mode || !response.ready || response.rcd_fault) { return false; }
         if (!ok(OpenV2g_HostSimulation_StartEnergyTransfer(sim, now))) { return false; }
         client->energy_started = true;
     }
@@ -251,7 +283,8 @@ static bool exchange_protocol(OvWireClient *client)
     message.generation = client->io.generation; message.correlation_id = pending->correlation_id;
     message.request_service_detail = pending->kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY;
     message.kind = pending->kind; message.now = Ov2g_OsNow() + 10u; message.accepted = true; message.ongoing = response.ongoing;
-    if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND) {
+    if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND || pending->kind == OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS) {
+        if (!response.ready || response.rcd_fault || response.ac_mode != client->ac_mode) { return false; }
         if (pending->protocol == OPENV2G_PROTOCOL_ISO_15118_2 &&
             (response.schedule_id != client->schedule_id || response.evse_id_length != client->evse_id_length ||
              memcmp(response.evse_id, client->evse_id, client->evse_id_length) != 0)) { return false; }
@@ -262,9 +295,33 @@ static bool exchange_protocol(OvWireClient *client)
         if (response.has_max_current && response.max_current_ma < client->peer_limits.max_charge_current_ma) { client->peer_limits.max_charge_current_ma = response.max_current_ma; }
         if (response.has_max_power && response.max_power_w < client->peer_limits.max_import_power_w) { client->peer_limits.max_import_power_w = response.max_power_w; }
         if (!refresh(client, now)) { return false; }
+        if (client->energy_started) {
+            const OpenV2g_ChargePermission *permission;
+            if (!ok(OpenV2g_ChargingCoordinator_EvaluatePermission(&sim->coordinator, now))) { return false; }
+            permission = &sim->coordinator.permission_manager.current;
+            if (permission->limits.max_charge_current_ma > client->peer_limits.max_charge_current_ma ||
+                permission->limits.max_import_power_w > client->peer_limits.max_import_power_w ||
+                permission->limits.max_voltage_mv > client->peer_limits.max_voltage_mv) { return false; }
+        }
         ++client->loops;
         /* Local application budget, not an invented wire ongoing flag. */
         message.ongoing = client->loops < 3u;
+    }
+    if (response.receipt_required) {
+        if (pending->protocol != OPENV2G_PROTOCOL_ISO_15118_2 || !response.has_meter_info ||
+            (pending->kind != OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND && pending->kind != OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS) || client->meter_correlation != 0u) { return false; }
+        client->meter_info = response.meter_info; client->meter_correlation = pending->correlation_id;
+        message.metering_receipt_required = true;
+        message.metering_evidence.generation = client->io.generation;
+        message.metering_evidence.evidence_id = client->meter_correlation;
+        message.metering_evidence.source_correlation_id = pending->correlation_id;
+        /* An opaque meter signature is never treated as verified evidence. */
+        message.metering_evidence.signature_required = !client->allow_unsigned_receipts || response.meter_info.signature_length != 0u;
+    }
+    if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT) {
+        if (!response.ready || response.rcd_fault || response.ac_mode != client->ac_mode || (!client->ac_mode && !response.isolation_valid) || client->meter_correlation == 0u) { return false; }
+        message.ongoing = client->loops < 3u; ++client->receipts;
+        (void)memset(&client->meter_info, 0, sizeof(client->meter_info)); client->meter_correlation = 0u;
     }
     ++client->messages;
     (void)printf("wire schema=%d message=%d loop=%u\n", (int)pending->schema, (int)pending->kind, client->loops);
@@ -285,6 +342,7 @@ stop:
     Ov2g_OsCancel(&client->environment.os, 0u);
     if (client->discovery_port != 0u) { Ov2g_TcpClose(&client->io.fd); }
     (void)OpenV2g_ExiCodec_Stop(&client->codec.codec, client->io.generation);
+    (void)memset(&client->meter_info, 0, sizeof(client->meter_info)); client->meter_correlation = 0u;
     client->io.queued = false; client->io.pending.data = NULL;
     return success;
 }

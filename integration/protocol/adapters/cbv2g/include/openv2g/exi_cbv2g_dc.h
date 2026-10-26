@@ -13,6 +13,20 @@ typedef struct { int16_t set_id; char name[32]; uint16_t name_length; bool is_st
 #define OPENV2G_EXI_SCHEDULE_POINTS_MAX 5u
 typedef struct { uint32_t start_s; uint32_t duration_s; int32_t power_w; } OpenV2g_ExiSchedulePoint;
 typedef struct { uint8_t id; uint8_t count; OpenV2g_ExiSchedulePoint points[OPENV2G_EXI_SCHEDULE_POINTS_MAX]; } OpenV2g_ExiSchedule;
+#define OPENV2G_EXI_METER_ID_MAX 32u
+#define OPENV2G_EXI_METER_SIGNATURE_MAX 64u
+typedef struct {
+    uint16_t id_length;
+    char id[OPENV2G_EXI_METER_ID_MAX];
+    bool has_reading;
+    uint64_t reading_wh;
+    bool has_status;
+    int16_t status;
+    bool has_time;
+    int64_t time_s;
+    uint16_t signature_length;
+    uint8_t signature[OPENV2G_EXI_METER_SIGNATURE_MAX];
+} OpenV2g_ExiMeterInfo;
 /* Bounded host data model; capacities are explicit, not imported ABI.
  * No imported/generated type is exported. Physical fields use project SI units.
  */
@@ -26,7 +40,13 @@ typedef struct {
     bool isolation_valid;
     bool resumed_session;
     bool pause_session;
+    bool ac_mode; /* Bounded single-phase AC EIM host profile. */
+    bool rcd_fault;
+    uint32_t ac_energy_wh;
     bool charging_complete;
+    bool has_meter_info;
+    bool receipt_required;
+    OpenV2g_ExiMeterInfo meter_info;
     bool waiting_for_customer;
     bool omit_pending_parameters;
     bool omit_pending_schedules;

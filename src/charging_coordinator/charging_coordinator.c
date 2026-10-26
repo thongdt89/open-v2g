@@ -386,7 +386,7 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_ApplyAssessment(
         assessment->hardware_sequence == 0u || assessment->hardware_sequence != coordinator->hardware.env.sequence_counter ||
         !OpenV2g_EnvelopeIsCurrent(&assessment->env, coordinator->generation, now,
             coordinator->config.assessment_max_age_us)) { return OPENV2G_RESULT_REJECTED; }
-    if (assessment->kind == OPENV2G_ASSESS_PRECHARGE) { target = &coordinator->precharge_assessment; }
+    if (assessment->kind == OPENV2G_ASSESS_PRECHARGE || assessment->kind == OPENV2G_ASSESS_AC_READINESS) { target = &coordinator->precharge_assessment; }
     else if (assessment->kind == OPENV2G_ASSESS_WELDING) { target = &coordinator->welding_assessment; }
     else { return OPENV2G_RESULT_REJECTED; }
     *target = *assessment;
@@ -406,6 +406,7 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_RequestEnergyTransfer(
 
     if (coordinator->config.require_physical_assessment &&
         (!coordinator->precharge_assessment.passed ||
+         coordinator->precharge_assessment.kind != (coordinator->hlc.selected_mode == OPENV2G_MODE_AC ? OPENV2G_ASSESS_AC_READINESS : OPENV2G_ASSESS_PRECHARGE) ||
          coordinator->config.assessment_max_age_us == 0u ||
          coordinator->precharge_assessment.hardware_sequence != coordinator->hardware.env.sequence_counter ||
          !OpenV2g_EnvelopeIsCurrent(&coordinator->precharge_assessment.env,

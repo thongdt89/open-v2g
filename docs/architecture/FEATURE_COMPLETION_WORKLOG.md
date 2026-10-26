@@ -3,6 +3,9 @@
 Started 26/10/2026 after coverage audit `0b79f7e`. Status: IN PROGRESS.
 User scope: implement all missing features identified by the protocol audit.
 
+Current inventory: [INCOMPLETE_ITEMS.md](INCOMPLETE_ITEMS.md). Historical rows
+below retain the scope and evidence of each earlier increment.
+
 ## Implementation work streams
 
 - [ ] Explicit correlated/fresh physical-readiness and welding assessments; no invented vehicle threshold.
@@ -10,7 +13,7 @@ User scope: implement all missing features identified by the protocol audit.
 - [ ] Bounded multiple services, parameters, schedules, minimum/dynamic limits and completion policy.
 - [ ] ServiceDetail, metering/receipt wire mapping; signed evidence separate from mock tokens.
 - [ ] Explicit pause/resume retention and renegotiation lifecycles.
-- [ ] AC host wire path and supporting permission/port model.
+- [x] Gated single-phase AC EIM host wire path and supporting permission/port model; broader AC remains open.
 - [ ] Real host UDP/IPv6 SDP and optional TLS/crypto/credential services.
 - [ ] Evaluate ISO-20/PnC/BPT code against available pinned models and capability/evidence gates.
 - [ ] Permanent wire/negative/sanitizer/independent-codec regressions and coverage instrumentation.
@@ -107,3 +110,30 @@ also rerun after timeout/completion cleanup changes. Wire regression now include
 **35** two-process sessions (two additional full IPv6 discovery sessions).
 Actual `station6`/`evcc6` CLI smoke runs for DIN and ISO-2 each exited 0 at both
 ends and completed 15 protocol exchanges. This is host evidence only.
+
+
+## AC EIM and metering increment — 26/10/2026
+
+Implemented a gated single-phase ISO-2 AC path, both legacy IPv4 and discovered
+IPv6: AC parameter discovery, PowerDelivery, ChargingStatus, controlled stop and
+SessionStop. Permission and simulated hardware each require explicit AC
+capability; prepared/permission modes must match. AC has a separate host
+readiness assessment; DC precharge evidence cannot satisfy its assessment kind.
+RCD and mode-mismatch tests stop with DENY and simulated hardware safe.
+
+Implemented bounded ISO-2 MeterInfo and MeteringReceipt wire mapping for AC/DC.
+The retained meter record is tied to generation/source correlation and consumed
+once. `allow_unsigned_receipts` is false by default; positive unsigned fixture
+tests opt in explicitly. Receipt policy rejection and unverified meter signature
+negatives stop after transfer began. No signed-receipt/PnC completion is claimed.
+
+Added integer boundary/truncation tests and 19 additional independently
+round-tripped AC/metering differential vectors in `tests/oracle/feature_vectors.json`.
+The original 50 references remain unchanged. New profile names in the test
+corpus map explicitly to the same ISO-2 oracle/schema, not new wire schema IDs.
+See the current inventory for all remaining implementation and external gates.
+
+Verification for the AC/metering increment: **28/28** normal, **26/26** sanitizer,
+**20/20** default-codec-OFF and **26/26** clean coverage checks passed. The wire
+regression now has **43** sessions. Real IPv4 and IPv6 `iso2-ac` CLI pairs each
+completed 12 exchanges and exited 0. See [coverage/source hashes](evidence/ac_metering_coverage.json).
