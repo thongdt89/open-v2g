@@ -94,4 +94,17 @@ not implement real DIN/ISO EXI communication or a complete charging session.
 
 ## SAP EXI host candidate — 26/10/2026
 
-An opt-in real SAP EXI backend using pinned external libcbv2g is available. See [build instructions and limits](integration/protocol/adapters/cbv2g/README.md). DIN/ISO-2 EXI message backends and session/socket mapping are not yet implemented.
+An opt-in real SAP EXI backend using pinned external libcbv2g is available. See [build instructions and limits](integration/protocol/adapters/cbv2g/README.md). That initial SAP-only milestone is now extended by separate DIN/ISO-2 backends and the wire runner described below.
+
+## Full DC EIM host wire runner — 26/10/2026
+
+The opt-in candidate now runs separate DIN/ISO-2 generated EXI backends and SAP
+inside V2GTP over actual Linux TCP. Both profiles complete the closed host
+sequence through current demand and protocol stop, with continuous permission
+supervision. Use [the wire runner guide](simulation/linux/wire/README.md) for
+build/run commands. The old custom-frame smoke fixture is retained separately.
+
+[Current evidence and external gates](docs/architecture/EXI_WIRE_IMPLEMENTATION_STATUS.md):
+24/24 ordinary checks with a separate pinned OpenV2G oracle, 23/23 sanitizer
+checks, and 50 differential payload examples. These remain host evidence;
+licensed schema provenance, target supplier ABI and vehicle safety are open.

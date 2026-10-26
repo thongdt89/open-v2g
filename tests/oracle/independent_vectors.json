@@ -1,0 +1,260 @@
+{
+  "date": "2026-10-26",
+  "candidate_commit": "03350be048b35b179905129005a97144a4bdcf93",
+  "oracle_repository": "https://github.com/Martin-P/OpenV2G",
+  "oracle_commit": "733d4f43cb6579c705d59c7386786ce12a0a0026",
+  "method": "Candidate-constructed bounded DTOs encoded by libcbv2g, decoded/re-encoded byte-identically by external OpenV2G. Differential references, not independently authored standards vectors.",
+  "oracle_configuration": "Unmodified pinned source copied to build directory; DEPLOY_DIN_CODEC changed from SUPPORT_NO to SUPPORT_YES in the build copy only. ISO-2:2013 uses external iso1 model.",
+  "vectors": [
+    {
+      "schema": "sap",
+      "message_type_id": 1,
+      "hex": "8000dbab9371d3234b71d1b981899189d191818991d26b9b3a232b30020000280040"
+    },
+    {
+      "schema": "sap",
+      "message_type_id": 2,
+      "hex": "80400280"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 1,
+      "hex": "809a02000000000000000011d01a121dc983cd6000"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 101,
+      "hex": "809a02000000000000000011e02019213d4d50c0c480"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 2,
+      "hex": "809a0200000000000000001198"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 102,
+      "hex": "809a02000000000000000011a0012002412084"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 3,
+      "hex": "809a02000000000000000011b2001280"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 103,
+      "hex": "809a02000000000000000011c000"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 4,
+      "hex": "809a02000000000000000010b8"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 104,
+      "hex": "809a02000000000000000010c00000"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 5,
+      "hex": "809a020000000000000000107111400c8040c24138060e161d402040a1104e40"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 105,
+      "hex": "809a02000000000000000010800000040020000480e02c3a80455040800000818482700c1c2c3a80408142209c000c00000140004006000200"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 6,
+      "hex": "809a0200000000000000001011400c80"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 106,
+      "hex": "809a0200000000000000001020004080000000"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 7,
+      "hex": "809a0200000000000000001151400c808142807c040c2209c0"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 107,
+      "hex": "809a02000000000000000011600040800001028500f800"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 8,
+      "hex": "809a02000000000000000011322280190800"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 108,
+      "hex": "809a02000000000000000011400420400000"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 9,
+      "hex": "809a02000000000000000010d1400c8040c2209c821028500f80"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 109,
+      "hex": "809a02000000000000000010e00040800001028500f8081844138000c0"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 12,
+      "hex": "809a02000000000000000011302280190a00"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 112,
+      "hex": "809a02000000000000000011400420400000"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 13,
+      "hex": "809a0200000000000000001211400c80"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 113,
+      "hex": "809a02000000000000000012200040800001028500f800"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 14,
+      "hex": "809a02000000000000000011f0"
+    },
+    {
+      "schema": "din",
+      "message_type_id": 114,
+      "hex": "809a020000000000000000120000"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 1,
+      "hex": "809802000000000000000011d01a121dc983cd6000"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 101,
+      "hex": "809802000000000000000011e02021213d4d50c0c480"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 2,
+      "hex": "809802000000000000000011b8"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 102,
+      "hex": "809802000000000000000011c0012004828224"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 3,
+      "hex": "80980200000000000000001132001280"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 103,
+      "hex": "8098020000000000000000114000"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 4,
+      "hex": "80980200000000000000001008"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 104,
+      "hex": "809802000000000000000010100000"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 5,
+      "hex": "809802000000000000000010948a400640218482700c50b0ea0102102209c800"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 105,
+      "hex": "809802000000000000000010a00000000000240700c50b0ea010aa000004080861209c062858750081081104e0018000008000200c000400"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 6,
+      "hex": "80980200000000000000001031001900"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 106,
+      "hex": "80980200000000000000001040000000204000"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 7,
+      "hex": "80980200000000000000001171001901081403e02184413800"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 107,
+      "hex": "809802000000000000000011800000002040840a01f000"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 8,
+      "hex": "80980200000000000000001150000220032100"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 108,
+      "hex": "809802000000000000000011600400001020"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 9,
+      "hex": "809802000000000000000010d1001900861104e410840a01f000"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 109,
+      "hex": "809802000000000000000010e00000002040840a01f010c2209c000608484f535430310008"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 12,
+      "hex": "80980200000000000000001151000220032140"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 112,
+      "hex": "809802000000000000000011600400001020"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 13,
+      "hex": "80980200000000000000001211001900"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 113,
+      "hex": "809802000000000000000012200000002040840a01f000"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 14,
+      "hex": "809802000000000000000011f000"
+    },
+    {
+      "schema": "iso2",
+      "message_type_id": 114,
+      "hex": "8098020000000000000000120000"
+    }
+  ]
+}

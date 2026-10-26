@@ -105,3 +105,25 @@ This supplements the `PARTIAL_HOST` classification; it does not close
 placeholder. Schema provenance, independent golden vectors, generated protocol
 mapping, supplier ABI and target evidence remain open. See
 [adapter evidence](../../integration/protocol/adapters/cbv2g/README.md).
+
+
+## Current generated DC wire mapping supplement — 26/10/2026
+
+This supersedes the SAP-only future-work descriptions above for host mapping.
+`EXI-IF-001…007` and `SCH-IF-001…004` now have separate explicit generated SAP,
+DIN and ISO-2 host backends with bounded neutral DTOs. `SAP-IF-004/005` and
+`PAD-IF-009/004` are connected by the Linux wire runner to actual V2GTP/EXI/TCP.
+The runner retains local request correlation and validates selected wire ID,
+SessionID, response kind, EVSE identity and schedule ID. `TTS-IF-002/006/008`
+are exercised through bounded copied TX and correlated completion; RX uses the
+existing HLC generation/connection boundary. Coordinator stopping maps the
+host `BeginProtocolStop` local operation to revoke/safe-state before the
+protocol tail, with final HLC/PLC teardown on completion/fault/timeout.
+
+Verification: 24/24 ordinary checks with the optional separate pinned oracle,
+23/23 sanitizer checks, both full closed-profile DC sessions, malformed corpus
+and 50 differential payloads. See
+[current evidence and external closure inventory](EXI_WIRE_IMPLEMENTATION_STATUS.md).
+Classification remains `PARTIAL_HOST`/`BLOCKED_G2` where full schema features,
+standardized ABI, licensed provenance, target configuration or safety evidence
+are required. Host implementation does not close or freeze those boundaries.

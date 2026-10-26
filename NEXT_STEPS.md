@@ -80,3 +80,19 @@ Implemented a generic C11/POSIX surrounding environment at `simulation/linux/`, 
 ## SAP EXI update — 26/10/2026
 
 Implemented an opt-in pinned libcbv2g SAP host backend with bounded neutral objects and fixed upstream-vector/malformed-input tests. See `integration/protocol/adapters/cbv2g/README.md`. Next: recover exact schema/generator provenance and independent vectors; then add separate DIN/ISO-2 message backends and wire mapping. Target/legal/safety gates remain open.
+
+## Current DC wire update — 26/10/2026
+
+This update supersedes the SAP-only and custom-frame future-work entries above.
+Host implementation now includes separate DIN/ISO-2 codecs, real SAP/V2GTP/EXI
+socket sessions for both DC EIM profiles, continuous nonblocking supervision,
+coordinator-owned protocol stopping, malformed/sanitizer tests and a separate
+pinned independent-codec comparison. See
+[the evidence and closure inventory](docs/architecture/EXI_WIRE_IMPLEMENTATION_STATUS.md).
+
+The next production gates require external evidence: exact schema/generator/
+license provenance and editions (OP-006/007), supplier ARXML/BSW signatures
+(OP-001/002/003/008), target scheduling/resources (OP-004/011), and approved
+safety/physical sequencing (OP-005). None is frozen by this host implementation.
+Independent host extensions can broaden services/schedules, UDP/IPv6 SDP and
+coverage-guided fuzzing; current support is the documented closed DC EIM profile.

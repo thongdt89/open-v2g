@@ -107,6 +107,13 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_RequestEnergyTransfer(
     OpenV2g_ChargingCoordinator *coordinator,
     OpenV2g_TimeUs now);
 
+/* Revoke and request the host hardware safe state while retaining HLC/PLC
+ * for the protocol's bounded stop/welding/session-stop exchange. The caller
+ * must subsequently call Stop on completion, timeout or fault.
+ */
+OpenV2g_Result OpenV2g_ChargingCoordinator_BeginProtocolStop(
+    OpenV2g_ChargingCoordinator *coordinator, OpenV2g_TimeUs now);
+
 OpenV2g_Result OpenV2g_ChargingCoordinator_Stop(
     OpenV2g_ChargingCoordinator *coordinator,
     OpenV2g_TimeUs now,

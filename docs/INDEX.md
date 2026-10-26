@@ -5,7 +5,7 @@ Các file có tên `EVCC_AUTOSAR_*` bên dưới là bản nguồn hoặc bản 
 | Ưu tiên sử dụng | File | Document revision | Nội dung / nơi tra cứu |
 |---|---|---|---|
 | Working proposal — tiếp tục khi open points chưa chốt | [Provisional Baseline Proposal](PROVISIONAL_BASELINE_PROPOSAL_VI.md) | Draft 0.1, 09/09/2026 | Phạm vi G0–G1 được phép, hard invariants, xử lý tạm `OP-001`…`OP-011`, milestone, risk và điều kiện thay thế giả định; không phải freeze approval |
-| EXI implementation proposal | [EXI Implementation Proposal](architecture/EXI_IMPLEMENTATION_PROPOSAL_VI.md) | Draft 0.3, 26/10/2026 | Candidate selection, typed EXI/schema boundary, pinned opt-in SAP generated host backend, generated artifact layout, license/resource/conformance gates; không phải supplier selection hoặc target evidence |
+| EXI implementation proposal | [EXI Implementation Proposal](architecture/EXI_IMPLEMENTATION_PROPOSAL_VI.md) | Draft 0.4, 26/10/2026 | Candidate selection, typed EXI/schema boundary, pinned opt-in SAP/DIN/ISO-2 generated host backends, generated artifact layout, license/resource/conformance gates; không phải supplier selection hoặc target evidence |
 | Provisional ASR interface style | [Provisional ASR Interface Style](architecture/PROVISIONAL_ASR_INTERFACE_STYLE.md) | Draft 0.6, 20/09/2026 | Quy ước và mapping C/S, S/R, queued event cho coordinator, support, correlated hardware feedback/result, HLC, bounded transport TX, EXI và protocol request/context; chuyển sang RTE/ARXML sau này |
 | DIN/ISO-2 protocol data flows | [Protocol Data Flows](architecture/PROTOCOL_DATA_FLOWS_DIN_ISO2_VI.md) | Draft 0.1, 15/09/2026 | Main session/DC/AC/metering/stop flows, per-message data projection và mapping vào C/S–S/R hiện có; wire conformance còn ở G2 |
 | G1 implementation — host/SIL skeleton | [Host/SIL Skeleton Architecture](architecture/HOST_SIL_SKELETON.md) | Draft 0.14, 15/10/2026 | C11 repository layout, implemented host behavior, ASR-style ports, correlated TCP/TLS lifecycle và bounded TX, hardware measured-feedback mismatch, reusable surrounding-component simulation, SAP và request-generating DIN/ISO-2 semantic FSMs/data flows với permission-expiry matrix, AUTOSAR/protocol replacement seams và test mapping; không phải target evidence |
@@ -43,3 +43,7 @@ Các hình kiến trúc được giữ tại `assets/EVCC_AUTOSAR_Charging_Archi
 ## Linux stub environment — 26/10/2026
 
 [Linux stub environment](../simulation/linux/README.md), Draft 0.1: generic C11/POSIX RTE-style wiring, bounded OS events, TCP station/EVCC smoke exchange and service stubs. Host evidence only; exact supplier ABI and full protocol wire mapping remain open.
+
+## Current DC wire implementation — 26/10/2026
+
+[EXI wire implementation status](architecture/EXI_WIRE_IMPLEMENTATION_STATUS.md), Draft 0.1: current host implementation of all five requested work streams, verification evidence and explicit external closure inventory. [Linux wire run guide](../simulation/linux/wire/README.md) distinguishes the new real EXI executable from the older custom-frame smoke fixture.

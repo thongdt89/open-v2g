@@ -74,3 +74,14 @@ Nguồn là Project Overview Rev.1, §§7–10. Dự kiến trong tài liệu: 1
 Chưa có trong bộ nguồn: target implementation repository/commit, frozen supplier ARXML/generated headers, licensed standards/schema package, actual HARA/safety concept, target toolchain/setup, concrete per-interface timing/queue configuration, test execution artifacts và biên bản freeze. Không suy diễn rằng các tài liệu này không tồn tại ở nơi khác; chỉ là chưa được cung cấp trong gói này.
 
 Ưu tiên tiếp tục: đối chiếu consistency, đóng các quyết định phụ thuộc supplier/platform/safety, lập traceability tới implementation và verification. Xem [NEXT_STEPS.md](NEXT_STEPS.md).
+
+
+## 7. Host implementation supplement — 26/10/2026
+
+The original handoff snapshot above remains historical. The repository now has
+C11 host logic, Linux surrounding stubs and opt-in pinned SAP/DIN/ISO-2 generated
+EXI adapters. Actual TCP/V2GTP/EXI closed DC EIM sessions complete for DIN and
+ISO-2, including supervised stop; external standards/supplier/safety gates are
+still open. Current implementation/evidence is documented in
+`docs/architecture/EXI_WIRE_IMPLEMENTATION_STATUS.md`. No production AUTOSAR,
+physical EVSE interoperability or formal approval is implied by these additions.

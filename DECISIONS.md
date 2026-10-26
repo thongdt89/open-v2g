@@ -57,3 +57,17 @@ Nguồn: Atomic Rev.3 §§28, 33, 35; Overview §§9, 14, 17. Vai trò owner dư
 Một điểm chỉ chuyển sang `FROZEN` khi có quyết định cụ thể, owner/reviewer thực tế, artifact/version áp dụng, evidence kiểm tra, phạm vi release và ngày hiệu lực. Ghi cả các phụ thuộc còn mở và tác động thay đổi.
 
 Không có dòng nào trong bản bàn giao này được tự chuyển thành `FROZEN`. Yêu cầu trước đây về “freeze hết open point” được giữ như mục tiêu công việc, không phải bằng chứng rằng việc freeze đã hoàn tất.
+
+
+## Host implementation evidence supplement — 26/10/2026
+
+The current host profile uses pinned external libcbv2g commit
+`03350be048b35b179905129005a97144a4bdcf93` and an optional separate test-only
+OpenV2G oracle at `733d4f43cb6579c705d59c7386786ce12a0a0026`. Separate explicit
+SAP/DIN/ISO-2 backends, one-service/one-flat-schedule DC EIM socket sessions and
+a coordinator-owned protocol-stop phase are implemented and host-tested.
+These are working host choices, not a selected production supplier or normative
+edition/safety allocation. Exact scope, observed results and evidence needed for
+OP-001…OP-011 are recorded in
+[the implementation status](docs/architecture/EXI_WIRE_IMPLEMENTATION_STATUS.md).
+All external open-point statuses above remain OPEN; no formal freeze is asserted.

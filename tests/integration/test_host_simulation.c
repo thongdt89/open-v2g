@@ -195,6 +195,22 @@ int main(void)
                     &simulation,
                     &energy) == OPENV2G_RESULT_REJECTED);
 
+    /* Bounded protocol-stop phase must revoke before the hardware request,
+     * retain HLC/PLC for the tail exchange, and never renew permission. */
+    TEST_ASSERT(OpenV2g_ChargingCoordinator_BeginProtocolStop(&simulation.coordinator, 180u) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(simulation.coordinator.permission_manager.current.decision == OPENV2G_PERMISSION_DENY);
+    TEST_ASSERT(simulation.hardware.status.state == OPENV2G_HW_SAFE);
+    TEST_ASSERT(simulation.hlc.status.state == OPENV2G_HLC_PROTOCOL_SESSION);
+    TEST_ASSERT(simulation.plc.status.state == OPENV2G_PLC_LINK_READY);
+    {
+        size_t trace_count = simulation.trace_count;
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_BeginProtocolStop(&simulation.coordinator, 181u) == OPENV2G_RESULT_OK);
+        TEST_ASSERT(simulation.trace_count == trace_count);
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_EvaluatePermission(&simulation.coordinator, 182u) == OPENV2G_RESULT_REJECTED);
+        TEST_ASSERT(simulation.coordinator.permission_manager.current.decision == OPENV2G_PERMISSION_DENY);
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_RequestEnergyTransfer(&simulation.coordinator, 183u) == OPENV2G_RESULT_REJECTED);
+    }
+
     before_stop = simulation.trace_count;
     TEST_ASSERT(OpenV2g_HostSimulation_Stop(
                     &simulation,

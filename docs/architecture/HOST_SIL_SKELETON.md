@@ -161,3 +161,17 @@ Passing host tests is `VERIFIED_HOST` evidence only. It is not target, safety, i
 ## Linux surrounding environment supplement — 26/10/2026
 
 Added `simulation/linux/` as a generic C11/POSIX host boundary around existing project ports. It provides OS events/alarms, loopback TCP with correlated transport TX completion, a semantic SessionSetup station smoke exchange, bounded diagnostics, RAM NvM and fail-closed crypto seams. See [Linux build/run and coverage](../../simulation/linux/README.md). GCC portability fixes add explicit `<stddef.h>` includes in the state-machine and subsystem lifecycle sources. Linux GCC 13.3 Debug strict-warning build and 19/19 host test executables passed. No supplier ABI, full wire protocol, sustained charging loop or target evidence is implied.
+
+
+## Generated DC wire supplement — 26/10/2026
+
+The later opt-in wire runner now executes actual SAP/DIN/ISO-2 generated EXI
+inside V2GTP over Linux sockets, preserving the existing C/S and S/R owner
+boundaries. Nonblocking I/O keeps coordinator expiry/evidence supervision
+running, and coordinator-owned `BeginProtocolStop` revokes permission before
+host hardware safe-state while retaining communication for protocol stopping.
+The old custom-frame smoke fixture remains separate. See
+[wire run guide](../../simulation/linux/wire/README.md) and
+[current implementation/evidence](EXI_WIRE_IMPLEMENTATION_STATUS.md).
+This is a closed DC EIM host profile; no target/supplier/safety approval is
+inferred and no imported AUTOSAR ABI is changed.

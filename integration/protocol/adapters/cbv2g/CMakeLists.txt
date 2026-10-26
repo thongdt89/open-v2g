@@ -1,4 +1,4 @@
-# Deliberately build only inspected SAP/common C sources, with no upstream
+# Build inspected SAP/common/DIN/ISO-2 C sources, with no upstream
 # FetchContent, C++ test framework or ISO-20 dependency.
 set(_pin 03350be048b35b179905129005a97144a4bdcf93)
 set(_manifest "${CMAKE_CURRENT_SOURCE_DIR}/../../generated/libcbv2g/${_pin}/SHA256SUMS")
@@ -39,14 +39,20 @@ add_library(openv2g_cbv2g_sap_generated STATIC
     ${_base}/common/exi_types_decoder.c
     ${_base}/app_handshake/appHand_Datatypes.c
     ${_base}/app_handshake/appHand_Encoder.c
-    ${_base}/app_handshake/appHand_Decoder.c)
+    ${_base}/app_handshake/appHand_Decoder.c
+    ${_base}/din/din_msgDefDatatypes.c
+    ${_base}/din/din_msgDefEncoder.c
+    ${_base}/din/din_msgDefDecoder.c
+    ${_base}/iso_2/iso2_msgDefDatatypes.c
+    ${_base}/iso_2/iso2_msgDefEncoder.c
+    ${_base}/iso_2/iso2_msgDefDecoder.c)
 target_include_directories(openv2g_cbv2g_sap_generated PRIVATE "${OPENV2G_CBV2G_SOURCE_DIR}/include")
 target_compile_features(openv2g_cbv2g_sap_generated PRIVATE c_std_11)
 # Generated warnings are visible but not promoted to project-owned errors.
 if(NOT MSVC)
     target_compile_options(openv2g_cbv2g_sap_generated PRIVATE -Wall -Wextra -Wpedantic)
 endif()
-add_library(openv2g_exi_cbv2g_sap STATIC exi_cbv2g_sap.c)
+add_library(openv2g_exi_cbv2g_sap STATIC exi_cbv2g_sap.c exi_cbv2g_din.c exi_cbv2g_iso2.c exi_cbv2g_dc_defaults.c)
 target_include_directories(openv2g_exi_cbv2g_sap PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_include_directories(openv2g_exi_cbv2g_sap PRIVATE
     "${OPENV2G_CBV2G_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}")
@@ -59,4 +65,17 @@ if(OPENV2G_BUILD_TESTS)
     openv2g_enable_strict_warnings(openv2g_test_cbv2g_sap)
     add_test(NAME openv2g_test_cbv2g_sap COMMAND openv2g_test_cbv2g_sap)
     set_tests_properties(openv2g_test_cbv2g_sap PROPERTIES TIMEOUT 30)
+endif()
+if(OPENV2G_BUILD_TESTS)
+    add_executable(openv2g_test_cbv2g_dc tests/test_cbv2g_dc.c)
+    target_link_libraries(openv2g_test_cbv2g_dc PRIVATE openv2g_exi_cbv2g_sap)
+    target_include_directories(openv2g_test_cbv2g_dc PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+    openv2g_enable_strict_warnings(openv2g_test_cbv2g_dc)
+    add_test(NAME openv2g_test_cbv2g_dc COMMAND openv2g_test_cbv2g_dc)
+    set_tests_properties(openv2g_test_cbv2g_dc PROPERTIES TIMEOUT 30)
+endif()
+if(OPENV2G_BUILD_TESTS)
+    add_executable(openv2g_exi_vector_dump tests/vector_dump.c)
+    target_link_libraries(openv2g_exi_vector_dump PRIVATE openv2g_exi_cbv2g_sap)
+    openv2g_enable_strict_warnings(openv2g_exi_vector_dump)
 endif()

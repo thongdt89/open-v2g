@@ -44,7 +44,7 @@ jobs:
         run: cmake -E chdir build-ci ctest -C Debug --output-on-failure
 
   sap-exi-candidate:
-    name: Linux / pinned SAP EXI candidate
+    name: Linux / pinned EXI codecs and DC sessions
     runs-on: ubuntu-latest
     steps:
       - name: Check out project
@@ -56,12 +56,20 @@ jobs:
           ref: 03350be048b35b179905129005a97144a4bdcf93
           path: out/deps/libcbv2g
           persist-credentials: false
+      - name: Check out independent test-only codec
+        uses: actions/checkout@v4
+        with:
+          repository: Martin-P/OpenV2G
+          ref: 733d4f43cb6579c705d59c7386786ce12a0a0026
+          path: out/deps/openv2g-oracle
+          persist-credentials: false
       - name: Configure SAP candidate and host tests
         run: >-
           cmake -S . -B build-sap
           -DCMAKE_BUILD_TYPE=Debug
           -DOPENV2G_ENABLE_CBV2G_SAP_POC=ON
           -DOPENV2G_CBV2G_SOURCE_DIR=${{ github.workspace }}/out/deps/libcbv2g
+          -DOPENV2G_ORACLE_SOURCE_DIR=${{ github.workspace }}/out/deps/openv2g-oracle
           -DOPENV2G_WARNINGS_AS_ERRORS=ON
       - name: Build and test host candidate
         run: |
@@ -73,11 +81,11 @@ jobs:
           -DCMAKE_BUILD_TYPE=Debug
           -DOPENV2G_ENABLE_CBV2G_SAP_POC=ON
           -DOPENV2G_CBV2G_SOURCE_DIR=${{ github.workspace }}/out/deps/libcbv2g
-          -DOPENV2G_BUILD_SIMULATION=OFF
+          -DOPENV2G_BUILD_SIMULATION=ON
           -DOPENV2G_BUILD_EXAMPLES=OFF
           -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
           -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
-      - name: Run SAP malformed-input corpus with sanitizers
+      - name: Run codec corpora and socket sessions with sanitizers
         run: |
-          cmake --build build-sap-sanitize --target openv2g_test_cbv2g_sap --parallel
-          ctest --test-dir build-sap-sanitize -R cbv2g_sap --output-on-failure
+          cmake --build build-sap-sanitize --parallel
+          ctest --test-dir build-sap-sanitize --output-on-failure

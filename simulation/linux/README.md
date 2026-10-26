@@ -110,3 +110,12 @@ so socket execution used the approved elevated test command.
 
 Evidence is host-only. Supplier ABI, target scheduling/WCET, actual TLS,
 protocol conformance, HIL and vehicle safety remain unverified.
+
+
+## Generated-wire extension — 26/10/2026
+
+This original custom-frame smoke fixture is retained. The separate
+[wire runner](wire/README.md) now runs both full closed DC EIM host sequences
+using generated SAP/DIN/ISO-2 EXI in V2GTP, with nonblocking supervision and
+coordinator-owned protocol stopping. Use `openv2g_linux_exi` for that path;
+`openv2g_linux_stub` remains the simpler custom-frame example described above.

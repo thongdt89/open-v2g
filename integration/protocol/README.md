@@ -47,3 +47,14 @@ SoAd/TcpIp/PduR callbacks and proving protocol conformance remain G2 work.
 ## SAP host candidate — 26/10/2026
 
 [libcbv2g SAP backend](adapters/cbv2g/README.md) implements real generated encode/decode behind the existing codec C/S interface, with project-neutral objects and pinned external source/hash checks. This is host-only SAP evidence. DIN/ISO-2 backends, independent golden vectors, schema provenance/legal acceptance and target integration remain open.
+
+
+## Generated DC wire extension — 26/10/2026
+
+The initial SAP-only candidate above is now extended with separate DIN and ISO-2
+DC EIM host backends and the Linux V2GTP/EXI session runner. The external source
+snapshot is commit/hash verified, not vendored. Independent-codec differential
+and sanitizer evidence are available. See
+[implementation status](../../docs/architecture/EXI_WIRE_IMPLEMENTATION_STATUS.md).
+Production/target status remains blocked on the listed external artifacts;
+expanded host functionality does not close the licensed-schema or supplier gates.

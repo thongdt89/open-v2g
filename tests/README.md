@@ -47,3 +47,13 @@ Remaining extensions requiring more implementation or G2/G3 inputs:
 Linux simulation builds also register `openv2g_test_linux_bsw`, covering bounded OS/service stubs and local socket nominal/reject/stale/disconnect flows. See `simulation/linux/README.md` for the exact smoke scope. Socket tests require local network permissions.
 
 With `OPENV2G_ENABLE_CBV2G_SAP_POC=ON` and a verified external checkout, `openv2g_test_cbv2g_sap` executes generated SAP EXI request/response encoding and decoding against fixed upstream vectors plus malformed/mutation corpora. These are host regression references from the same codec, not independent conformance vectors.
+
+
+The enabled candidate now also registers `openv2g_test_cbv2g_dc` (both schema
+backends, all closed-profile DC kinds/directions, truncation and 20,000 malformed
+inputs), `openv2g_test_linux_wire` (two-process generated-wire sessions and fault
+injection), and `openv2g_test_exi_reference_vectors` (50 recorded differential
+payloads). With `OPENV2G_ORACLE_SOURCE_DIR` pointing at the pinned separate
+OpenV2G checkout, `openv2g_test_exi_differential` repeats independent decode/
+re-encode comparisons. Totals: 19 baseline checks, 23 candidate checks, 24 with
+oracle. See `tests/oracle/README.md` and `simulation/linux/wire/README.md`.

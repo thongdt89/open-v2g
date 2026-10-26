@@ -406,6 +406,28 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_RequestEnergyTransfer(
     return result;
 }
 
+OpenV2g_Result OpenV2g_ChargingCoordinator_BeginProtocolStop(
+    OpenV2g_ChargingCoordinator *coordinator, OpenV2g_TimeUs now)
+{
+    if (coordinator == NULL || now == 0u || coordinator->teardown_started) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    if (coordinator->state_machine.state == OPENV2G_COORDINATOR_STOPPING) {
+        return OPENV2G_RESULT_OK;
+    }
+    if (coordinator->state_machine.state != OPENV2G_COORDINATOR_ENERGY_TRANSFER &&
+        coordinator->state_machine.state != OPENV2G_COORDINATOR_READY_FOR_ENERGY) {
+        return OPENV2G_RESULT_REJECTED;
+    }
+    OpenV2g_PermissionManager_Revoke(&coordinator->permission_manager,
+        coordinator->generation, now, OPENV2G_REASON_CANCELLED);
+    (void)OpenV2g_ChargeStateMachine_Dispatch(&coordinator->state_machine,
+        OPENV2G_CSM_EVENT_STOP_REQUESTED);
+    return coordinator->ports.hardware.request_safe_state(
+        coordinator->ports.hardware.context, coordinator->generation, now,
+        OPENV2G_REASON_CANCELLED);
+}
+
 OpenV2g_Result OpenV2g_ChargingCoordinator_Stop(
     OpenV2g_ChargingCoordinator *coordinator,
     OpenV2g_TimeUs now,

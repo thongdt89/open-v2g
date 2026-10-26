@@ -1,7 +1,7 @@
 # Đề xuất triển khai EXI cho EVCC
 
-**Revision:** Draft 0.3 — 26/10/2026
-**Status:** `PROPOSED_WITH_VERIFIED_SAP_HOST_CANDIDATE` — chưa phải lựa chọn supplier, schema license hoặc bằng chứng conformance
+**Revision:** Draft 0.4 — 26/10/2026
+**Status:** `PROPOSED_WITH_VERIFIED_DC_HOST_CANDIDATE` — chưa phải lựa chọn supplier, schema license hoặc bằng chứng conformance
 
 ## 1. Quyết định tạm
 
@@ -160,3 +160,23 @@ not silently replaced by this candidate.
 
 Build/run instructions and evidence:
 [cbv2g SAP candidate](../../integration/protocol/adapters/cbv2g/README.md).
+
+
+## 10. DC generated wire implementation — 26/10/2026
+
+Revision note (Draft 0.4): expanded the historical SAP-only milestone in §9.
+Separate DIN and ISO-2 generated backends now map bounded project DTOs for the
+complete closed DC EIM host sequence, including all four initial slices in §5.
+The Linux wire runner connects SAP and protocol EXI/V2GTP to the existing HLC
+owners with local correlation, explicit schemas, bounded nonblocking I/O,
+continued coordinator supervision and a coordinator-owned protocol stop phase.
+
+Independent-codec differential verification passed for 50 payloads using a
+separate pinned OpenV2G executable; 24/24 ordinary checks and 23/23 sanitizer
+checks pass locally. This is not independently authored normative golden or
+physical interoperability evidence. Original schema/license/generator source
+chain, exact editions, target/MISRA/resource/safety approvals remain OPEN.
+
+[Current implementation, evidence and external closure inventory](EXI_WIRE_IMPLEMENTATION_STATUS.md)
+supersedes the future-work statements in §9 for host DIN/ISO-2 mapping and socket
+integration. It does not mark any target or production gate complete.
