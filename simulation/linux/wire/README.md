@@ -191,3 +191,23 @@ implied. Meter records are copied, correlated, used once and cleared on teardown
 [Current incomplete items](../../../docs/architecture/INCOMPLETE_ITEMS.md) separates
 these delivered host paths from TLS, signed metering, three-phase AC, retained
 sessions, ISO-20/BPT and target work still to implement.
+
+
+## Actual TLS and cumulative processing — 28/10/2026
+
+Build with `OPENV2G_ENABLE_OPENSSL_HOST=ON` and append security arguments:
+
+```sh
+./build-security/simulation/linux/wire/openv2g_linux_exi station6 15118 iso2 tls12 server-chain.pem server.key
+./build-security/simulation/linux/wire/openv2g_linux_exi evcc6 15118 iso2 tls12 test-ca.pem localhost
+```
+
+Use `iso2-ac` for AC, `tls13` for the alternate host version and optionally append
+an offline CRL file on the EVCC command. DIN/TLS is rejected. A failed trust,
+identity, validity, revocation or handshake check terminates; no plaintext retry.
+
+The HLC supervisor additionally bounds cumulative Authorization/CPD/CableCheck
+processing. The host uses 2 seconds/8 Ongoing responses per stage; retries cannot
+restart this budget. These settings are provisional host limits. [Full provider,
+crypto, timer and test contracts](../TLS_CRYPTO.md). None of this enables PnC or
+signed metering automatically.

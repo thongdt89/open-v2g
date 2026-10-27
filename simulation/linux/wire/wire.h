@@ -1,6 +1,7 @@
 #ifndef OPENV2G_LINUX_WIRE_H
 #define OPENV2G_LINUX_WIRE_H
 #include "openv2g/linux/bsw.h"
+#include "openv2g/linux/tls.h"
 #include "openv2g/exi_cbv2g_sap.h"
 #include "openv2g/exi_cbv2g_dc.h"
 #define OV_WIRE_FRAME_MAX (OPENV2G_EXI_DC_PAYLOAD_MAX + OPENV2G_V2GTP_HEADER_SIZE)
@@ -10,6 +11,9 @@
 
 typedef struct {
     int fd;
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+    Ov2g_Tls *tls;
+#endif
     uint32_t generation;
     uint32_t connection;
     uint8_t tx[OV_WIRE_FRAME_MAX];
@@ -50,6 +54,11 @@ typedef struct {
     Ov2g_LinuxEnvironment environment;
     OvWireCodec codec;
     OvWireIo io;
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+    Ov2g_Tls tls;
+    Ov2g_TlsConfig tls_config;
+    bool tls_enabled;
+#endif
     OpenV2g_SapTxRequest pending_sap;
     OpenV2g_ProtocolTxRequest pending_protocol;
     OpenV2g_TimeUs refresh_at;
@@ -76,6 +85,13 @@ typedef struct {
     OpenV2g_PhysicalAssessmentCsPort assessment_port;
 } OvWireClient;
 
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+/* Config path/name strings must outlive Run/start; no private bytes cross this seam. */
+bool OvWireClient_SetTls(OvWireClient *client, const Ov2g_TlsConfig *config);
+bool OvWireIo_Handshake(OvWireIo *io, Ov2g_Tls *tls, const Ov2g_TlsConfig *config);
+bool OvWireStation_RunSecure(int listener, OpenV2g_ProtocolId protocol, OvWireScenario scenario, const Ov2g_TlsConfig *config);
+bool OvWireStation_RunDiscoveredSecure(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol, bool ac_mode, const Ov2g_TlsConfig *config);
+#endif
 OpenV2g_PhysicalAssessmentCsPort OvWireHostAssessmentPort(void);
 bool OvWireCodec_Init(OvWireCodec *codec, uint32_t generation);
 bool OvWireEncode(OvWireCodec *codec, uint32_t generation, OpenV2g_SchemaId schema,

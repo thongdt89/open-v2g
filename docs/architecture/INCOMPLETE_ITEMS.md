@@ -1,11 +1,22 @@
 # Current feature completion status
 
-Revision: Draft 0.1 — 26/10/2026. **Overall implementation remains in progress.**
+Revision: Draft 0.2 — 28/10/2026. **Overall implementation remains in progress.**
 This is the current inventory; older audits/work-log entries describe their own
 snapshots. Implemented means host code, not selected supplier, frozen design,
 vehicle safety allocation or protocol conformance.
 
-## Updated in this increment
+## Latest increment — 28/10/2026
+
+| Item | Current host result | Remaining limits |
+|---|---|---|
+| TLS | Real optional OpenSSL TLS1.2/1.3 over IPv4 and discovered IPv6 before SAP/EXI; CA/SAN/time verification, optional CRLs and mutual-certificate API | Explicit host AEAD profile; supplier/OEM PKI/trusted-time/revocation policy, target resource evidence and exact-edition cipher selection remain open |
+| Software crypto | Typed bounded SHA256/P-256 sign/verify jobs, versioned key handles, copied input, deadlines/cancel/generation checks and two-way raw-signature fixture verification | Not XMLDSIG/EXI canonicalization, signed receipts, PnC authorization, HSM or transactional credential provisioning |
+| Processing budgets | HLC-owned cumulative Authorization/CPD/CableCheck deadlines and Ongoing count limits; no reset on retry; late Finished/old timer events fail closed | Wire settings are provisional; broader setup/response/physical-stop watchdogs and normative timing selection remain open |
+
+See [host security and processing implementation](../../simulation/linux/TLS_CRYPTO.md)
+for API contracts, build/run examples, security policy and evidence scope.
+
+## Earlier AC/metering increment
 
 | Item | Current result | Limits |
 |---|---|---|
@@ -26,11 +37,11 @@ settlement, identity or signature-verification evidence.
 
 | Work item | Already present | Remaining implementation |
 |---|---|---|
-| TLS and cryptographic services | Correlated lifecycle/status ports and fail-closed mock seams | Real handshake/I/O, credential/trust-store provider, identity/time/revocation checks, crypto jobs and cancellation tests; no plaintext fallback on security failure |
+| TLS / credential integration | Actual verified host TLS and typed software crypto jobs, with explicit development trust/identity and optional CRL configuration | Selected supplier/HSM integration, OEM provisioning/trust/time/OCSP policy, exact-edition TLS profile and qualified resources; no automatic plaintext fallback |
 | PnC / signed receipts | Disabled feature gates; bounded opaque meter signatures; signed headers rejected | PaymentDetails, certificate install/update, challenge binding, EXI/XMLDSIG signing/verification and transactional credential lifecycle |
 | Pause/resume | ISO-2 Pause and OldSessionJoined mapper fields | Retained session context, binding to peer/service/schedule, expiry, fresh generation/evidence and new permission on resume |
 | Renegotiation | Semantic interface seam; DC/AC owner state machines | PowerDelivery Renegotiate, safe coordinator transition, evidence invalidation, fresh assessment/permission and race tests |
-| Processing budgets | Per-exchange timeout and finite host session/loop guards | Configurable per-state cumulative Ongoing/customer-interaction budgets; no invented normative timer values |
+| Broader timing supervision | Configurable cumulative Authorization/CPD/CableCheck budgets plus exchange/session guards | Setup, response, physical/protocol-stop supervision and watchdog integration; select normative budgets from exact editions and vehicle timing work products |
 | Services and schedules | ServiceDetail integer/string sets; bounded three tuples/five intervals with conservative selection | Multiple payment/service/mode offers, more parameter forms, tariffs/profiles, notifications and richer completion/schedule policy |
 | Broader AC | Single-phase EIM through real IPv4/IPv6 sockets | Three-phase, phase-specific limits, actual OBC control/measurement and complete AC protocol feature coverage |
 | Broader metering | ISO-2 unsigned host AC/DC receipt loop | DIN metering branches, authenticated meter data, signed receipt policy and compliant signature generation/verification |

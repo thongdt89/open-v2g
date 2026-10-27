@@ -18,7 +18,7 @@ static bool send_fragmented(OvWireIo *io, const uint8_t *bytes, size_t length)
     OpenV2g_TimeUs deadline = Ov2g_OsNow() + OV_WIRE_TIMEOUT_US;
     return length > 3u && OvWireIo_Write(io, bytes, 3u, deadline) && OvWireIo_Write(io, bytes + 3u, length - 3u, deadline);
 }
-bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario scenario)
+static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenario scenario, const Ov2g_TlsConfig *tls_config)
 {
     OvWireCodec codec;
     OvWireIo io;
@@ -29,10 +29,18 @@ bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario
     size_t length, sap_length;
     const uint8_t session_id[8] = {1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u};
     OpenV2g_SchemaId schema = protocol == OPENV2G_PROTOCOL_DIN_70121 ? OPENV2G_SCHEMA_DIN_70121 : OPENV2G_SCHEMA_ISO_15118_2;
-    int fd = Ov2g_TcpAccept(listener, Ov2g_OsNow() + 30000000u);
+    int fd = -1;
     bool success = false;
     size_t index;
     bool pending_sent = false;
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+    Ov2g_Tls tls;
+    Ov2g_TlsInit(&tls);
+    if (tls_config != NULL && (protocol == OPENV2G_PROTOCOL_DIN_70121 || !tls_config->server)) { return false; }
+#else
+    if (tls_config != NULL) { return false; }
+#endif
+    fd = Ov2g_TcpAccept(listener, Ov2g_OsNow() + 30000000u);
     bool ac_mode = scenario >= OV_WIRE_AC && scenario <= OV_WIRE_AC_WRONG_MODE;
     OpenV2g_ProtocolMessageKind steps[sizeof(sequence) / sizeof(sequence[0])];
     (void)memcpy(steps, sequence, sizeof(steps));
@@ -44,6 +52,9 @@ bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario
     }
     if (fd < 0 || !OvWireCodec_Init(&codec, 1u)) { goto stop; }
     OvWireIo_Init(&io, fd, 1u);
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+    if (tls_config != NULL) { io.connection = 1u; if (!OvWireIo_Handshake(&io, &tls, tls_config)) { goto stop; } }
+#endif
     if (!OvWireIo_Receive(&io, &received, Ov2g_OsNow() + OV_WIRE_TIMEOUT_US) ||
         !OvWireDecode(&codec, 1u, OPENV2G_SCHEMA_SAP, OPENV2G_EXI_SAP_REQUEST, &received, &sap_request, sizeof(sap_request))) { goto stop; }
     if (scenario == OV_WIRE_TIMEOUT) { (void)poll(NULL, 0u, 600); success = true; goto stop; }
@@ -154,26 +165,48 @@ bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario
     }
     success = true;
 stop:
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+    if (tls_config != NULL) { (void)Ov2g_TlsCancel(&tls, 1u, 1u); }
+#endif
     Ov2g_TcpClose(&fd);
     return success;
 }
 
-bool OvWireStation_RunDiscoveredMode(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol, bool ac_mode)
+static bool run_discovered(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol, bool ac_mode, const Ov2g_TlsConfig *tls_config)
 {
     OpenV2g_Endpoint advertised = {0};
     OpenV2g_TimeUs deadline = Ov2g_OsNow() + 30000000u;
     OpenV2g_Result result;
     advertised.address[15] = 1u; advertised.port = tcp_port;
-    advertised.transport = OPENV2G_TRANSPORT_TCP; advertised.security = OPENV2G_SECURITY_NONE;
+    advertised.transport = OPENV2G_TRANSPORT_TCP; advertised.security = tls_config == NULL ? OPENV2G_SECURITY_NONE : tls_config->version;
     do {
         struct pollfd descriptor = {udp, POLLIN, 0};
         result = Ov2g_Sdp6ServeOnce(udp, &advertised);
         if (result == OPENV2G_RESULT_BUSY) { (void)poll(&descriptor, 1u, 1); }
     } while (result == OPENV2G_RESULT_BUSY && Ov2g_OsNow() < deadline);
-    return result == OPENV2G_RESULT_OK && OvWireStation_Run(listener, protocol, ac_mode ? OV_WIRE_AC : OV_WIRE_NORMAL);
+    return result == OPENV2G_RESULT_OK && run_station(listener, protocol, ac_mode ? OV_WIRE_AC : OV_WIRE_NORMAL, tls_config);
 }
 
 bool OvWireStation_RunDiscovered(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol)
 {
     return OvWireStation_RunDiscoveredMode(listener, udp, tcp_port, protocol, false);
 }
+
+bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario scenario)
+{
+    return run_station(listener, protocol, scenario, NULL);
+}
+bool OvWireStation_RunDiscoveredMode(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol, bool ac_mode)
+{
+    return run_discovered(listener, udp, tcp_port, protocol, ac_mode, NULL);
+}
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+bool OvWireStation_RunSecure(int listener, OpenV2g_ProtocolId protocol, OvWireScenario scenario, const Ov2g_TlsConfig *config)
+{
+    return config != NULL && run_station(listener, protocol, scenario, config);
+}
+bool OvWireStation_RunDiscoveredSecure(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol, bool ac_mode, const Ov2g_TlsConfig *config)
+{
+    return config != NULL && run_discovered(listener, udp, tcp_port, protocol, ac_mode, config);
+}
+#endif

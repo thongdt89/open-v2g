@@ -41,3 +41,6 @@ if(TARGET openv2g_host_sim)
         openv2g_test_host_simulation
         integration/test_host_simulation.c)
 endif()
+if(TARGET openv2g_host_sim)
+    add_openv2g_simulation_test(openv2g_test_processing_budgets integration/test_processing_budgets.c)
+endif()

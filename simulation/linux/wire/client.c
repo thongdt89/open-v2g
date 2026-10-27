@@ -55,6 +55,9 @@ static bool supervise(void *context, OpenV2g_TimeUs now)
     ++client->ticks;
     if (client->io.generation != sim->coordinator.generation ||
         (client->io.connection != 0u && client->io.connection != sim->hlc.tcp_tls_session.status.connection_id)) { return false; }
+    if (OpenV2g_Iso15118Chrg_TickProcessing(&sim->hlc, client->io.generation, now) != OPENV2G_RESULT_OK) {
+        (void)OpenV2g_HostSimulation_Stop(sim, now, OPENV2G_REASON_TIMEOUT); return false;
+    }
     /* Expiry is evaluated before renewal; a late owner turn cannot revive it. */
     OpenV2g_ChargingCoordinator_Tick(&sim->coordinator, now);
     if (sim->coordinator.teardown_started) { return false; }
@@ -87,6 +90,13 @@ bool OvWireClient_InitMode(OvWireClient *client, int fd, OpenV2g_ProtocolId prot
     config.coordinator.require_physical_assessment = true;
     client->assessment_port = OvWireHostAssessmentPort();
     if (OpenV2g_HostSimulation_Init(&client->environment.rte, &config) != OPENV2G_RESULT_OK || !OvWireCodec_Init(&client->codec, 1u)) { return false; }
+    {
+        const OpenV2g_ProcessingConfig processing = {3u, {
+            {OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION, 2000000u, 8u},
+            {OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER, 2000000u, 8u},
+            {OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK, 2000000u, 8u}}};
+        if (OpenV2g_Iso15118Chrg_ConfigureProcessing(&client->environment.rte.hlc, &processing) != OPENV2G_RESULT_OK) { return false; }
+    }
     OvWireIo_Init(&client->io, fd, 1u);
     client->io.transport = &client->environment.rte.hlc.tcp_tls_session;
     client->io.hlc = &client->environment.rte.hlc;
@@ -111,6 +121,17 @@ bool OvWireClient_InitDiscovery(OvWireClient *client, OpenV2g_ProtocolId protoco
 {
     return OvWireClient_InitDiscoveryMode(client, protocol, discovery_port, false);
 }
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+bool OvWireClient_SetTls(OvWireClient *client, const Ov2g_TlsConfig *config)
+{
+    if (client == NULL || config == NULL || config->server || client->environment.rte.config.features.din_70121_dc_eim ||
+        (config->version != OPENV2G_SECURITY_TLS12 && config->version != OPENV2G_SECURITY_TLS13) ||
+        client->environment.rte.coordinator.generation != 0u) { return false; }
+    client->tls_config = *config; client->tls_enabled = true;
+    client->environment.rte.config.peer_endpoint.security = config->version;
+    Ov2g_TlsInit(&client->tls); return true;
+}
+#endif
 static OpenV2g_Result discovered(void *context, uint32_t generation, const OpenV2g_Endpoint *endpoint)
 {
     OvWireClient *client = context;
@@ -125,6 +146,9 @@ static bool discover(OvWireClient *client)
     Ov2g_Sdp6Init(&job); job.complete = discovered; job.completion_context = client;
     server.address[15] = 1u; server.port = client->discovery_port;
     server.transport = OPENV2G_TRANSPORT_TCP; server.security = OPENV2G_SECURITY_NONE;
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+    if (client->tls_enabled) { server.security = client->tls_config.version; }
+#endif
     if (Ov2g_Sdp6Begin(&job, &sim->hlc.sdp_client, &server, Ov2g_OsNow() + OV_WIRE_TIMEOUT_US) != OPENV2G_RESULT_ACCEPTED) { return false; }
     do {
         struct pollfd descriptor = {job.fd, POLLIN, 0};
@@ -152,8 +176,14 @@ static bool sap(OvWireClient *client)
     if (client->discovery_port != 0u) { if (!discover(client)) { return false; } }
     else if (!ok(OpenV2g_Iso15118Chrg_OnSdpComplete(&sim->hlc, sim->coordinator.generation, Ov2g_OsNow() + 10u, &sim->config.peer_endpoint))) { return false; }
     client->io.connection = sim->hlc.tcp_tls_session.status.connection_id;
-    if (!ok(OpenV2g_Iso15118Chrg_OnTransportReady(&sim->hlc, client->io.generation, client->io.connection, Ov2g_OsNow() + 10u)) ||
-        !ok(OpenV2g_Iso15118Chrg_TakeSapRequest(&sim->hlc, client->io.generation, &client->pending_sap))) { return false; }
+    if (!ok(OpenV2g_Iso15118Chrg_OnTransportReady(&sim->hlc, client->io.generation, client->io.connection, Ov2g_OsNow() + 10u))) { return false; }
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+    if (client->tls_enabled) {
+        bool established = OvWireIo_Handshake(&client->io, &client->tls, &client->tls_config);
+        if (!ok(OpenV2g_Iso15118Chrg_OnTlsComplete(&sim->hlc, client->io.generation, client->io.connection, Ov2g_OsNow(), established)) || !established) { return false; }
+    }
+#endif
+    if (!ok(OpenV2g_Iso15118Chrg_TakeSapRequest(&sim->hlc, client->io.generation, &client->pending_sap))) { return false; }
     (void)memset(&request, 0, sizeof(request)); request.message_type_id = OPENV2G_EXI_SAP_REQUEST;
     if (client->pending_sap.offer_count > OPENV2G_EXI_SAP_OFFERS_MAX) { return false; }
     request.body.request.count = client->pending_sap.offer_count;
@@ -282,7 +312,7 @@ static bool exchange_protocol(OvWireClient *client)
     (void)memset(&message, 0, sizeof(message));
     message.generation = client->io.generation; message.correlation_id = pending->correlation_id;
     message.request_service_detail = pending->kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY;
-    message.kind = pending->kind; message.now = Ov2g_OsNow() + 10u; message.accepted = true; message.ongoing = response.ongoing;
+    message.kind = pending->kind; message.now = Ov2g_OsNow(); message.accepted = true; message.ongoing = response.ongoing;
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND || pending->kind == OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS) {
         if (!response.ready || response.rcd_fault || response.ac_mode != client->ac_mode) { return false; }
         if (pending->protocol == OPENV2G_PROTOCOL_ISO_15118_2 &&
@@ -340,6 +370,9 @@ bool OvWireClient_Run(OvWireClient *client)
 stop:
     (void)OpenV2g_HostSimulation_Stop(sim, Ov2g_OsNow() + 100u, success ? OPENV2G_REASON_CANCELLED : OPENV2G_REASON_PRECONDITION);
     Ov2g_OsCancel(&client->environment.os, 0u);
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+    if (client->tls_enabled) { (void)Ov2g_TlsCancel(&client->tls, client->io.generation, client->io.connection); client->io.tls = NULL; }
+#endif
     if (client->discovery_port != 0u) { Ov2g_TcpClose(&client->io.fd); }
     (void)OpenV2g_ExiCodec_Stop(&client->codec.codec, client->io.generation);
     (void)memset(&client->meter_info, 0, sizeof(client->meter_info)); client->meter_correlation = 0u;

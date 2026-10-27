@@ -115,3 +115,12 @@ The subsequent IPv6 increment adds `station6`/`evcc6`: actual unicast IPv6 UDP S
 before IPv6 TCP and the same SAP/DIN/ISO-2 EXI sessions. Legacy IPv4 mode still
 injects its endpoint. See [IPv6 provider details](../../simulation/linux/SDP_IPV6.md).
 TLS, multicast/link-local and physical PLC remain outside the delivered profile.
+
+
+## Host security/timing increment — 28/10/2026
+
+Optional real TLS, typed software crypto and HLC cumulative processing budgets
+are now implemented. See [current status](INCOMPLETE_ITEMS.md) and the
+[host provider guide](../../simulation/linux/TLS_CRYPTO.md). Earlier no-TLS/mock-only
+statements describe their dated baseline. Signed receipts/PnC, retained sessions,
+ISO-20/BPT and target qualification are still incomplete.

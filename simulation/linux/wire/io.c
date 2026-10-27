@@ -33,7 +33,17 @@ OpenV2g_TcpTxCsPort OvWireIo_TxPort(OvWireIo *io)
 }
 static bool pump_write(OvWireIo *io)
 {
-    ssize_t written = send(io->fd, io->tx + io->tx_offset, io->tx_length - io->tx_offset, MSG_NOSIGNAL);
+    ssize_t written;
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+    if (io->tls != NULL) {
+        size_t count;
+        OpenV2g_Result result = Ov2g_TlsWrite(io->tls, io->generation, io->connection, io->tx + io->tx_offset, io->tx_length - io->tx_offset, &count);
+        if (result == OPENV2G_RESULT_BUSY) { return true; }
+        if (result != OPENV2G_RESULT_OK) { return false; }
+        written = (ssize_t)count;
+    } else
+#endif
+    { written = send(io->fd, io->tx + io->tx_offset, io->tx_length - io->tx_offset, MSG_NOSIGNAL); }
     if (written < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)) { return true; }
     if (written <= 0) { return false; }
     io->tx_offset += (size_t)written;
@@ -57,15 +67,35 @@ static bool receive(OvWireIo *io, OpenV2g_V2gtpFrameView *frame, OpenV2g_TimeUs 
         struct pollfd pollfd = {io->fd, POLLIN | (io->queued ? POLLOUT : 0), 0};
         OpenV2g_TimeUs now = Ov2g_OsNow();
         int ready;
+        bool buffered = false;
+        short read_events = POLLIN, write_events = POLLOUT;
         if (now == 0u || now >= deadline || !service(io, now)) { return false; }
         if (!want_frame && !io->queued) { return true; }
-        ready = poll(&pollfd, 1, 1); /* at most 1 ms between owner supervision turns */
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+        if (io->tls != NULL) {
+            if (io->tls->state != OV2G_TLS_READY) { return false; }
+            buffered = !io->queued && Ov2g_TlsHasData(io->tls);
+            read_events = (short)io->tls->read_events; write_events = (short)io->tls->write_events;
+            pollfd.events = io->queued ? write_events : read_events;
+        }
+#endif
+        ready = poll(&pollfd, 1, buffered ? 0 : 1); /* at most 1 ms between owner supervision turns */
         if (ready < 0 && errno == EINTR) { continue; }
         if (ready < 0 || (pollfd.revents & (POLLERR | POLLNVAL)) != 0) { return false; }
-        if ((pollfd.revents & POLLOUT) != 0 && !pump_write(io)) { return false; }
-        if (want_frame && (pollfd.revents & (POLLIN | POLLHUP)) != 0) {
+        if ((pollfd.revents & write_events) != 0 && io->queued && !pump_write(io)) { return false; }
+        if (want_frame && (buffered || (pollfd.revents & (read_events | POLLHUP)) != 0)) {
             uint8_t bytes[256];
-            ssize_t count = recv(io->fd, bytes, sizeof(bytes), 0);
+            ssize_t count;
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+            if (io->tls != NULL) {
+                size_t length;
+                OpenV2g_Result received = Ov2g_TlsRead(io->tls, io->generation, io->connection, bytes, sizeof(bytes), &length);
+                if (received == OPENV2G_RESULT_BUSY) { continue; }
+                if (received != OPENV2G_RESULT_OK) { return false; }
+                count = (ssize_t)length;
+            } else
+#endif
+            { count = recv(io->fd, bytes, sizeof(bytes), 0); }
             size_t consumed = 0u;
             OpenV2g_Result result;
             if (count < 0 && (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)) { continue; }
@@ -114,3 +144,20 @@ bool OvWireIo_Exchange(OvWireIo *io, const uint8_t *frame, size_t length,
     } else if (OpenV2g_V2gtpParser_Reset(&io->parser, io->generation) != OPENV2G_RESULT_OK) { return false; }
     return receive(io, response, deadline, true) && io->confirmed;
 }
+
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+bool OvWireIo_Handshake(OvWireIo *io, Ov2g_Tls *tls, const Ov2g_TlsConfig *config)
+{
+    OpenV2g_Result result;
+    OpenV2g_TimeUs now = Ov2g_OsNow();
+    if (Ov2g_TlsStart(tls, io->fd, io->generation, io->connection, now, now + OV_WIRE_TIMEOUT_US, config) != OPENV2G_RESULT_ACCEPTED) { return false; }
+    do {
+        struct pollfd descriptor = {io->fd, (short)tls->handshake_events, 0};
+        if (!service(io, Ov2g_OsNow())) { (void)Ov2g_TlsCancel(tls, io->generation, io->connection); return false; }
+        result = Ov2g_TlsPump(tls, io->generation, io->connection, Ov2g_OsNow());
+        if (result == OPENV2G_RESULT_BUSY) { (void)poll(&descriptor, 1u, 1); }
+    } while (result == OPENV2G_RESULT_BUSY);
+    if (result != OPENV2G_RESULT_OK) { return false; }
+    io->tls = tls; return true;
+}
+#endif

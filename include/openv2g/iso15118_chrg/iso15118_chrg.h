@@ -54,12 +54,32 @@ typedef struct {
         uint32_t *dropped_count);
 } OpenV2g_HlcEventQueuedSrPort;
 
+#define OPENV2G_PROCESSING_LIMIT_MAX 3u
+#define OPENV2G_HLC_PROCESSING_TIMER_ID 0x7001u
+typedef struct {
+    OpenV2g_ProtocolMessageKind kind;
+    OpenV2g_TimeUs budget_us;
+    uint16_t max_ongoing_responses;
+} OpenV2g_ProcessingLimit;
+typedef struct {
+    uint8_t count;
+    OpenV2g_ProcessingLimit limits[OPENV2G_PROCESSING_LIMIT_MAX];
+} OpenV2g_ProcessingConfig;
+typedef struct {
+    OpenV2g_ProtocolMessageKind kind;
+    OpenV2g_TimeUs started;
+    OpenV2g_TimeUs deadline;
+    uint16_t ongoing_responses;
+} OpenV2g_ProcessingStage;
+
 typedef struct {
     uint32_t generation;
     uint32_t next_event_id;
     OpenV2g_HlcSessionStatus status;
     OpenV2g_HlcEventQueue event_queue;
     OpenV2g_HlcFeatureConfig features;
+    OpenV2g_ProcessingConfig processing_config;
+    OpenV2g_ProcessingStage processing_stage;
     OpenV2g_SdpClient sdp_client;
     OpenV2g_SdpClientCsPort sdp_required_port;
     OpenV2g_SdpStatusSrPort sdp_status_required_port;
@@ -94,6 +114,10 @@ typedef struct {
     OpenV2g_Subsystem pki_security_adapter;
     OpenV2g_Subsystem certificate_manager;
 } OpenV2g_Iso15118Chrg;
+
+/* PROJECT policy. Supervisor owns one cumulative stage timer; values are not normative defaults. */
+OpenV2g_Result OpenV2g_Iso15118Chrg_ConfigureProcessing(OpenV2g_Iso15118Chrg *hlc, const OpenV2g_ProcessingConfig *config);
+OpenV2g_Result OpenV2g_Iso15118Chrg_TickProcessing(OpenV2g_Iso15118Chrg *hlc, uint32_t generation, OpenV2g_TimeUs now);
 
 void OpenV2g_Iso15118Chrg_Init(
     OpenV2g_Iso15118Chrg *hlc,

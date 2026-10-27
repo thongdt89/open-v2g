@@ -223,3 +223,12 @@ session/completion fields. See [the work log](FEATURE_COMPLETION_WORKLOG.md) for
 precise implementation/test scope and remaining work. The overall request to
 implement all missing features remains in progress; this is not full protocol
 coverage or closure of the external production gates.
+
+
+## Host security/timing increment — 28/10/2026
+
+Optional real TLS, typed software crypto and HLC cumulative processing budgets
+are now implemented. See [current status](INCOMPLETE_ITEMS.md) and the
+[host provider guide](../../simulation/linux/TLS_CRYPTO.md). Earlier no-TLS/mock-only
+statements describe their dated baseline. Signed receipts/PnC, retained sessions,
+ISO-20/BPT and target qualification are still incomplete.

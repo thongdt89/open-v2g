@@ -81,6 +81,38 @@ static OpenV2g_Result sap_channel_send(
     return OPENV2G_RESULT_ACCEPTED;
 }
 
+static const OpenV2g_ProcessingLimit *processing_limit(const OpenV2g_Iso15118Chrg *hlc, OpenV2g_ProtocolMessageKind kind)
+{
+    unsigned i;
+    for (i = 0u; i < hlc->processing_config.count; ++i) {
+        if (hlc->processing_config.limits[i].kind == kind) { return &hlc->processing_config.limits[i]; }
+    }
+    return NULL;
+}
+OpenV2g_Result OpenV2g_Iso15118Chrg_ConfigureProcessing(OpenV2g_Iso15118Chrg *hlc, const OpenV2g_ProcessingConfig *config)
+{
+    unsigned i, j;
+    if (hlc == NULL || config == NULL || hlc->status.state != OPENV2G_HLC_IDLE || config->count > OPENV2G_PROCESSING_LIMIT_MAX) { return OPENV2G_RESULT_REJECTED; }
+    for (i = 0u; i < config->count; ++i) {
+        const OpenV2g_ProcessingLimit *limit = &config->limits[i];
+        if ((limit->kind != OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION && limit->kind != OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER &&
+             limit->kind != OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK) || limit->budget_us == 0u || limit->max_ongoing_responses == 0u) { return OPENV2G_RESULT_REJECTED; }
+        for (j = 0u; j < i; ++j) { if (config->limits[j].kind == limit->kind) { return OPENV2G_RESULT_REJECTED; } }
+    }
+    hlc->processing_config = *config; return OPENV2G_RESULT_OK;
+}
+OpenV2g_Result OpenV2g_Iso15118Chrg_TickProcessing(OpenV2g_Iso15118Chrg *hlc, uint32_t generation, OpenV2g_TimeUs now)
+{
+    if (hlc == NULL || generation == 0u || generation != hlc->generation || now == 0u) { return OPENV2G_RESULT_REJECTED; }
+    if (hlc->status.state == OPENV2G_HLC_ERROR) { return OPENV2G_RESULT_REJECTED; }
+    if (hlc->status.state != OPENV2G_HLC_PROTOCOL_SESSION || hlc->processing_stage.deadline == 0u) { return OPENV2G_RESULT_OK; }
+    if (now < hlc->processing_stage.started) { return OPENV2G_RESULT_REJECTED; }
+    if (now >= hlc->processing_stage.deadline) {
+        (void)OpenV2g_Iso15118Chrg_OnProtocolTimerExpired(hlc, generation, now, OPENV2G_HLC_PROCESSING_TIMER_ID);
+        return OPENV2G_RESULT_REJECTED;
+    }
+    return OPENV2G_RESULT_OK;
+}
 static OpenV2g_Result protocol_channel_send(
     void *context,
     const OpenV2g_ProtocolTxRequest *request)
@@ -93,6 +125,15 @@ static OpenV2g_Result protocol_channel_send(
     }
     if (hlc->protocol_request_pending) {
         return OPENV2G_RESULT_BUSY;
+    }
+    {
+        const OpenV2g_ProcessingLimit *limit = processing_limit(hlc, request->kind);
+        if (limit == NULL) { (void)memset(&hlc->processing_stage, 0, sizeof(hlc->processing_stage)); }
+        else if (hlc->processing_stage.kind != request->kind) {
+            if (request->timestamp == 0u || limit->budget_us > UINT64_MAX - request->timestamp) { return OPENV2G_RESULT_REJECTED; }
+            hlc->processing_stage.kind = request->kind; hlc->processing_stage.started = request->timestamp;
+            hlc->processing_stage.deadline = request->timestamp + limit->budget_us; hlc->processing_stage.ongoing_responses = 0u;
+        }
     }
     hlc->pending_protocol_request = *request;
     hlc->protocol_request_pending = true;
@@ -444,6 +485,7 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_Start(
         return OPENV2G_RESULT_REJECTED;
     }
 
+    (void)memset(&hlc->processing_stage, 0, sizeof(hlc->processing_stage));
     hlc->generation = generation;
     hlc->next_event_id = 0u;
     hlc->protocol_request_pending = false;
@@ -829,6 +871,18 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_OnProtocolMessage(
     }
     (void)memset(&adapter_status, 0, sizeof(adapter_status));
     completed_request = hlc->dispatched_protocol_request;
+    if (message->kind == completed_request.kind && message->correlation_id == completed_request.correlation_id) {
+        const OpenV2g_ProcessingLimit *limit = processing_limit(hlc, message->kind);
+        if (OpenV2g_Iso15118Chrg_TickProcessing(hlc, hlc->generation, now) != OPENV2G_RESULT_OK) { return OPENV2G_RESULT_REJECTED; }
+        if (limit != NULL && message->accepted && message->ongoing) {
+            if (hlc->processing_stage.ongoing_responses >= limit->max_ongoing_responses) {
+                hlc->processing_stage.deadline = now; /* The configured count limit expires this stage immediately. */
+                (void)OpenV2g_Iso15118Chrg_OnProtocolTimerExpired(hlc, hlc->generation, now, OPENV2G_HLC_PROCESSING_TIMER_ID);
+                return OPENV2G_RESULT_REJECTED;
+            }
+            ++hlc->processing_stage.ongoing_responses;
+        }
+    }
     normalized_message = *message;
     normalized_message.now = now;
     result = hlc->active_adapter_port.on_message(
@@ -884,6 +938,8 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_OnProtocolTimerExpired(
         (hlc->active_adapter_port.on_timer_expired == NULL)) {
         return OPENV2G_RESULT_REJECTED;
     }
+    if (timer_id == OPENV2G_HLC_PROCESSING_TIMER_ID &&
+        (hlc->processing_stage.deadline == 0u || now < hlc->processing_stage.deadline)) { return OPENV2G_RESULT_REJECTED; }
     result = hlc->active_adapter_port.on_timer_expired(
         hlc->active_adapter_port.context, generation, timer_id);
     if (result == OPENV2G_RESULT_OK) {
@@ -893,6 +949,10 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_OnProtocolTimerExpired(
                  &adapter_status) == OPENV2G_RESULT_OK)) {
             hlc->status.protocol_step = (uint16_t)adapter_status.state;
         }
+        hlc->protocol_request_pending = false; hlc->protocol_request_dispatched = false;
+        (void)memset(&hlc->pending_protocol_request, 0, sizeof(hlc->pending_protocol_request));
+        (void)memset(&hlc->dispatched_protocol_request, 0, sizeof(hlc->dispatched_protocol_request));
+        (void)memset(&hlc->processing_stage, 0, sizeof(hlc->processing_stage));
         update_status(hlc, now, OPENV2G_HLC_ERROR, OPENV2G_REASON_TIMEOUT);
     }
     return result;
@@ -955,6 +1015,7 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_Stop(
         hlc->tcp_tls_session.status.connection_id,
         now,
         reason);
+    (void)memset(&hlc->processing_stage, 0, sizeof(hlc->processing_stage));
     hlc->status.protocol = OPENV2G_PROTOCOL_NONE;
     hlc->status.schema = OPENV2G_SCHEMA_NONE;
     hlc->status.selected_mode = OPENV2G_MODE_NONE;

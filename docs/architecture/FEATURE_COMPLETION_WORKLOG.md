@@ -137,3 +137,32 @@ Verification for the AC/metering increment: **28/28** normal, **26/26** sanitize
 **20/20** default-codec-OFF and **26/26** clean coverage checks passed. The wire
 regression now has **43** sessions. Real IPv4 and IPv6 `iso2-ac` CLI pairs each
 completed 12 exchanges and exited 0. See [coverage/source hashes](evidence/ac_metering_coverage.json).
+
+
+## TLS, software crypto and processing budgets — 28/10/2026
+
+Added an opt-in OpenSSL host provider and actual encrypted AC/DC EIM sessions,
+including IPv6 SDP announcing TLS before connection/handshake/SAP. The EVCC
+verifies the configured CA, SAN identity and certificate validity; optional
+CRLs and mutual-certificate API cases are tested. Exact version selection rejects
+mismatch; security failures stop before energy transfer, without plaintext retry.
+
+Added a typed four-key/four-job SHA256/P-256 provider with copied bounded input,
+raw signature results, key-version binding, deadline/cancel and stale-generation
+checks. It is a software primitive provider, not XMLDSIG/PnC or a supplier Csm ABI.
+
+The HLC supervisor now owns configurable cumulative Authorization/CPD/CableCheck
+processing limits. Retries retain the deadline, stage changes reset it, and count
+caps, late Finished and old timer events fail closed. The wire clock no longer
+adds an artificial future offset to protocol response timestamps.
+
+API policy, dependency provenance and tests: [TLS/crypto host guide](../../simulation/linux/TLS_CRYPTO.md).
+Overall completion remains in progress. The separately created architecture
+review directory is preserved and is not part of this implementation increment.
+
+Verification: **33/33** normal checks with independent oracle, **31/31**
+ASan/UBSan checks, **29/29** OpenSSL-OFF checks, **21/21** default codec-OFF
+checks and **31/31** fresh coverage checks passed. Secure wire tests include
+eight AC/DC positive/negative sessions and two actual CLI pairs. System OpenSSL
+shared libraries are outside sanitizer/coverage instrumentation. See
+[coverage and source hashes](evidence/security_processing_coverage.json).

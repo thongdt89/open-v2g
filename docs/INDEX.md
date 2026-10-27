@@ -72,3 +72,12 @@ implementation versus external evidence. Overall feature completion is in progre
 [Current feature completion status](architecture/INCOMPLETE_ITEMS.md), Draft 0.1:
 new single-phase AC and unsigned metering host coverage; exact remaining work,
 capability/security gates and external production evidence.
+
+
+## TLS/crypto and cumulative budgets — 28/10/2026
+
+[Host security and processing guide](../simulation/linux/TLS_CRYPTO.md): actual
+optional OpenSSL handshakes/I/O, typed crypto jobs, peer policy, ephemeral test
+credentials, cumulative stage timing, build/run and limits. [Current inventory](architecture/INCOMPLETE_ITEMS.md)
+now distinguishes these delivered host features from PnC/signed receipts and
+supplier/vehicle/target work still open.

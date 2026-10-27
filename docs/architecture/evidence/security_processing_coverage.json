@@ -1,0 +1,552 @@
+{
+  "date": "2026-10-28",
+  "scope": "Fresh instrumented host suite: 31/31 tests; execution coverage, not protocol conformance. External OpenSSL shared libraries are not instrumented.",
+  "configuration": {
+    "OPENV2G_ENABLE_COVERAGE": true,
+    "OPENV2G_ENABLE_OPENSSL_HOST": true,
+    "OPENV2G_ENABLE_CBV2G_SAP_POC": true,
+    "oracle": false
+  },
+  "verification": {
+    "normal_with_oracle": "33/33 passed",
+    "asan_ubsan": "31/31 passed",
+    "openssl_off_with_oracle": "29/29 passed",
+    "default_codecs_off": "21/21 passed"
+  },
+  "files": {
+    "examples/flow_simulator/main.c": {
+      "lines": 42,
+      "lines_hit": 0,
+      "branches": 28,
+      "branches_hit": 0
+    },
+    "examples/host_demo/main.c": {
+      "lines": 12,
+      "lines_hit": 0,
+      "branches": 10,
+      "branches_hit": 0
+    },
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_dc_defaults.c": {
+      "lines": 14,
+      "lines_hit": 14,
+      "branches": 2,
+      "branches_hit": 2
+    },
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_din.c": {
+      "lines": 411,
+      "lines_hit": 409,
+      "branches": 558,
+      "branches_hit": 355
+    },
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_iso2.c": {
+      "lines": 564,
+      "lines_hit": 562,
+      "branches": 766,
+      "branches_hit": 501
+    },
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_sap.c": {
+      "lines": 130,
+      "lines_hit": 124,
+      "branches": 110,
+      "branches_hit": 80
+    },
+    "integration/protocol/adapters/cbv2g/tests/feature_vector_dump.c": {
+      "lines": 38,
+      "lines_hit": 38,
+      "branches": 34,
+      "branches_hit": 27
+    },
+    "integration/protocol/adapters/cbv2g/tests/test_cbv2g_dc.c": {
+      "lines": 99,
+      "lines_hit": 98,
+      "branches": 178,
+      "branches_hit": 123
+    },
+    "integration/protocol/adapters/cbv2g/tests/test_cbv2g_features.c": {
+      "lines": 69,
+      "lines_hit": 69,
+      "branches": 98,
+      "branches_hit": 64
+    },
+    "integration/protocol/adapters/cbv2g/tests/test_cbv2g_sap.c": {
+      "lines": 158,
+      "lines_hit": 158,
+      "branches": 156,
+      "branches_hit": 89
+    },
+    "integration/protocol/adapters/cbv2g/tests/vector_dump.c": {
+      "lines": 35,
+      "lines_hit": 35,
+      "branches": 36,
+      "branches_hit": 30
+    },
+    "simulation/linux/src/crypto.c": {
+      "lines": 117,
+      "lines_hit": 113,
+      "branches": 234,
+      "branches_hit": 148
+    },
+    "simulation/linux/src/main.c": {
+      "lines": 21,
+      "lines_hit": 0,
+      "branches": 40,
+      "branches_hit": 0
+    },
+    "simulation/linux/src/os.c": {
+      "lines": 36,
+      "lines_hit": 31,
+      "branches": 28,
+      "branches_hit": 20
+    },
+    "simulation/linux/src/rte.c": {
+      "lines": 89,
+      "lines_hit": 88,
+      "branches": 64,
+      "branches_hit": 39
+    },
+    "simulation/linux/src/sdp6.c": {
+      "lines": 76,
+      "lines_hit": 75,
+      "branches": 160,
+      "branches_hit": 97
+    },
+    "simulation/linux/src/services.c": {
+      "lines": 28,
+      "lines_hit": 28,
+      "branches": 26,
+      "branches_hit": 17
+    },
+    "simulation/linux/src/soad.c": {
+      "lines": 39,
+      "lines_hit": 26,
+      "branches": 28,
+      "branches_hit": 10
+    },
+    "simulation/linux/src/tcpip.c": {
+      "lines": 98,
+      "lines_hit": 91,
+      "branches": 134,
+      "branches_hit": 71
+    },
+    "simulation/linux/src/tls.c": {
+      "lines": 135,
+      "lines_hit": 132,
+      "branches": 252,
+      "branches_hit": 158
+    },
+    "simulation/linux/tests/test_crypto.c": {
+      "lines": 63,
+      "lines_hit": 63,
+      "branches": 126,
+      "branches_hit": 68
+    },
+    "simulation/linux/tests/test_linux.c": {
+      "lines": 89,
+      "lines_hit": 82,
+      "branches": 110,
+      "branches_hit": 62
+    },
+    "simulation/linux/tests/test_sdp6.c": {
+      "lines": 76,
+      "lines_hit": 76,
+      "branches": 102,
+      "branches_hit": 54
+    },
+    "simulation/linux/tests/test_tls.c": {
+      "lines": 94,
+      "lines_hit": 94,
+      "branches": 184,
+      "branches_hit": 112
+    },
+    "simulation/linux/wire/assessment.c": {
+      "lines": 23,
+      "lines_hit": 21,
+      "branches": 46,
+      "branches_hit": 27
+    },
+    "simulation/linux/wire/client.c": {
+      "lines": 281,
+      "lines_hit": 274,
+      "branches": 432,
+      "branches_hit": 306
+    },
+    "simulation/linux/wire/codec.c": {
+      "lines": 22,
+      "lines_hit": 22,
+      "branches": 20,
+      "branches_hit": 11
+    },
+    "simulation/linux/wire/io.c": {
+      "lines": 105,
+      "lines_hit": 103,
+      "branches": 146,
+      "branches_hit": 90
+    },
+    "simulation/linux/wire/main.c": {
+      "lines": 40,
+      "lines_hit": 37,
+      "branches": 80,
+      "branches_hit": 53
+    },
+    "simulation/linux/wire/station.c": {
+      "lines": 137,
+      "lines_hit": 103,
+      "branches": 252,
+      "branches_hit": 113
+    },
+    "simulation/linux/wire/test_wire.c": {
+      "lines": 96,
+      "lines_hit": 89,
+      "branches": 202,
+      "branches_hit": 132
+    },
+    "simulation/linux/wire/test_wire_tls.c": {
+      "lines": 51,
+      "lines_hit": 46,
+      "branches": 102,
+      "branches_hit": 59
+    },
+    "simulation/src/host_simulation.c": {
+      "lines": 341,
+      "lines_hit": 276,
+      "branches": 159,
+      "branches_hit": 76
+    },
+    "src/charging_coordinator/bpt_coordinator.c": {
+      "lines": 59,
+      "lines_hit": 55,
+      "branches": 44,
+      "branches_hit": 30
+    },
+    "src/charging_coordinator/charge_state_machine.c": {
+      "lines": 73,
+      "lines_hit": 49,
+      "branches": 49,
+      "branches_hit": 25
+    },
+    "src/charging_coordinator/charging_coordinator.c": {
+      "lines": 285,
+      "lines_hit": 237,
+      "branches": 268,
+      "branches_hit": 160
+    },
+    "src/charging_coordinator/fault_coordinator.c": {
+      "lines": 50,
+      "lines_hit": 40,
+      "branches": 26,
+      "branches_hit": 10
+    },
+    "src/charging_coordinator/permission_manager.c": {
+      "lines": 120,
+      "lines_hit": 102,
+      "branches": 150,
+      "branches_hit": 88
+    },
+    "src/common/validation.c": {
+      "lines": 32,
+      "lines_hit": 31,
+      "branches": 30,
+      "branches_hit": 22
+    },
+    "src/iso15118_chrg/din70121_adapter.c": {
+      "lines": 219,
+      "lines_hit": 198,
+      "branches": 125,
+      "branches_hit": 80
+    },
+    "src/iso15118_chrg/exi_codec.c": {
+      "lines": 227,
+      "lines_hit": 202,
+      "branches": 170,
+      "branches_hit": 99
+    },
+    "src/iso15118_chrg/hlc_event_queue.c": {
+      "lines": 45,
+      "lines_hit": 43,
+      "branches": 44,
+      "branches_hit": 27
+    },
+    "src/iso15118_chrg/iso15118_2_adapter.c": {
+      "lines": 276,
+      "lines_hit": 245,
+      "branches": 178,
+      "branches_hit": 121
+    },
+    "src/iso15118_chrg/iso15118_chrg.c": {
+      "lines": 569,
+      "lines_hit": 511,
+      "branches": 446,
+      "branches_hit": 273
+    },
+    "src/iso15118_chrg/protocol_adapter_factory.c": {
+      "lines": 128,
+      "lines_hit": 105,
+      "branches": 76,
+      "branches_hit": 39
+    },
+    "src/iso15118_chrg/protocol_data_flow.c": {
+      "lines": 210,
+      "lines_hit": 200,
+      "branches": 206,
+      "branches_hit": 140
+    },
+    "src/iso15118_chrg/sap_negotiator.c": {
+      "lines": 182,
+      "lines_hit": 158,
+      "branches": 152,
+      "branches_hit": 88
+    },
+    "src/iso15118_chrg/schema_registry.c": {
+      "lines": 136,
+      "lines_hit": 112,
+      "branches": 132,
+      "branches_hit": 59
+    },
+    "src/iso15118_chrg/sdp_client.c": {
+      "lines": 77,
+      "lines_hit": 67,
+      "branches": 48,
+      "branches_hit": 31
+    },
+    "src/iso15118_chrg/subsystem_stubs.c": {
+      "lines": 26,
+      "lines_hit": 22,
+      "branches": 20,
+      "branches_hit": 12
+    },
+    "src/iso15118_chrg/tcp_tls_session.c": {
+      "lines": 198,
+      "lines_hit": 181,
+      "branches": 186,
+      "branches_hit": 124
+    },
+    "src/iso15118_chrg/v2gtp_codec.c": {
+      "lines": 138,
+      "lines_hit": 126,
+      "branches": 90,
+      "branches_hit": 53
+    },
+    "src/support/charge_hardware_adapter.c": {
+      "lines": 192,
+      "lines_hit": 177,
+      "branches": 152,
+      "branches_hit": 95
+    },
+    "src/support/cp_pp_manager.c": {
+      "lines": 29,
+      "lines_hit": 26,
+      "branches": 24,
+      "branches_hit": 13
+    },
+    "src/support/energy_data_provider.c": {
+      "lines": 29,
+      "lines_hit": 26,
+      "branches": 24,
+      "branches_hit": 13
+    },
+    "src/support/plc_link_manager.c": {
+      "lines": 106,
+      "lines_hit": 96,
+      "branches": 48,
+      "branches_hit": 26
+    },
+    "tests/integration/test_host_simulation.c": {
+      "lines": 96,
+      "lines_hit": 95,
+      "branches": 128,
+      "branches_hit": 64
+    },
+    "tests/integration/test_nominal_flow.c": {
+      "lines": 125,
+      "lines_hit": 125,
+      "branches": 126,
+      "branches_hit": 64
+    },
+    "tests/integration/test_processing_budgets.c": {
+      "lines": 67,
+      "lines_hit": 67,
+      "branches": 104,
+      "branches_hit": 55
+    },
+    "tests/test_support.c": {
+      "lines": 104,
+      "lines_hit": 98,
+      "branches": 14,
+      "branches_hit": 7
+    },
+    "tests/unit/test_asr_style_ports.c": {
+      "lines": 137,
+      "lines_hit": 137,
+      "branches": 178,
+      "branches_hit": 89
+    },
+    "tests/unit/test_bpt_coordinator.c": {
+      "lines": 13,
+      "lines_hit": 13,
+      "branches": 16,
+      "branches_hit": 8
+    },
+    "tests/unit/test_exi_codec.c": {
+      "lines": 177,
+      "lines_hit": 176,
+      "branches": 138,
+      "branches_hit": 72
+    },
+    "tests/unit/test_hardware_gate.c": {
+      "lines": 92,
+      "lines_hit": 92,
+      "branches": 78,
+      "branches_hit": 39
+    },
+    "tests/unit/test_hlc_event_bridge.c": {
+      "lines": 40,
+      "lines_hit": 40,
+      "branches": 28,
+      "branches_hit": 14
+    },
+    "tests/unit/test_hlc_event_queue.c": {
+      "lines": 30,
+      "lines_hit": 30,
+      "branches": 30,
+      "branches_hit": 16
+    },
+    "tests/unit/test_hlc_generation.c": {
+      "lines": 53,
+      "lines_hit": 53,
+      "branches": 82,
+      "branches_hit": 41
+    },
+    "tests/unit/test_hlc_tls.c": {
+      "lines": 31,
+      "lines_hit": 31,
+      "branches": 46,
+      "branches_hit": 23
+    },
+    "tests/unit/test_permission_manager.c": {
+      "lines": 94,
+      "lines_hit": 94,
+      "branches": 46,
+      "branches_hit": 23
+    },
+    "tests/unit/test_protocol_adapters.c": {
+      "lines": 269,
+      "lines_hit": 266,
+      "branches": 222,
+      "branches_hit": 123
+    },
+    "tests/unit/test_protocol_data_flow.c": {
+      "lines": 79,
+      "lines_hit": 77,
+      "branches": 60,
+      "branches_hit": 30
+    },
+    "tests/unit/test_public_headers.c": {
+      "lines": 2,
+      "lines_hit": 2,
+      "branches": 0,
+      "branches_hit": 0
+    },
+    "tests/unit/test_sap_negotiator.c": {
+      "lines": 80,
+      "lines_hit": 79,
+      "branches": 62,
+      "branches_hit": 31
+    },
+    "tests/unit/test_sdp_client.c": {
+      "lines": 25,
+      "lines_hit": 25,
+      "branches": 40,
+      "branches_hit": 20
+    },
+    "tests/unit/test_tcp_tls_session.c": {
+      "lines": 128,
+      "lines_hit": 127,
+      "branches": 134,
+      "branches_hit": 68
+    },
+    "tests/unit/test_v2gtp_codec.c": {
+      "lines": 64,
+      "lines_hit": 64,
+      "branches": 92,
+      "branches_hit": 46
+    }
+  },
+  "project_source_sha256": {
+    "examples/flow_simulator/main.c": "c7f2491471c8cdb53c606f8e71c8d366a0bef961dbd64369328161d6b4af796c",
+    "examples/host_demo/main.c": "85e5f916c277051a483f3b68734ebdc3a90ce53ba5be0d439e9306b7bd0304d3",
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_dc_defaults.c": "ea74b183e41e3b01f07742aafb84fcf013b4dbe04444c6c1b09cd6de88c5e956",
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_din.c": "fc5f44567a555ffb949632eb391cce9850e1f35948120b3c91bdde38e5e888ba",
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_iso2.c": "0fd89e003c510a7395addc210091f7a54438a1cbab07b1ac5022702c55b41ffc",
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_sap.c": "dc4ac89e213a96390935c2013cc7498f94d443d52364f74e3f65a8418efd562f",
+    "integration/protocol/adapters/cbv2g/tests/feature_vector_dump.c": "6e36c48045c50bd8a161a43bff89aab13361c0a860426eaecda9934a4977c80d",
+    "integration/protocol/adapters/cbv2g/tests/test_cbv2g_dc.c": "6211c9757497f3df7c0127680bfce6fb4b3db6dc82ab2438f9a9b60c6fe1cbcb",
+    "integration/protocol/adapters/cbv2g/tests/test_cbv2g_features.c": "ef586e62b6ea4ce8b19a944103a84d5f6b31980e820d04bc94ba8735a95be6c4",
+    "integration/protocol/adapters/cbv2g/tests/test_cbv2g_sap.c": "5134764d2b02fbce2d906577c4e1939ca4561640a174cbeb85cc102fcce23d44",
+    "integration/protocol/adapters/cbv2g/tests/vector_dump.c": "18d9227e1b254d19e380180d1fe22588d0a0000092c47daa5f358fbbf9612d49",
+    "simulation/linux/src/crypto.c": "68b29728fda657ba45b1909633ad09df29ca1036fce61854a9aa4ec4016709fd",
+    "simulation/linux/src/main.c": "433e8029e0a7382ce13055b7073cf61caea87e591151e9f538fe307193df2d78",
+    "simulation/linux/src/os.c": "32946644b2e1f5e41e150eebbb39b60010e9eedf11b73d804d7f1c73fd0e7fa8",
+    "simulation/linux/src/rte.c": "97c462304c6e6fe718dd2a75325b4e597e1ff4c0ecde12f1891eb9302f267bd2",
+    "simulation/linux/src/sdp6.c": "2068699351392c80988d99278a1c560cf492254024e9e150f1684f8c42fc0d90",
+    "simulation/linux/src/services.c": "8db402ef153628099d0bd195716de92ed489f939c9a8b7fe7d6625b78a4e3d17",
+    "simulation/linux/src/soad.c": "40e07d2351eba909e4892429a8f996c18aa12b798e1806d1e76e1a24ad3d2d1f",
+    "simulation/linux/src/tcpip.c": "7adf4f9fd15e9bcf0f5406bc826c6f802e67fa6ca049a1283ea1d77d64e9bcc5",
+    "simulation/linux/src/tls.c": "a09304ed716b1f3dfdc214cf697bab824438465c2ccf7bb357cda840c6ab573a",
+    "simulation/linux/tests/test_crypto.c": "53889631151bbcea622cc4df74925f3ef79e3950ca76996619f3b5eb1f2f0bc2",
+    "simulation/linux/tests/test_linux.c": "b9d47321d6346cdc791a26d5bdbe5aecc8530587f67e2b5ac516ab1b804b99ea",
+    "simulation/linux/tests/test_sdp6.c": "2620fcf1742eee1bb28b993b5cc6c01cc0b269ad7e792ff07226f4bf289b01e4",
+    "simulation/linux/tests/test_tls.c": "1e0ad1372fddc966a5ce78d2d6cafa5bbafb2e378fc8130264bf707bfc478eb7",
+    "simulation/linux/wire/assessment.c": "392734be031de01022661d3de55adac731b92701fdbfc2babc93b75f6746377e",
+    "simulation/linux/wire/client.c": "f00506b6f7a49c229ca469418da4112077aa106bd3278c0a059c376d49753e3d",
+    "simulation/linux/wire/codec.c": "ded83ba7523597763fe87812ac107c321ac86d441885f8d223545cba84ae5f05",
+    "simulation/linux/wire/io.c": "0bbb91362140f4aa2dce0c90b7685467ee866a4e6f2703a907b5385b7d80141c",
+    "simulation/linux/wire/main.c": "864137991dfa4a66194c3e7fb173eb58dedee3514da9a811236447998bf62a80",
+    "simulation/linux/wire/station.c": "51c4cee394b11cc41cfe3eea55386531a970f8a1a13fffb77581a371369dc168",
+    "simulation/linux/wire/test_wire.c": "147bcc31bf06c406be859b94087623286ba47f3042899ddfb4a3cc5a77368d1d",
+    "simulation/linux/wire/test_wire_tls.c": "d57e7a2c3e08845ce51a955e01dbbf46765b48720a4b13e06b9bef0d12587224",
+    "simulation/src/host_simulation.c": "021435d34acedcf28caa1910aa05458f1dc6f8248580f83f8802bde7f64c5813",
+    "src/charging_coordinator/bpt_coordinator.c": "a47c7c1608cd44fd2f258b104cb0223591435f174d6137205bf44f53b48b945e",
+    "src/charging_coordinator/charge_state_machine.c": "6fa93349aab6f8dae48ea94498e5f6bb0afb3e634db52599cb7c80717fda4426",
+    "src/charging_coordinator/charging_coordinator.c": "8acf9a991bd05f0f401e085487f95a3f841b76a0332ccc4bc9f359fd1aa0c12f",
+    "src/charging_coordinator/fault_coordinator.c": "0764eba1438668e485e5542513999df9664e82c2db746a96fa3241987289749f",
+    "src/charging_coordinator/permission_manager.c": "031d7305488ed41595838f35c8bbcacf4ce3dcdad85b81a8ed1b212d3db9384d",
+    "src/common/validation.c": "be32fea203cf58f8749a224963356ef6567ce9c0d13f00df581cbc068d49bd59",
+    "src/iso15118_chrg/din70121_adapter.c": "b0b3f436e9a4d1c9b34d5dbf06a69eebc94346fd3fba40139af66391bd012295",
+    "src/iso15118_chrg/exi_codec.c": "328a9e9fe0263f5684a1d08d9daf3d647f2227fcb460b82cb0a186b0e14d1be8",
+    "src/iso15118_chrg/hlc_event_queue.c": "4add6fdc83fe48825ae9c610f3dbbdc5fae3cfefd49bffbb7998461e89e6e287",
+    "src/iso15118_chrg/iso15118_2_adapter.c": "4eae8d9bc077c0eefa503eaa74f6fbb673a5a2206ca2ab361bcc6b4f2b93a594",
+    "src/iso15118_chrg/iso15118_chrg.c": "00b45f7a1e750c79bd3394609e4bac55e802a47970f7052cd7710ba5667772fd",
+    "src/iso15118_chrg/protocol_adapter_factory.c": "5c3bb880ca0b7d29fa1c8278368615b35e99ee48c0be705c80d2d7b7a5e1fc59",
+    "src/iso15118_chrg/protocol_data_flow.c": "c15c39f04a676256a9f7ce606bcd7358b75d2952b68c52cfe047fefcd8fba898",
+    "src/iso15118_chrg/sap_negotiator.c": "26fe17d2e79de8ca8e9639cf0855c6c9f0bdcdcfb91387b2bf5b186bf37ae9bf",
+    "src/iso15118_chrg/schema_registry.c": "c6ed41a4f68cd448d3270fdb85879e3a31a56ed3974fda4ba69a2d8323c9847e",
+    "src/iso15118_chrg/sdp_client.c": "f2e6c9ca18a6faffb00634509a6523443c7c7065b258e0049310fd0ab1fbc7a4",
+    "src/iso15118_chrg/subsystem_stubs.c": "b0423c72fb86aadab0d7e9448fc414a535e9a98665ace20ea938faabda3d7177",
+    "src/iso15118_chrg/tcp_tls_session.c": "9c021a32257f58916d47bde2b5db01a4722173fccd47534a73c119f424eeb32f",
+    "src/iso15118_chrg/v2gtp_codec.c": "e119241667833baf203f360cf3736608c5ab8be9bedd0a43247c92af8c05e0cc",
+    "src/support/charge_hardware_adapter.c": "8753c12ca0a6deda1a4fbd09a1f1683d97b7b112433a173b6c7c28dffba891d7",
+    "src/support/cp_pp_manager.c": "3d62ce7378230e88dcc327844011b2313f1fe82e9ba456e181a642749730406d",
+    "src/support/energy_data_provider.c": "13a09e8c178ebb675c4d7ac0a7f5a93821b592cb79d887b21298967e4ae7de9a",
+    "src/support/plc_link_manager.c": "63f01385979349e30b9353e37d1f8e1949b90f06c7ea3445da1f20ad29cb5747",
+    "tests/integration/test_host_simulation.c": "bceb2a9318ca25d63aafb0b998c30769067f65d71d63055eb201ec8a281e62d0",
+    "tests/integration/test_nominal_flow.c": "5d69fccead50dcb7d2c368f2aba0dcc3445f847ec4bbcb83cec50ccdcedada9b",
+    "tests/integration/test_processing_budgets.c": "3afc0eebcfc57297402ee7d25585a89e59bd5071bea44b6d345e4a7bd396c62f",
+    "tests/test_support.c": "75fcc42e132c416ec3af019cac0bb83fb1d30a96b43030494f220313c8140f4a",
+    "tests/unit/test_asr_style_ports.c": "78a17b57fc0bbdcb9dcb9ac8048cbcfad01212334534838746234aa3c69dfe93",
+    "tests/unit/test_bpt_coordinator.c": "1f46a90ba21d9edc48e9bcc39c06de4fc00492d3e366e036f66ac435212ab70a",
+    "tests/unit/test_exi_codec.c": "41f696a6548c03b25dc5dfb89ff7a7bf11b9abb6f4313775b2f746cca0309ae3",
+    "tests/unit/test_hardware_gate.c": "ebfafe41df5858a16c8691f4df0cb3d7f7424541c7cc4718cc1b250af63588c9",
+    "tests/unit/test_hlc_event_bridge.c": "0c2d48a0f693685f90f1636e20241f6059160f760a8969ec315b0bd2d19e54a8",
+    "tests/unit/test_hlc_event_queue.c": "64fce4a36a05c45f4f16bb6d84bbce403f95ada4e209045beed1803cd449995d",
+    "tests/unit/test_hlc_generation.c": "8070cc51ce1ec14ee7aa2448e268b1e3f819f9b2bbbde130e2a796f5547c2644",
+    "tests/unit/test_hlc_tls.c": "3f06980d3d544e7f417972a37ac4970f3694f9d5d676db52968b0c344171b72e",
+    "tests/unit/test_permission_manager.c": "0c9d55f40393ed724d005a268e43561b8a396934e1c996af77aec61acfda67d6",
+    "tests/unit/test_protocol_adapters.c": "2bc98765a07a4b05c53e288719794c2925fe4773c60118f20a00f06f1ea39a40",
+    "tests/unit/test_protocol_data_flow.c": "d9f126113dc878207148fd38723f487de92ed143a6ddf5e1f037e9d27f8e03b0",
+    "tests/unit/test_public_headers.c": "d0e111d751117da6909056bc3b8be13065ad69a8265cbedcc5549747beda4ac9",
+    "tests/unit/test_sap_negotiator.c": "20d5b8a65e97ab57660f70ca107a92d2a2a554540d2a9df86b5ed06f9450c55a",
+    "tests/unit/test_sdp_client.c": "149e1d4c3d30d452553a47b9ab3cfdba562ff2894ceffe74c8cff30cdf486ecb",
+    "tests/unit/test_tcp_tls_session.c": "bbf111738a532fc7f06712e2cf2a53cfdef0ebbe3c01758e6beaba7aa1b02d02",
+    "tests/unit/test_v2gtp_codec.c": "3ea462d2700b0b8d2a40a015d93f602a8ddfe763a96f24615da5e96d90032711"
+  }
+}

@@ -126,3 +126,11 @@ A separate [nonblocking IPv6 UDP SDP provider](SDP_IPV6.md) and IPv6 loopback TC
 helpers now exist and have real-socket tests. The EXI runner supports real
 discovery via `station6`/`evcc6` for both protocols. TLS, multicast/link-local
 and PLC integration remain open. SDP security-field tests do not establish TLS sessions.
+
+
+## Optional real security provider — 28/10/2026
+
+[Host TLS/crypto guide](TLS_CRYPTO.md): opt-in OpenSSL TLS with actual encrypted
+AC/DC sessions, peer/certificate checks, typed software crypto jobs and HLC-owned
+cumulative processing limits. Default builds remain independent of OpenSSL.
+PnC, signed EXI/receipts and supplier/vehicle qualification remain open.

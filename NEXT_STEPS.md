@@ -1,16 +1,13 @@
 # Công việc tiếp tục trong Codex
 
-## Current implementation priorities — 26/10/2026
+## Current implementation priorities — 28/10/2026
 
-See [current incomplete items](docs/architecture/INCOMPLETE_ITEMS.md). Single-phase
-ISO-2 AC EIM and explicitly opted-in unsigned host metering now have wire paths
-and tests. Next: real TLS/crypto/credentials and signed receipts/PnC, retained
-pause/resume and renegotiation, cumulative processing budgets, richer offers/
-schedules, then ISO-20/BPT with explicit schemas/capabilities. Target/supplier/
-safety/PKI approvals remain external. Historical planning entries follow.
-
-
-Trạng thái: PROPOSED — kế hoạch tiếp tục từ bộ tài liệu hiện có. Không thay thế release/WP plan gốc.
+See [current incomplete items](docs/architecture/INCOMPLETE_ITEMS.md). Real optional
+host TLS, typed software crypto and cumulative processing budgets now extend the
+DC/AC EIM runner. Next close reusable control/evidence/stop-boundary findings,
+then signed EXI/receipt and PnC credential lifecycle, retained pause/resume and
+renegotiation, richer offers/schedules and ISO-20/BPT. Supplier, vehicle safety,
+PKI and target qualification remain external. Historical entries follow.
 
 ## Bổ sung host simulation — 15/10/2026
 
