@@ -71,6 +71,9 @@ static bool evidence_is_complete(
         return false;
     }
 
+    if ((evidence->energy->availability_mask & (OPENV2G_ENERGY_FIELD_INTERLOCK | OPENV2G_ENERGY_FIELD_LIMITS)) !=
+        (OPENV2G_ENERGY_FIELD_INTERLOCK | OPENV2G_ENERGY_FIELD_LIMITS)) { return false; }
+
     if ((evidence->energy->snapshot_id == 0u) || !evidence->energy->interlock_closed ||
         (evidence->energy->limits.max_import_power_w < 0) ||
         (evidence->energy->limits.max_charge_current_ma < 0)) {
@@ -121,6 +124,7 @@ OpenV2g_Result OpenV2g_PermissionManager_Evaluate(
 {
     uint32_t permission_id;
     uint32_t publication_sequence;
+    bool preparation_only = false;
 
     if ((manager == NULL) || (config == NULL) || (evidence == NULL) ||
         (config->permission_validity_us == 0u) ||
@@ -140,6 +144,22 @@ OpenV2g_Result OpenV2g_PermissionManager_Evaluate(
         return OPENV2G_RESULT_REJECTED;
     }
 
+    if (evidence->require_physical_assessment &&
+        (evidence->hardware->state == OPENV2G_HW_READY || evidence->hardware->state == OPENV2G_HW_ENERGIZED) &&
+        (evidence->assessment == NULL || !evidence->assessment->passed ||
+         evidence->assessment->correlation_id == 0u ||
+         evidence->assessment->kind != (evidence->hlc->selected_mode == OPENV2G_MODE_AC ? OPENV2G_ASSESS_AC_READINESS : OPENV2G_ASSESS_PRECHARGE) ||
+         evidence->assessment->env.session_generation != evidence->generation ||
+         evidence->assessment->env.quality != OPENV2G_QUALITY_VALID ||
+         evidence->assessment->env.timestamp == 0u || evidence->assessment->env.timestamp > now ||
+         (evidence->coordinator_state != OPENV2G_COORDINATOR_ENERGY_TRANSFER &&
+          (!OpenV2g_EnvelopeIsCurrent(&evidence->assessment->env, evidence->generation, now, evidence->assessment_max_age_us) ||
+           evidence->assessment->hardware_sequence != evidence->hardware->env.sequence_counter)) ||
+         (evidence->coordinator_state == OPENV2G_COORDINATOR_ENERGY_TRANSFER && evidence->hardware->state != OPENV2G_HW_ENERGIZED))) {
+        if (evidence->coordinator_state != OPENV2G_COORDINATOR_HLC_NEGOTIATION) { return OPENV2G_RESULT_REJECTED; }
+        preparation_only = true;
+    }
+
     permission_id = manager->next_permission_id++;
     if (manager->next_permission_id == 0u) {
         manager->next_permission_id = 1u;
@@ -152,8 +172,8 @@ OpenV2g_Result OpenV2g_PermissionManager_Evaluate(
     manager->current.permission_id = permission_id;
     manager->current.decision = OPENV2G_PERMISSION_ALLOW;
     manager->current.action =
-        ((evidence->hardware->state == OPENV2G_HW_READY) ||
-         (evidence->hardware->state == OPENV2G_HW_ENERGIZED))
+        (!preparation_only && ((evidence->hardware->state == OPENV2G_HW_READY) ||
+         (evidence->hardware->state == OPENV2G_HW_ENERGIZED)))
             ? OPENV2G_ACTION_ENERGIZE
             : OPENV2G_ACTION_PREPARE;
     manager->current.mode = evidence->hlc->selected_mode;

@@ -14,14 +14,22 @@ OpenV2g_Result OpenV2g_EnergyDataProvider_Publish(
     OpenV2g_EnergyDataProvider *provider,
     const OpenV2g_EvEnergySnapshot *snapshot)
 {
-    if ((provider == NULL) || (snapshot == NULL) ||
-        (snapshot->env.quality != OPENV2G_QUALITY_VALID) ||
-        (snapshot->env.session_generation == 0u) ||
-        (snapshot->env.timestamp == 0u) ||
-        (snapshot->snapshot_id == 0u)) {
+    if (provider == NULL || snapshot == NULL || snapshot->env.session_generation == 0u) { return OPENV2G_RESULT_REJECTED; }
+    if (provider->has_value && provider->snapshot.env.session_generation == snapshot->env.session_generation &&
+        snapshot->env.timestamp != 0u &&
+        (snapshot->env.timestamp < provider->snapshot.env.timestamp ||
+         (provider->snapshot.env.sequence_counter != 0u && snapshot->env.sequence_counter < provider->snapshot.env.sequence_counter))) {
         return OPENV2G_RESULT_REJECTED;
     }
+    if (provider->has_value && provider->snapshot.env.session_generation == snapshot->env.session_generation &&
+        snapshot->env.quality == OPENV2G_QUALITY_VALID && snapshot->env.timestamp != 0u && snapshot->snapshot_id != 0u &&
+        provider->snapshot.env.timestamp == snapshot->env.timestamp &&
+        provider->snapshot.env.sequence_counter == snapshot->env.sequence_counter) {
+        return provider->snapshot.env.quality == OPENV2G_QUALITY_VALID ? OPENV2G_RESULT_OK : OPENV2G_RESULT_REJECTED;
+    }
     provider->snapshot = *snapshot;
+    if (snapshot->snapshot_id == 0u || snapshot->env.timestamp == 0u) { provider->snapshot.env.quality = OPENV2G_QUALITY_INVALID; }
+    /* Publication success is not a claim of valid evidence: readers see quality. */
     provider->has_value = true;
     return OPENV2G_RESULT_OK;
 }

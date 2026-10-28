@@ -172,6 +172,7 @@ OpenV2g_CoordinatorPorts OpenV2g_TestRig_Ports(OpenV2g_TestRig *rig)
 OpenV2g_CoordinatorConfig OpenV2g_TestRig_Config(void)
 {
     OpenV2g_CoordinatorConfig config = {0};
+    config.stop_timeout_us = 2000000u;
     config.permission.cp_pp_max_age_us = 1000u;
     config.permission.energy_max_age_us = 1000u;
     config.permission.link_max_age_us = 1000u;

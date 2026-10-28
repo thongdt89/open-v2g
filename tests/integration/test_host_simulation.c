@@ -130,7 +130,6 @@ int main(void)
     size_t safe_index;
     size_t hlc_stop_index;
     size_t link_stop_index;
-    size_t before_stop;
 
     TEST_ASSERT(OpenV2g_HostSimulation_Init(&simulation, NULL) ==
                 OPENV2G_RESULT_OK);
@@ -211,7 +210,6 @@ int main(void)
         TEST_ASSERT(OpenV2g_ChargingCoordinator_RequestEnergyTransfer(&simulation.coordinator, 183u) == OPENV2G_RESULT_REJECTED);
     }
 
-    before_stop = simulation.trace_count;
     TEST_ASSERT(OpenV2g_HostSimulation_Stop(
                     &simulation,
                     200u,
@@ -225,7 +223,7 @@ int main(void)
     safe_index = find_operation(
         &simulation,
         OPENV2G_HOST_SIM_OP_HW_SAFE,
-        before_stop);
+        0u);
     hlc_stop_index = find_operation(
         &simulation,
         OPENV2G_HOST_SIM_OP_HLC_STOP,

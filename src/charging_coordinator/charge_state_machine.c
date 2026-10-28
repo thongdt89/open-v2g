@@ -70,6 +70,10 @@ bool OpenV2g_ChargeStateMachine_Dispatch(
     case OPENV2G_COORDINATOR_ENERGY_TRANSFER:
         break;
     case OPENV2G_COORDINATOR_STOPPING:
+        if (event == OPENV2G_CSM_EVENT_SAFE_CONNECTED) {
+            machine->state = OPENV2G_COORDINATOR_CONNECTED_IDLE;
+            return true;
+        }
         if ((event == OPENV2G_CSM_EVENT_STOP_COMPLETED) ||
             (event == OPENV2G_CSM_EVENT_UNPLUGGED)) {
             machine->state = OPENV2G_COORDINATOR_UNPLUGGED;

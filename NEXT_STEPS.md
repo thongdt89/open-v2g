@@ -1,3 +1,15 @@
+## Current continuation — control boundaries, 28/10/2026
+
+Evidence invalidation/order, expiry-before-renewal, physical assessment in the
+permission action, bounded stopping and connected-safe fresh-generation restart
+are implemented in the host core. See
+[control-boundary status](docs/architecture/CONTROL_BOUNDARY_HARDENING.md).
+Next close explicit protocol authorization/service evidence and move independent
+vehicle/cable/peer/schedule limit intersection into PermissionManager. Then move
+portable session/wire validation into ISO15118Chrg before wider signed EXI/PnC,
+retained-session recovery and ISO-20/BPT work. Target safety/PKI/supplier gates
+remain open. Earlier entries below describe their own historical snapshots.
+
 # Công việc tiếp tục trong Codex
 
 ## Current implementation priorities — 28/10/2026

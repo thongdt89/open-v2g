@@ -166,3 +166,22 @@ checks and **31/31** fresh coverage checks passed. Secure wire tests include
 eight AC/DC positive/negative sessions and two actual CLI pairs. System OpenSSL
 shared libraries are outside sanitizer/coverage instrumentation. See
 [coverage and source hashes](evidence/security_processing_coverage.json).
+
+## Coordinator control-boundary increment — 28/10/2026
+
+Implemented stale/duplicate input protection and current-source invalidation
+through CP/energy providers and coordinator state. Required availability and
+physical assessment qualify ENERGIZE; preparation and historical start proof
+are distinguished from continued hardware supervision. Coordinator evaluation
+checks expiry before renewal. A required host stop budget bounds protocol-tail
+teardown and measured safety; failures remain visible on repeated stop calls.
+Connected-safe completion can explicitly restart with a new generation.
+
+The original architecture review is preserved separately. This increment does
+not claim all review findings or protocol features closed. Detailed contracts,
+provisional timing and external gates are in [control-boundary status](CONTROL_BOUNDARY_HARDENING.md).
+
+Final validation: **34/34** normal with oracle, **32/32** ASan/UBSan and
+**22/22** default-codec/OpenSSL-OFF tests passed. The wire regressions retain
+43 plaintext/scenario sessions, eight TLS sessions and two secure CLI pairs.
+See [verification and source hashes](evidence/control_boundaries_verification.json).

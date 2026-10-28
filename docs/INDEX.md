@@ -81,3 +81,9 @@ optional OpenSSL handshakes/I/O, typed crypto jobs, peer policy, ephemeral test
 credentials, cumulative stage timing, build/run and limits. [Current inventory](architecture/INCOMPLETE_ITEMS.md)
 now distinguishes these delivered host features from PnC/signed receipts and
 supplier/vehicle/target work still open.
+
+## Coordinator control-boundary increment — 28/10/2026
+
+[Control-boundary contracts and evidence](architecture/CONTROL_BOUNDARY_HARDENING.md)
+records current-source invalidation, permission readiness/expiry, bounded measured
+stopping and connected restart. Remaining review and target gates stay explicit.

@@ -58,6 +58,7 @@ int main(void)
     (void)memset(&energy, 0, sizeof(energy));
     energy.env = envelope(generation, 101u);
     energy.snapshot_id = 1u;
+    energy.availability_mask = OPENV2G_ENERGY_FIELD_INTERLOCK | OPENV2G_ENERGY_FIELD_LIMITS;
     energy.interlock_closed = true;
     energy.limits.max_import_power_w = 50000;
     energy.limits.max_charge_current_ma = 125000;

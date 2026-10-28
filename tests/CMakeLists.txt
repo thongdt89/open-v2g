@@ -44,3 +44,7 @@ endif()
 if(TARGET openv2g_host_sim)
     add_openv2g_simulation_test(openv2g_test_processing_budgets integration/test_processing_budgets.c)
 endif()
+
+if(TARGET openv2g_host_sim)
+    add_openv2g_simulation_test(openv2g_test_control_boundaries integration/test_control_boundaries.c)
+endif()

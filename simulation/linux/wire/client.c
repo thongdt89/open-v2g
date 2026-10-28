@@ -27,6 +27,9 @@ static bool refresh(OvWireClient *client, OpenV2g_TimeUs now)
     OpenV2g_HostSimulation *sim = &client->environment.rte;
     OpenV2g_QualifiedCpPp cp = OpenV2g_HostSimulation_DefaultCpPp(sim, now);
     OpenV2g_EvEnergySnapshot energy = OpenV2g_HostSimulation_DefaultEnergy(sim, now);
+    /* A derating sample can arrive in the same clock tick as a periodic sample. */
+    if (sim->coordinator.energy.env.sequence_counter == UINT32_MAX) { return false; }
+    energy.env.sequence_counter = sim->coordinator.energy.env.sequence_counter + 1u;
     if (client->ac_mode) {
         energy.limits.max_voltage_mv = 250000u; energy.limits.max_charge_current_ma = 32000;
         energy.limits.max_import_power_w = 7360; energy.target_voltage_mv = 230000u; energy.target_current_ma = 16000;
@@ -303,6 +306,8 @@ static bool exchange_protocol(OvWireClient *client)
             !ok(client->assessment_port.assess(client->assessment_port.context, kind, client->io.generation,
                 pending->correlation_id, now, request.voltage_mv, response.voltage_mv, &hardware, &assessment)) ||
             !ok(OpenV2g_ChargingCoordinator_ApplyAssessment(&sim->coordinator, &assessment, pending->correlation_id, now))) { return false; }
+        if (kind != OPENV2G_ASSESS_WELDING &&
+            !ok(OpenV2g_ChargingCoordinator_EvaluatePermission(&sim->coordinator, now))) { return false; }
     }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START) {
         if (response.ac_mode != client->ac_mode || !response.ready || response.rcd_fault) { return false; }

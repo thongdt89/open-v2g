@@ -29,6 +29,7 @@ typedef struct {
     OpenV2g_PermissionConfig permission;
     bool require_physical_assessment;
     OpenV2g_TimeUs assessment_max_age_us;
+    OpenV2g_TimeUs stop_timeout_us; /* Required PROJECT host budget, not a normative timer. */
 } OpenV2g_CoordinatorConfig;
 
 typedef struct {
@@ -65,6 +66,16 @@ typedef struct {
     OpenV2g_TimeUs hlc_event_overflow_time;
     bool has_hardware;
     bool teardown_started;
+    OpenV2g_TimeUs owner_time;
+    OpenV2g_TimeUs stop_started;
+    OpenV2g_TimeUs stop_deadline;
+    OpenV2g_Result stop_result;
+    bool safe_requested;
+    bool stop_measured_safe;
+    bool stop_completed;
+    bool hlc_stop_completed;
+    bool link_stop_completed;
+    uint32_t stop_hardware_sequence;
     /* Legacy field name: slot holds PRECHARGE or AC_READINESS for current mode. */
     OpenV2g_PhysicalAssessment precharge_assessment;
     OpenV2g_PhysicalAssessment welding_assessment;
@@ -115,7 +126,7 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_RequestEnergyTransfer(
 
 /* Revoke and request the host hardware safe state while retaining HLC/PLC
  * for the protocol's bounded stop/welding/session-stop exchange. The caller
- * must subsequently call Stop on completion, timeout or fault.
+ * calls Stop on completion/fault; Tick also enforces the configured stop budget.
  */
 OpenV2g_Result OpenV2g_ChargingCoordinator_ApplyAssessment(
     OpenV2g_ChargingCoordinator *coordinator, const OpenV2g_PhysicalAssessment *assessment,
@@ -128,6 +139,10 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_Stop(
     OpenV2g_ChargingCoordinator *coordinator,
     OpenV2g_TimeUs now,
     OpenV2g_ReasonCode reason);
+
+/* Explicit restart after qualified connected-safe completion; never fault reset. */
+OpenV2g_Result OpenV2g_ChargingCoordinator_RestartConnected(
+    OpenV2g_ChargingCoordinator *coordinator, OpenV2g_TimeUs now);
 
 void OpenV2g_ChargingCoordinator_Tick(
     OpenV2g_ChargingCoordinator *coordinator,

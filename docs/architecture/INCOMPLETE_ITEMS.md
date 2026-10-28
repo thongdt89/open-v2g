@@ -1,9 +1,24 @@
 # Current feature completion status
 
-Revision: Draft 0.2 — 28/10/2026. **Overall implementation remains in progress.**
+Revision: Draft 0.3 — 28/10/2026. **Overall implementation remains in progress.**
 This is the current inventory; older audits/work-log entries describe their own
 snapshots. Implemented means host code, not selected supplier, frozen design,
 vehicle safety allocation or protocol conformance.
+
+## Control-boundary increment — 28/10/2026
+
+Implemented current-source evidence invalidation, stale/duplicate protection,
+action-specific physical assessment checks, expiry enforcement before renewal,
+a bounded coordinator stop transaction and measured connected/unplugged completion.
+An explicit connected-safe restart creates a new generation. Host CP/energy
+publishers propagate invalid quality; the wire provider sequences same-tick
+samples. See [contracts and remaining gates](CONTROL_BOUNDARY_HARDENING.md).
+
+Still open in the control review: explicit protocol authorization/service evidence,
+independent cable/peer/schedule limit intersection in PermissionManager, portable
+HLC session/wire mapping, target ingress/runnable/watchdog binding and vehicle
+physical retry/fallback/fault-reset policy. The earlier review files are historical
+evidence and are preserved without editing their reproduction assertions.
 
 ## Latest increment — 28/10/2026
 
@@ -11,7 +26,7 @@ vehicle safety allocation or protocol conformance.
 |---|---|---|
 | TLS | Real optional OpenSSL TLS1.2/1.3 over IPv4 and discovered IPv6 before SAP/EXI; CA/SAN/time verification, optional CRLs and mutual-certificate API | Explicit host AEAD profile; supplier/OEM PKI/trusted-time/revocation policy, target resource evidence and exact-edition cipher selection remain open |
 | Software crypto | Typed bounded SHA256/P-256 sign/verify jobs, versioned key handles, copied input, deadlines/cancel/generation checks and two-way raw-signature fixture verification | Not XMLDSIG/EXI canonicalization, signed receipts, PnC authorization, HSM or transactional credential provisioning |
-| Processing budgets | HLC-owned cumulative Authorization/CPD/CableCheck deadlines and Ongoing count limits; no reset on retry; late Finished/old timer events fail closed | Wire settings are provisional; broader setup/response/physical-stop watchdogs and normative timing selection remain open |
+| Processing budgets | HLC-owned cumulative Authorization/CPD/CableCheck deadlines and Ongoing count limits; no reset on retry; late Finished/old timer events fail closed | Wire settings are provisional; broader setup/response watchdogs and target physical-stop integration and normative timing selection remain open |
 
 See [host security and processing implementation](../../simulation/linux/TLS_CRYPTO.md)
 for API contracts, build/run examples, security policy and evidence scope.
@@ -41,7 +56,7 @@ settlement, identity or signature-verification evidence.
 | PnC / signed receipts | Disabled feature gates; bounded opaque meter signatures; signed headers rejected | PaymentDetails, certificate install/update, challenge binding, EXI/XMLDSIG signing/verification and transactional credential lifecycle |
 | Pause/resume | ISO-2 Pause and OldSessionJoined mapper fields | Retained session context, binding to peer/service/schedule, expiry, fresh generation/evidence and new permission on resume |
 | Renegotiation | Semantic interface seam; DC/AC owner state machines | PowerDelivery Renegotiate, safe coordinator transition, evidence invalidation, fresh assessment/permission and race tests |
-| Broader timing supervision | Configurable cumulative Authorization/CPD/CableCheck budgets plus exchange/session guards | Setup, response, physical/protocol-stop supervision and watchdog integration; select normative budgets from exact editions and vehicle timing work products |
+| Broader timing supervision | Configurable cumulative Authorization/CPD/CableCheck budgets plus exchange/session guards | Setup/response supervision and target watchdog/physical-stop integration; select normative budgets from exact editions and vehicle timing work products |
 | Services and schedules | ServiceDetail integer/string sets; bounded three tuples/five intervals with conservative selection | Multiple payment/service/mode offers, more parameter forms, tariffs/profiles, notifications and richer completion/schedule policy |
 | Broader AC | Single-phase EIM through real IPv4/IPv6 sockets | Three-phase, phase-specific limits, actual OBC control/measurement and complete AC protocol feature coverage |
 | Broader metering | ISO-2 unsigned host AC/DC receipt loop | DIN metering branches, authenticated meter data, signed receipt policy and compliant signature generation/verification |

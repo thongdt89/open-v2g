@@ -2,6 +2,7 @@
 #define OPENV2G_CHARGING_COORDINATOR_PERMISSION_MANAGER_H
 
 #include "openv2g/common/result.h"
+#include "openv2g/charging_coordinator/physical_assessment.h"
 #include "openv2g/common/types.h"
 
 typedef struct {
@@ -29,6 +30,9 @@ typedef struct {
     const OpenV2g_ChargeHardwareStatus *hardware;
     const OpenV2g_BlockingFaultStatus *blocking_fault;
     const OpenV2g_BptPermissionRequest *bpt;
+    bool require_physical_assessment;
+    OpenV2g_TimeUs assessment_max_age_us;
+    const OpenV2g_PhysicalAssessment *assessment;
 } OpenV2g_PermissionEvidence;
 
 typedef struct {
