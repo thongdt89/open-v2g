@@ -106,5 +106,11 @@ int main(void)
     TEST_ASSERT(OpenV2g_ExiCodec_Start(&codec, 1u) == OPENV2G_RESULT_OK);
     TEST_ASSERT(metering() == 0);
     TEST_ASSERT(ac_profile() == 0);
+    {
+        OpenV2g_ExiDcDocument document = OpenV2g_ExiDc_Default(OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE, false), output;
+        TEST_ASSERT(roundtrip(&document, &output) == 0 && output.kind == OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE);
+        document.ac_mode = true;
+        TEST_ASSERT(roundtrip(&document, &output) == 0 && output.ac_mode && output.kind == OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE);
+    }
     return 0;
 }

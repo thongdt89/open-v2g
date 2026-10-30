@@ -60,5 +60,20 @@ int main(void)
         document = OpenV2g_ExiDc_Default(OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT, true);
         if (emit("iso2-meter", &document) != 0) { return 1; }
     }
+    {
+        unsigned ac;
+        for (ac = 0u; ac < 2u; ++ac) {
+            const char *profile = ac != 0u ? "iso2-lifecycle-ac" : "iso2-lifecycle";
+            OpenV2g_ExiDcDocument document = OpenV2g_ExiDc_Default(OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE, false);
+            document.ac_mode = ac != 0u;
+            if (emit(profile, &document) != 0) { return 1; }
+            document = OpenV2g_ExiDc_Default(OPENV2G_PROTOCOL_MESSAGE_SESSION_STOP, false);
+            document.pause_session = true;
+            if (emit(profile, &document) != 0) { return 1; }
+            document = OpenV2g_ExiDc_Default(OPENV2G_PROTOCOL_MESSAGE_SESSION_SETUP, true);
+            document.new_session = false; document.resumed_session = true;
+            if (emit(profile, &document) != 0) { return 1; }
+        }
+    }
     return 0;
 }

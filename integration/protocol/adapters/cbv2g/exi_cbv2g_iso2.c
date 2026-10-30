@@ -152,10 +152,11 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
             body->PreChargeReq_isUsed = 1u; ev_status(&body->PreChargeReq.DC_EVStatus, value);
             OUT_PHYS(body->PreChargeReq.EVTargetVoltage, value->voltage_mv, V);
             OUT_PHYS(body->PreChargeReq.EVTargetCurrent, value->current_ma, A); break;
+        case OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE:
         case OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START:
         case OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_STOP:
             body->PowerDeliveryReq_isUsed = 1u;
-            body->PowerDeliveryReq.ChargeProgress = value->kind == OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START ? iso2_chargeProgressType_Start : iso2_chargeProgressType_Stop;
+            body->PowerDeliveryReq.ChargeProgress = value->kind == OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START ? iso2_chargeProgressType_Start : (value->kind == OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE ? iso2_chargeProgressType_Renegotiate : iso2_chargeProgressType_Stop);
             body->PowerDeliveryReq.SAScheduleTupleID = value->schedule_id;
             body->PowerDeliveryReq.DC_EVPowerDeliveryParameter_isUsed = !value->ac_mode;
             ev_status(&body->PowerDeliveryReq.DC_EVPowerDeliveryParameter.DC_EVStatus, value);
@@ -289,6 +290,7 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
             body->PreChargeRes_isUsed = 1u; body->PreChargeRes.ResponseCode = code;
             evse_status(&body->PreChargeRes.DC_EVSEStatus, value);
             OUT_PHYS(body->PreChargeRes.EVSEPresentVoltage, value->voltage_mv, V); break;
+        case OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE:
         case OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START:
         case OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_STOP:
             body->PowerDeliveryRes_isUsed = 1u; body->PowerDeliveryRes.ResponseCode = code;
@@ -541,8 +543,8 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
         REQUIRE(!body->PowerDeliveryReq.ChargingProfile_isUsed && !body->PowerDeliveryReq.EVPowerDeliveryParameter_isUsed);
         value->ac_mode = !body->PowerDeliveryReq.DC_EVPowerDeliveryParameter_isUsed;
         if (!value->ac_mode) { REQUIRE(request_status_in(&body->PowerDeliveryReq.DC_EVPowerDeliveryParameter.DC_EVStatus, value)); }
-        REQUIRE(body->PowerDeliveryReq.ChargeProgress == iso2_chargeProgressType_Start || body->PowerDeliveryReq.ChargeProgress == iso2_chargeProgressType_Stop);
-        value->kind = body->PowerDeliveryReq.ChargeProgress == iso2_chargeProgressType_Start ? OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START : OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_STOP;
+        REQUIRE(body->PowerDeliveryReq.ChargeProgress == iso2_chargeProgressType_Start || body->PowerDeliveryReq.ChargeProgress == iso2_chargeProgressType_Stop || body->PowerDeliveryReq.ChargeProgress == iso2_chargeProgressType_Renegotiate);
+        value->kind = body->PowerDeliveryReq.ChargeProgress == iso2_chargeProgressType_Start ? OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START : (body->PowerDeliveryReq.ChargeProgress == iso2_chargeProgressType_Renegotiate ? OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE : OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_STOP);
         value->schedule_id = body->PowerDeliveryReq.SAScheduleTupleID;
     }
     if (body->PowerDeliveryRes_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START; value->response = true;
