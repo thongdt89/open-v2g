@@ -176,6 +176,8 @@ static OpenV2g_Result advance_common(
         next_state = OPENV2G_PROTOCOL_STATE_CHARGE_PARAMETER;
         next_kind = OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER;
         break;
+    case OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE:
+        next_state = OPENV2G_PROTOCOL_STATE_CHARGE_PARAMETER; next_kind = OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER; break;
     case OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER:
         if (adapter->status.mode == OPENV2G_MODE_DC) {
             next_state = OPENV2G_PROTOCOL_STATE_CABLE_CHECK;
@@ -241,6 +243,11 @@ static OpenV2g_Result advance_charge_loop(
             message->correlation_id,
             OPENV2G_REASON_SEQUENCE);
         return OPENV2G_RESULT_REJECTED;
+    }
+    if (message->renegotiate) {
+        if (message->metering_receipt_required || message->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT) { return OPENV2G_RESULT_REJECTED; }
+        set_state(adapter, OPENV2G_PROTOCOL_STATE_POWER_DELIVERY_STOP, OPENV2G_REASON_NONE);
+        return send_request(adapter, OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE, message->now);
     }
     if (message->metering_receipt_required &&
         (message->kind == loop_kind)) {

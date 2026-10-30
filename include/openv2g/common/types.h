@@ -207,6 +207,23 @@ typedef struct {
     uint32_t ramp_limit_w_per_s;
 } OpenV2g_PowerLimits;
 
+/* PROJECT limit sources retain provenance independently of vehicle energy. */
+#define OPENV2G_LIMIT_SOURCE_COUNT 3u
+#define OPENV2G_LIMIT_SOURCE_BIT(source) (1u << (unsigned)(source))
+typedef enum {
+    OPENV2G_LIMIT_CABLE = 0,
+    OPENV2G_LIMIT_PEER = 1,
+    OPENV2G_LIMIT_SCHEDULE = 2
+} OpenV2g_LimitSource;
+typedef struct {
+    OpenV2g_CommEnvelope env;
+    OpenV2g_LimitSource source;
+    OpenV2g_ChargeMode mode;
+    uint32_t correlation_id;
+    OpenV2g_TimeUs valid_until;
+    OpenV2g_PowerLimits limits;
+} OpenV2g_LimitEvidence;
+
 /* Project semantic availability bits; not DIN/ISO wire bit positions. */
 typedef enum {
     OPENV2G_ENERGY_FIELD_SOC = (1u << 0),
@@ -260,6 +277,8 @@ typedef struct {
     OpenV2g_ChargeMode selected_mode;
     uint32_t permission_used;
     uint16_t protocol_step;
+    bool service_selected;
+    bool authorized; /* Protocol evidence only; never vehicle permission. */
 } OpenV2g_HlcSessionStatus;
 
 typedef struct {

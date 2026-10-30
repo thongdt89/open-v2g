@@ -105,6 +105,22 @@ OpenV2g_Result OpenV2g_ChargeHardwareAdapter_SetAutoFeedback(
     return OPENV2G_RESULT_OK;
 }
 
+OpenV2g_Result OpenV2g_ChargeHardwareAdapter_RebindSafeGeneration(OpenV2g_ChargeHardwareAdapter *adapter,
+    uint32_t previous_generation, uint32_t next_generation, OpenV2g_TimeUs now)
+{
+    uint32_t expected = previous_generation == UINT32_MAX ? 1u : previous_generation + 1u;
+    if (adapter == NULL || !adapter->host_fake || now == 0u || next_generation == 0u || next_generation != expected ||
+        adapter->pending_command_id != 0u || adapter->status.state != OPENV2G_HW_SAFE ||
+        adapter->status.positive_contactor_closed || adapter->status.negative_contactor_closed ||
+        adapter->status.precharge_active || adapter->status.discharge_active || adapter->status.measured_current_ma != 0) { return OPENV2G_RESULT_REJECTED; }
+    if (adapter->generation == next_generation) { return OPENV2G_RESULT_OK; }
+    if (adapter->generation != previous_generation || adapter->status.env.quality != OPENV2G_QUALITY_VALID ||
+        adapter->status.env.timestamp == 0u || adapter->status.env.timestamp > now) { return OPENV2G_RESULT_REJECTED; }
+    adapter->generation = next_generation; adapter->status.env.quality = OPENV2G_QUALITY_INIT;
+    adapter->accepted_permission_id = 0u; adapter->prepared_mode = OPENV2G_MODE_NONE;
+    return OPENV2G_RESULT_OK;
+}
+
 OpenV2g_Result OpenV2g_ChargeHardwareAdapter_Prepare(
     OpenV2g_ChargeHardwareAdapter *adapter,
     uint32_t generation,

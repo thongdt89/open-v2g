@@ -41,12 +41,20 @@ static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenari
     if (tls_config != NULL) { return false; }
 #endif
     fd = Ov2g_TcpAccept(listener, Ov2g_OsNow() + 30000000u);
-    bool ac_mode = scenario >= OV_WIRE_AC && scenario <= OV_WIRE_AC_WRONG_MODE;
-    OpenV2g_ProtocolMessageKind steps[sizeof(sequence) / sizeof(sequence[0])];
-    (void)memcpy(steps, sequence, sizeof(steps));
+    bool ac_mode = (scenario >= OV_WIRE_AC && scenario <= OV_WIRE_AC_WRONG_MODE) || scenario == OV_WIRE_PAUSE_AC || scenario == OV_WIRE_RESUME_AC || scenario == OV_WIRE_RENEGOTIATE_AC;
+    size_t step_count = sizeof(sequence) / sizeof(sequence[0]);
+    OpenV2g_ProtocolMessageKind steps[24];
+    (void)memcpy(steps, sequence, sizeof(sequence));
+    if (scenario == OV_WIRE_RENEGOTIATE || scenario == OV_WIRE_RENEGOTIATE_AC) {
+        size_t after_loop = 10u;
+        (void)memmove(&steps[after_loop + 5u], &steps[after_loop], (step_count - after_loop) * sizeof(steps[0]));
+        steps[after_loop] = OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE; steps[after_loop + 1u] = OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER;
+        steps[after_loop + 2u] = OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK; steps[after_loop + 3u] = OPENV2G_PROTOCOL_MESSAGE_PRECHARGE;
+        steps[after_loop + 4u] = OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START; step_count += 5u;
+    }
     if (ac_mode) {
         if (protocol != OPENV2G_PROTOCOL_ISO_15118_2) { goto stop; }
-        for (index = 0u; index < sizeof(steps) / sizeof(steps[0]); ++index) {
+        for (index = 0u; index < step_count; ++index) {
             if (steps[index] == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND || steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS) { steps[index] = OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS; }
         }
     }
@@ -76,12 +84,13 @@ static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenari
     if (scenario == OV_WIRE_MALFORMED) { bytes[0] = 0u; }
     if (!send_fragmented(&io, bytes, length)) { goto stop; }
     if (scenario == OV_WIRE_UNOFFERED || scenario == OV_WIRE_MALFORMED) { success = true; goto stop; }
-    for (index = 0u; index < sizeof(sequence) / sizeof(sequence[0]); ++index) {
+    for (index = 0u; index < step_count; ++index) {
         OpenV2g_ExiDcDocument request;
         if (ac_mode && (steps[index] == OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK || steps[index] == OPENV2G_PROTOCOL_MESSAGE_PRECHARGE ||
             steps[index] == OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION)) { continue; }
         OpenV2g_ExiDcDocument response = OpenV2g_ExiDc_Default(steps[index], true);
         response.ac_mode = ac_mode;
+        if ((scenario == OV_WIRE_RENEGOTIATE || scenario == OV_WIRE_RENEGOTIATE_AC) && index > 10u) { response.schedule_id = 2u; }
         if (ac_mode) {
             response.voltage_mv = 230000u; response.max_voltage_mv = 250000u; response.max_current_ma = 32000;
             response.max_power_w = 7360; response.schedule_power_w = 7000;
@@ -89,9 +98,14 @@ static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenari
             if (scenario == OV_WIRE_AC_RCD && steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS) { response.rcd_fault = true; }
         }
         uint16_t response_id = (uint16_t)((unsigned)response.kind + OPENV2G_EXI_DC_RESPONSE_OFFSET);
+        if (index == 0u && (scenario == OV_WIRE_RESUME || scenario == OV_WIRE_RESUME_AC)) { response.new_session = false; response.resumed_session = true; }
+
         if (!OvWireIo_Receive(&io, &received, Ov2g_OsNow() + OV_WIRE_TIMEOUT_US) ||
             !OvWireDecode(&codec, 1u, schema, (uint16_t)steps[index], &received, &request, sizeof(request))) { goto stop; }
         if (index != 0u && memcmp(request.session_id, session_id, 8u) != 0) { goto stop; }
+        if (index == 0u && (scenario == OV_WIRE_RESUME || scenario == OV_WIRE_RESUME_AC) && memcmp(request.session_id, session_id, sizeof(session_id)) != 0) { goto stop; }
+        if (steps[index] == OPENV2G_PROTOCOL_MESSAGE_SESSION_STOP &&
+            request.pause_session != (scenario == OV_WIRE_PAUSE || scenario == OV_WIRE_PAUSE_AC)) { goto stop; }
         if (index == 0u && scenario == OV_WIRE_REPLAY_SAP) {
             success = send_fragmented(&io, sap_frame, sap_length); goto stop;
         }
@@ -172,7 +186,7 @@ stop:
     return success;
 }
 
-static bool run_discovered(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol, bool ac_mode, const Ov2g_TlsConfig *tls_config)
+static bool run_discovered(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol, OvWireScenario scenario, const Ov2g_TlsConfig *tls_config)
 {
     OpenV2g_Endpoint advertised = {0};
     OpenV2g_TimeUs deadline = Ov2g_OsNow() + 30000000u;
@@ -184,7 +198,7 @@ static bool run_discovered(int listener, int udp, uint16_t tcp_port, OpenV2g_Pro
         result = Ov2g_Sdp6ServeOnce(udp, &advertised);
         if (result == OPENV2G_RESULT_BUSY) { (void)poll(&descriptor, 1u, 1); }
     } while (result == OPENV2G_RESULT_BUSY && Ov2g_OsNow() < deadline);
-    return result == OPENV2G_RESULT_OK && run_station(listener, protocol, ac_mode ? OV_WIRE_AC : OV_WIRE_NORMAL, tls_config);
+    return result == OPENV2G_RESULT_OK && run_station(listener, protocol, scenario, tls_config);
 }
 
 bool OvWireStation_RunDiscovered(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol)
@@ -198,7 +212,7 @@ bool OvWireStation_Run(int listener, OpenV2g_ProtocolId protocol, OvWireScenario
 }
 bool OvWireStation_RunDiscoveredMode(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol, bool ac_mode)
 {
-    return run_discovered(listener, udp, tcp_port, protocol, ac_mode, NULL);
+    return run_discovered(listener, udp, tcp_port, protocol, ac_mode ? OV_WIRE_AC : OV_WIRE_NORMAL, NULL);
 }
 #ifdef OPENV2G_HAVE_OPENSSL_HOST
 bool OvWireStation_RunSecure(int listener, OpenV2g_ProtocolId protocol, OvWireScenario scenario, const Ov2g_TlsConfig *config)
@@ -207,6 +221,13 @@ bool OvWireStation_RunSecure(int listener, OpenV2g_ProtocolId protocol, OvWireSc
 }
 bool OvWireStation_RunDiscoveredSecure(int listener, int udp, uint16_t tcp_port, OpenV2g_ProtocolId protocol, bool ac_mode, const Ov2g_TlsConfig *config)
 {
-    return config != NULL && run_discovered(listener, udp, tcp_port, protocol, ac_mode, config);
+    return config != NULL && run_discovered(listener, udp, tcp_port, protocol, ac_mode ? OV_WIRE_AC : OV_WIRE_NORMAL, config);
 }
 #endif
+
+bool OvWireStation_RunDiscoveredScenario(int listener, int udp, uint16_t tcp_port,
+    OvWireScenario scenario, const Ov2g_TlsConfig *tls_config)
+{
+    if (scenario != OV_WIRE_PAUSE && scenario != OV_WIRE_RESUME && scenario != OV_WIRE_PAUSE_AC && scenario != OV_WIRE_RESUME_AC && scenario != OV_WIRE_RENEGOTIATE && scenario != OV_WIRE_RENEGOTIATE_AC) { return false; }
+    return run_discovered(listener, udp, tcp_port, OPENV2G_PROTOCOL_ISO_15118_2, scenario, tls_config);
+}

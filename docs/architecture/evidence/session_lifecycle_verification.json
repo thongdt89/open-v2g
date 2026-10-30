@@ -1,0 +1,72 @@
+{
+  "date": "2026-10-30",
+  "base_commit": "346c11f",
+  "scope": "Host limit/readiness/session/timing/lifecycle increment, not formal conformance or vehicle safety. System OpenSSL libraries not sanitizer-instrumented.",
+  "builds": {
+    "normal_generated_openssl_oracle": {
+      "passed": 38,
+      "failed": 0,
+      "ctest_log_sha256": "82f09fd2abef05e6a28413e1bcc4e9fca49a026737dfd1304e03a77537c7a32c"
+    },
+    "asan_ubsan_generated_openssl": {
+      "passed": 36,
+      "failed": 0,
+      "ctest_log_sha256": "46d22e125e814b511d1ada275bd6cf3c98fa6b817577bb50249ed0dcefdf866d"
+    },
+    "default_codecs_openssl_off": {
+      "passed": 25,
+      "failed": 0,
+      "ctest_log_sha256": "0a4350e3bb116a95d422db9845b65ee5a2f16548ee2c4d59a9cf63ed3ef6893c"
+    }
+  },
+  "differential_vectors": {
+    "original": 50,
+    "feature": 25,
+    "original_feature_rows_preserved": 19,
+    "method": "candidate-constructed, separate pinned codec decode/re-encode byte equality"
+  },
+  "lifecycle_socket_cases": {
+    "pause_resume_pairs": 4,
+    "renegotiation_sessions": 4,
+    "profiles": "AC/DC, real unicast IPv6 SDP, plaintext and fresh TLS13 handshakes"
+  },
+  "project_source_sha256": {
+    "CMakeLists.txt": "51efc1bf5815fe4b1e0f71ef8c06d2ccff90abdfe0b2b0773ee841355ea4d898",
+    "include/openv2g/charging_coordinator/charge_state_machine.h": "5d18d1400cdcabbb0d8e123d25cf7a20c6ffa0d6cc1ca5d61617fb5edb0208a2",
+    "include/openv2g/charging_coordinator/charging_coordinator.h": "81869218bbba06f6d148067f279cf65b9cfb0cfc0f4f56b08c2f86be2d5ff5e3",
+    "include/openv2g/charging_coordinator/permission_manager.h": "a010ec4994b1a4775a8c16021882a18c101b6562f67e9951caac98e5a6b8eb10",
+    "include/openv2g/common/types.h": "18cec684902bf2ef199972ea2cc7fbbd72adbb76c63816bdac4e2f4ad1926f58",
+    "include/openv2g/iso15118_chrg/iso15118_chrg.h": "e0db4450e3859af373e3af5c5a2338f530c413eba6dce1c60dcf5ca1691b9144",
+    "include/openv2g/iso15118_chrg/protocol_adapter.h": "6988c47734e88863b2a50e9d249ff1c7bb0b994cd02778183a54d76e2c6e3d1f",
+    "include/openv2g/iso15118_chrg/session_context.h": "6f8fa73d3460af5db0166bcf2890a0417489c6192cb1dbbc0266094d61a933ec",
+    "include/openv2g/support/charge_hardware_adapter.h": "70da6eb9c45b387921f92584622e44987eaa4b9e905edb0c8d6cda7fe152fa3e",
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_iso2.c": "0bf5268452fab8f4d1103100087ff72cba078b0e819ce0481d6aef13f5757fe4",
+    "integration/protocol/adapters/cbv2g/tests/feature_vector_dump.c": "5f3697890c53fa2975538bbac8656267da83b42e2e4791c375467c8c349c6250",
+    "integration/protocol/adapters/cbv2g/tests/test_cbv2g_features.c": "cf17d42a401bca4a16d71e5a0efe7bd4a41fc71801133c3e6105547d9ea34fae",
+    "simulation/linux/wire/CMakeLists.txt": "0bbbfdf6652ee3975aff1b76f97bc7a3d9a670ca081faf5bd6055af3a0801155",
+    "simulation/linux/wire/client.c": "acb622860e2466936ab3cfd8de1e3a69c3c7c699e16c2b56a7342ec0870aa7cb",
+    "simulation/linux/wire/station.c": "395b4fd874fb8c62ab1b615bdb7b4cba721c1d9d23ef1a89c7f22bb7c128bcb2",
+    "simulation/linux/wire/test_wire_resume.c": "3c57d16d6cdf646caf65cc4de0e1d5b5d1d63314f10ce43c3a994dbeb52a1bac",
+    "simulation/linux/wire/wire.h": "aec11907dc5fe8395257c9b49776741febc86fd1e6aec87a7b22f148d2f31a03",
+    "simulation/src/host_simulation.c": "bda633250f3120730fbcd9420ba384043a06b68168f4204bf19832306b953c89",
+    "src/charging_coordinator/charge_state_machine.c": "cdc5271c474570e6a48db6bb514a9013708c476f6181276026bb48f8b1b85ac5",
+    "src/charging_coordinator/charging_coordinator.c": "771e1462063302c778149f55a32a95e6692aeb225d05e255623b02564657da9d",
+    "src/charging_coordinator/permission_manager.c": "64cb51040b0900eab440026bc2e4edf8f02c31240c846b9354dc89cf26aa4d7b",
+    "src/iso15118_chrg/iso15118_2_adapter.c": "fc137c00017942eed847dcd0553a7de04ed45083dcad1ea83767975da9632405",
+    "src/iso15118_chrg/iso15118_chrg.c": "64b26d06b4c4cd6b954d35a1f5a9731ef51ce85cf36ca4715639225c35eb9585",
+    "src/iso15118_chrg/protocol_data_flow.c": "c8abb4525f57781b9625aa44383f176c553af8340701b4e423faeb78109d4ce5",
+    "src/iso15118_chrg/session_context.c": "f7cab03dc7f85038f32df3213c41685e1a3b70d156ab88f59b60d248f95267ae",
+    "src/support/charge_hardware_adapter.c": "784dac5c268f2bedfc5f79fac0598047972f6bd693c112f79d582ed08789ae4e",
+    "tests/CMakeLists.txt": "a8858242a1091d81ef993a3c89f23730d52ce1ed95d0367ee41e2eb60fd1f91c",
+    "tests/integration/test_communication_budgets.c": "f41f5756fcd2bb32cd311bbe4c0a1586e487c781e192edf7cc19fe80f1743bf0",
+    "tests/integration/test_control_boundaries.c": "7367eaebd219eba2b6dedf6a727b3fa175215b7aa12b228dc32ebd265161ee2e",
+    "tests/integration/test_processing_budgets.c": "96ac06381a093909021dffc03cc5686fb309982e6f6d22f3d04be2569e3ce5f8",
+    "tests/oracle/differential.py": "9c83eb9d17fb25053b85e82e973129d19cd73ba367b7e237d68374a8d60ef950",
+    "tests/oracle/feature_vectors.json": "7ab16526cfbddaf249058927de70a7b9b6b75dc338d4e7d4b4b7aaaf015fe0df",
+    "tests/unit/test_hardware_gate.c": "bc121ad7a3012392b5d93e068e21a5573d2ae43b04d4ce1b9e6e456c5fe48dec",
+    "tests/unit/test_permission_limits.c": "a079ca596bd22e0f941e28ee85bddafd3de755a57e04b9601edd68da811cdc0c",
+    "tests/unit/test_permission_manager.c": "91bff44ce1d7a63c63f28d40f3c5801fc97c700f70fb00f643f2033f22b71e5a",
+    "tests/unit/test_protocol_data_flow.c": "2d94c2851f351581021303c93a2bdb6a8dc059f3db6026531ce9713347997128",
+    "tests/unit/test_session_context.c": "7068bf7de94bedb0c765b089125a4efcb18102c7d6be3d65926341c00774c6ea"
+  }
+}

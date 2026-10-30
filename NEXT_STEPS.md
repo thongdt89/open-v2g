@@ -1,3 +1,14 @@
+## Current continuation — session lifecycle, 30/10/2026
+
+Independent limit intersection, protocol readiness, portable session validation,
+link/HLC/response supervision and ISO-2 EIM pause/resume/renegotiation now extend
+the host implementation. See
+[session lifecycle implementation](docs/architecture/SESSION_LIFECYCLE_IMPLEMENTATION.md).
+Continue signed EXI/receipts and credential transactions, PnC, richer service and
+schedule profiles, broader AC, ISO-20/BPT and network/target integration. Keep
+supplier/PKI/exact-edition/safety decisions explicit; no production freeze follows
+from the host additions. Older entries below describe historical snapshots.
+
 ## Current continuation — control boundaries, 28/10/2026
 
 Evidence invalidation/order, expiry-before-renewal, physical assessment in the

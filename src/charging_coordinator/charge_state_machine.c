@@ -68,6 +68,10 @@ bool OpenV2g_ChargeStateMachine_Dispatch(
         }
         break;
     case OPENV2G_COORDINATOR_ENERGY_TRANSFER:
+        if (event == OPENV2G_CSM_EVENT_RENEGOTIATE_REQUESTED) {
+            machine->state = OPENV2G_COORDINATOR_HLC_NEGOTIATION;
+            return true;
+        }
         break;
     case OPENV2G_COORDINATOR_STOPPING:
         if (event == OPENV2G_CSM_EVENT_SAFE_CONNECTED) {

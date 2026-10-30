@@ -177,8 +177,11 @@ int main(void)
                     &permission_port,
                     NULL,
                     &request,
-                    &reason) == OPENV2G_RESULT_REJECTED);
-    TEST_ASSERT(reason == OPENV2G_REASON_PRECONDITION);
+                    &reason) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(reason == OPENV2G_REASON_NONE);
+    TEST_ASSERT(request.requested_power_w <= 30000);
+    TEST_ASSERT(request.energy.target_current_ma == test.energy.target_current_ma);
+    TEST_ASSERT(request.target_current_ma <= request.energy.target_current_ma);
     test.permission.limits = test.energy.limits;
 
     TEST_ASSERT(OpenV2g_ProtocolDataFlow_PrepareRequest(

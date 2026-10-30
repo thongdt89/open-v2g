@@ -86,6 +86,10 @@ void OpenV2g_ChargeHardwareAdapter_InitHostFake(OpenV2g_ChargeHardwareAdapter *a
 OpenV2g_Result OpenV2g_ChargeHardwareAdapter_SetAutoFeedback(
     OpenV2g_ChargeHardwareAdapter *adapter,
     bool enabled);
+/* Host provider lifecycle only: no actuation and no measurement restamping. */
+OpenV2g_Result OpenV2g_ChargeHardwareAdapter_RebindSafeGeneration(OpenV2g_ChargeHardwareAdapter *adapter,
+    uint32_t previous_generation, uint32_t next_generation, OpenV2g_TimeUs now);
+
 OpenV2g_Result OpenV2g_ChargeHardwareAdapter_Prepare(
     OpenV2g_ChargeHardwareAdapter *adapter,
     uint32_t generation,

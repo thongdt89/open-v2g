@@ -26,6 +26,7 @@ static int setup(OpenV2g_HostSimulation *simulation, OpenV2g_ProtocolId protocol
         response.kind = request.kind; response.accepted = true;
         TEST_ASSERT(OpenV2g_Iso15118Chrg_OnProtocolMessage(&simulation->hlc, 140u + i * 10u, &response) == OPENV2G_RESULT_ACCEPTED);
     }
+    TEST_ASSERT(simulation->hlc.status.service_selected && !simulation->hlc.status.authorized);
     TEST_ASSERT(simulation->hlc.processing_stage.kind == OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION);
     TEST_ASSERT(simulation->hlc.processing_stage.started == 160u && simulation->hlc.processing_stage.deadline == 260u);
     return 0;
@@ -52,8 +53,10 @@ static int run(OpenV2g_ProtocolId protocol)
     generation = simulation.hlc.generation;
     TEST_ASSERT(respond(&simulation, 170u, true, true) == 0);
     TEST_ASSERT(respond(&simulation, 180u, true, true) == 0);
+    TEST_ASSERT(!simulation.hlc.status.authorized);
     TEST_ASSERT(simulation.hlc.processing_stage.started == 160u && simulation.hlc.processing_stage.deadline == 260u);
     TEST_ASSERT(respond(&simulation, 190u, false, true) == 0);
+    TEST_ASSERT(simulation.hlc.status.authorized);
     TEST_ASSERT(simulation.hlc.processing_stage.kind == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER && simulation.hlc.processing_stage.deadline == 290u);
     TEST_ASSERT(OpenV2g_Iso15118Chrg_TickProcessing(&simulation.hlc, generation + 1u, 290u) == OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(simulation.hlc.status.state == OPENV2G_HLC_PROTOCOL_SESSION);
@@ -61,6 +64,7 @@ static int run(OpenV2g_ProtocolId protocol)
     TEST_ASSERT(simulation.hlc.status.state == OPENV2G_HLC_PROTOCOL_SESSION);
     TEST_ASSERT(OpenV2g_Iso15118Chrg_TickProcessing(&simulation.hlc, generation, 289u) == OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_Iso15118Chrg_TickProcessing(&simulation.hlc, generation, 290u) == OPENV2G_RESULT_REJECTED);
+    TEST_ASSERT(!simulation.hlc.status.authorized && !simulation.hlc.status.service_selected);
     TEST_ASSERT(simulation.hlc.status.state == OPENV2G_HLC_ERROR && !simulation.hlc.protocol_request_pending && !simulation.hlc.protocol_request_dispatched);
     TEST_ASSERT(OpenV2g_Iso15118Chrg_TakeProtocolRequest(&simulation.hlc, generation, &request) == OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(OpenV2g_Iso15118Chrg_ReadProtocolDiagnostic(&simulation.hlc, &diagnostic) == OPENV2G_RESULT_OK && diagnostic.reason == OPENV2G_REASON_TIMEOUT);

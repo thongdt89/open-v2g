@@ -98,6 +98,36 @@ int main(void)
     TEST_ASSERT(ready(&s, false) == 0);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_EvaluatePermission(&s.coordinator, s.coordinator.permission_manager.current.valid_until) == OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(s.coordinator.teardown_started && s.coordinator.permission_manager.current.decision == OPENV2G_PERMISSION_DENY);
+    TEST_ASSERT(ready(&s, false) == 0 && ok(OpenV2g_HostSimulation_StartEnergyTransfer(&s, 160u)));
+    {
+        uint32_t old_permission = s.coordinator.permission_manager.current.permission_id;
+        TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_BeginRenegotiation(&s.coordinator, 170u)));
+        TEST_ASSERT(s.coordinator.permission_manager.current.decision == OPENV2G_PERMISSION_DENY && !s.coordinator.teardown_started);
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_EvaluatePermission(&s.coordinator, 171u) == OPENV2G_RESULT_REJECTED);
+        hardware = s.hardware.status;
+        TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_OnHardwareStatus(&s.coordinator, &hardware)) && s.coordinator.renegotiation_safe);
+        TEST_ASSERT(ok(OpenV2g_HostSimulation_PrepareEnergyTransfer(&s, 173u)));
+        TEST_ASSERT(ok(OpenV2g_HostSimulation_StartEnergyTransfer(&s, 174u)));
+        TEST_ASSERT(!s.coordinator.renegotiation_pending && s.coordinator.permission_manager.current.permission_id != old_permission);
+    }
+    TEST_ASSERT(ready(&s, false) == 0 && ok(OpenV2g_HostSimulation_StartEnergyTransfer(&s, 160u)));
+    TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_BeginRenegotiation(&s.coordinator, 170u)));
+    {
+        uint32_t command = s.hardware.next_command_id;
+        OpenV2g_ChargingCoordinator_Tick(&s.coordinator, 270u);
+        TEST_ASSERT(s.hardware.next_command_id == command && s.coordinator.state_machine.state == OPENV2G_COORDINATOR_FAULT_LATCHED);
+    }
+    TEST_ASSERT(ready(&s, false) == 0 && ok(OpenV2g_HostSimulation_StartEnergyTransfer(&s, 160u)));
+    TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_BeginRenegotiation(&s.coordinator, 170u)));
+    hardware = s.hardware.status;
+    TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_OnHardwareStatus(&s.coordinator, &hardware)));
+    {
+        uint32_t command = s.hardware.next_command_id;
+        TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_Stop(&s.coordinator, 180u, OPENV2G_REASON_CANCELLED)));
+        OpenV2g_ChargingCoordinator_Tick(&s.coordinator, 181u);
+        TEST_ASSERT(s.hardware.next_command_id == command && s.coordinator.stop_completed && !s.coordinator.renegotiation_pending);
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_RequestEnergyTransfer(&s.coordinator, 182u) == OPENV2G_RESULT_REJECTED);
+    }
     TEST_ASSERT(ready(&s, false) == 0);
     TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_BeginProtocolStop(&s.coordinator, 160u)));
     hardware = s.hardware.status;

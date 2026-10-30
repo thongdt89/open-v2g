@@ -149,5 +149,15 @@ int main(void)
     permission.mode = OPENV2G_MODE_AC;
     TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_Enable(&adapter, &permission, 501u) == OPENV2G_RESULT_ACCEPTED);
     TEST_ASSERT(adapter.status.state == OPENV2G_HW_ENERGIZED);
+    OpenV2g_ChargeHardwareAdapter_InitHostFake(&adapter);
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_RequestSafeState(&adapter, 1u, 600u, OPENV2G_REASON_NONE) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_RebindSafeGeneration(&adapter, 1u, 3u, 601u) == OPENV2G_RESULT_REJECTED);
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_RebindSafeGeneration(&adapter, 1u, 2u, 601u) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(adapter.generation == 2u && adapter.status.env.session_generation == 1u && adapter.status.env.quality == OPENV2G_QUALITY_INIT);
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_RequestSafeState(&adapter, 1u, 602u, OPENV2G_REASON_NONE) == OPENV2G_RESULT_REJECTED);
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_RequestSafeState(&adapter, 2u, 602u, OPENV2G_REASON_NONE) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(adapter.status.env.session_generation == 2u && adapter.status.env.quality == OPENV2G_QUALITY_VALID);
+    TEST_ASSERT(OpenV2g_ChargeHardwareAdapter_RebindSafeGeneration(&adapter, 1u, 2u, 603u) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(adapter.status.env.quality == OPENV2G_QUALITY_VALID);
     return 0;
 }

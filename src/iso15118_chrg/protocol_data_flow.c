@@ -30,7 +30,7 @@ static bool kind_is_valid_for_mode(
     OpenV2g_ProtocolMessageKind kind)
 {
     if (protocol == OPENV2G_PROTOCOL_DIN_70121) {
-        return (mode == OPENV2G_MODE_DC) &&
+        return (kind != OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE) && (mode == OPENV2G_MODE_DC) &&
                (kind != OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS) &&
                (kind != OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT);
     }
@@ -213,6 +213,7 @@ OpenV2g_Result OpenV2g_ProtocolDataFlow_GetRule(
             OPENV2G_ACTION_NONE,
             OPENV2G_HLC_EVENT_PEER_REQUEST);
         break;
+    case OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE:
     case OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_STOP:
         set_rule(
             rule,
@@ -441,30 +442,32 @@ OpenV2g_Result OpenV2g_ProtocolDataFlow_PrepareRequest(
         request->metering_evidence = *metering_evidence;
         request->has_metering_evidence = true;
     }
-    if (request->has_energy &&
-        !targets_fit_limits(
-            &request->energy,
-            request->has_permission ? &request->permission : NULL,
-            &rule)) {
-        *reason = OPENV2G_REASON_PRECONDITION;
-        return OPENV2G_RESULT_REJECTED;
-    }
-    if (request->has_energy &&
-        ((rule.relevant_energy_fields &
-          (OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE |
-           OPENV2G_ENERGY_FIELD_TARGET_CURRENT)) ==
-         (OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE |
-          OPENV2G_ENERGY_FIELD_TARGET_CURRENT)) &&
-        ((request->energy.availability_mask &
-          (OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE |
-           OPENV2G_ENERGY_FIELD_TARGET_CURRENT)) ==
-         (OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE |
-          OPENV2G_ENERGY_FIELD_TARGET_CURRENT))) {
-        requested_power_w =
-            ((int64_t)request->energy.target_voltage_mv *
-             request->energy.target_current_ma) /
-            1000000;
-        request->requested_power_w = (int32_t)requested_power_w;
+    if (request->has_energy) {
+        OpenV2g_EvEnergySnapshot projected = request->energy;
+        if (!targets_fit_limits(&request->energy, NULL, &rule)) {
+            *reason = OPENV2G_REASON_PRECONDITION; return OPENV2G_RESULT_REJECTED;
+        }
+        if (request->has_permission) {
+            const OpenV2g_PowerLimits *limits = &request->permission.limits;
+            if (projected.target_voltage_mv > limits->max_voltage_mv) { projected.target_voltage_mv = limits->max_voltage_mv; }
+            if (projected.target_current_ma > limits->max_charge_current_ma) { projected.target_current_ma = limits->max_charge_current_ma; }
+            if (projected.target_voltage_mv != 0u) {
+                int64_t current = (int64_t)limits->max_import_power_w * 1000000 / projected.target_voltage_mv;
+                if (current < projected.target_current_ma) { projected.target_current_ma = (int32_t)current; }
+            }
+        }
+        if (!targets_fit_limits(&projected, request->has_permission ? &request->permission : NULL, &rule)) {
+            *reason = OPENV2G_REASON_PRECONDITION; return OPENV2G_RESULT_REJECTED;
+        }
+        request->target_voltage_mv = projected.target_voltage_mv;
+        request->target_current_ma = projected.target_current_ma;
+        if ((rule.relevant_energy_fields & (OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE | OPENV2G_ENERGY_FIELD_TARGET_CURRENT)) ==
+            (OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE | OPENV2G_ENERGY_FIELD_TARGET_CURRENT) &&
+            (projected.availability_mask & (OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE | OPENV2G_ENERGY_FIELD_TARGET_CURRENT)) ==
+            (OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE | OPENV2G_ENERGY_FIELD_TARGET_CURRENT)) {
+            requested_power_w = (int64_t)projected.target_voltage_mv * projected.target_current_ma / 1000000;
+            request->requested_power_w = (int32_t)requested_power_w;
+        }
     }
     *reason = OPENV2G_REASON_NONE;
     return OPENV2G_RESULT_OK;

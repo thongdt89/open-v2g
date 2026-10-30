@@ -1,8 +1,8 @@
 {
-  "date": "2026-10-26",
+  "date": "2026-10-30",
   "candidate_codec_commit": "03350be048b35b179905129005a97144a4bdcf93",
   "oracle_commit": "733d4f43cb6579c705d59c7386786ce12a0a0026",
-  "method": "Candidate-constructed bounded AC and unsigned metering DTOs, independently decoded/re-encoded byte-identically by the separate pinned OpenV2G iso1 model. Differential regression, not independently authored standards vectors. Profile labels iso2-ac and iso2-meter select the same explicit ISO-2 schema.",
+  "method": "Candidate-constructed bounded AC and unsigned metering DTOs, independently decoded/re-encoded byte-identically by the separate pinned OpenV2G iso1 model. Differential regression, not independently authored standards vectors. Profile labels iso2-ac and iso2-meter select the same explicit ISO-2 schema. Six lifecycle additions cover DC/AC Renegotiate, Pause and OldSessionJoined; all profile labels still select ISO-2. Original nineteen rows are unchanged.",
   "vectors": [
     {
       "schema": "iso2-ac",
@@ -98,6 +98,36 @@
       "schema": "iso2-meter",
       "message_type_id": 111,
       "hex": "809802000000000000000011000400001020"
+    },
+    {
+      "schema": "iso2-lifecycle",
+      "message_type_id": 16,
+      "hex": "80980200000000000000001152000220032100"
+    },
+    {
+      "schema": "iso2-lifecycle",
+      "message_type_id": 14,
+      "hex": "809802000000000000000011f200"
+    },
+    {
+      "schema": "iso2-lifecycle",
+      "message_type_id": 101,
+      "hex": "809802000000000000000011e04021213d4d50c0c480"
+    },
+    {
+      "schema": "iso2-lifecycle-ac",
+      "message_type_id": 16,
+      "hex": "80980200000000000000001152000600"
+    },
+    {
+      "schema": "iso2-lifecycle-ac",
+      "message_type_id": 14,
+      "hex": "809802000000000000000011f200"
+    },
+    {
+      "schema": "iso2-lifecycle-ac",
+      "message_type_id": 101,
+      "hex": "809802000000000000000011e04021213d4d50c0c480"
     }
   ]
 }

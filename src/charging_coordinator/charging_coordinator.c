@@ -7,6 +7,8 @@ static bool config_is_valid(const OpenV2g_CoordinatorConfig *config)
 {
     return (config != NULL) &&
            (config->stop_timeout_us > 0u) &&
+           ((config->permission.required_limit_sources & ~((1u << OPENV2G_LIMIT_SOURCE_COUNT) - 1u)) == 0u) &&
+           (config->permission.required_limit_sources == 0u || config->permission.limit_max_age_us > 0u) &&
            (!config->require_physical_assessment || config->assessment_max_age_us > 0u) &&
            (config->permission.cp_pp_max_age_us > 0u) &&
            (config->permission.energy_max_age_us > 0u) &&
@@ -56,7 +58,7 @@ static void evidence_lost(OpenV2g_ChargingCoordinator *coordinator)
     OpenV2g_PermissionManager_Revoke(&coordinator->permission_manager,
         coordinator->generation, coordinator->owner_time, OPENV2G_REASON_STALE_DATA);
     if (coordinator->state_machine.state == OPENV2G_COORDINATOR_READY_FOR_ENERGY ||
-        coordinator->state_machine.state == OPENV2G_COORDINATOR_ENERGY_TRANSFER) {
+        coordinator->state_machine.state == OPENV2G_COORDINATOR_ENERGY_TRANSFER || coordinator->renegotiation_pending) {
         (void)OpenV2g_ChargingCoordinator_Stop(coordinator, coordinator->owner_time, OPENV2G_REASON_STALE_DATA);
     }
 }
@@ -142,7 +144,9 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnQualifiedCpPp(
         coordinator->stop_started = 0u; coordinator->stop_deadline = 0u;
         coordinator->safe_requested = false; coordinator->stop_measured_safe = false;
         coordinator->hlc_stop_completed = false; coordinator->link_stop_completed = false;
+        coordinator->renegotiation_pending = false; coordinator->renegotiation_safe = false;
         coordinator->stop_completed = false; coordinator->stop_hardware_sequence = 0u;
+        (void)memset(coordinator->has_limits, 0, sizeof(coordinator->has_limits));
         coordinator->has_energy = false; coordinator->has_link = false;
         coordinator->has_hlc = false; coordinator->has_hardware = false;
         coordinator->stop_result = OPENV2G_RESULT_OK;
@@ -168,6 +172,8 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnQualifiedCpPp(
             return OPENV2G_RESULT_NOT_OK;
         }
 
+        if (coordinator->config.link_setup_timeout_us > UINT64_MAX - now) { return OPENV2G_RESULT_REJECTED; }
+        coordinator->link_setup_deadline = coordinator->config.link_setup_timeout_us == 0u ? 0u : now + coordinator->config.link_setup_timeout_us;
         result = coordinator->ports.link.start(
             coordinator->ports.link.context,
             coordinator->generation,
@@ -199,6 +205,39 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnQualifiedCpPp(
     if (coordinator->cp_pp.env.sequence_counter != 0u && coordinator->cp_pp.env.sequence_counter == cp_pp->env.sequence_counter) { return OPENV2G_RESULT_REJECTED; }
     coordinator->cp_pp = *cp_pp;
     coordinator->has_cp_pp = true;
+    return OPENV2G_RESULT_OK;
+}
+
+OpenV2g_Result OpenV2g_ChargingCoordinator_OnLimitEvidence(
+    OpenV2g_ChargingCoordinator *coordinator, const OpenV2g_LimitEvidence *evidence, OpenV2g_TimeUs now)
+{
+    unsigned source;
+    if (coordinator == NULL || evidence == NULL || now == 0u || now < coordinator->owner_time ||
+        coordinator->generation == 0u || evidence->env.session_generation != coordinator->generation ||
+        (unsigned)evidence->source >= OPENV2G_LIMIT_SOURCE_COUNT) { return OPENV2G_RESULT_REJECTED; }
+    source = (unsigned)evidence->source;
+    if (evidence->env.timestamp != 0u && obsolete(&coordinator->limits[source].env, &evidence->env)) { return OPENV2G_RESULT_REJECTED; }
+    coordinator->owner_time = now;
+    if (evidence->env.quality != OPENV2G_QUALITY_VALID || evidence->env.timestamp == 0u || evidence->env.timestamp > now ||
+        evidence->correlation_id == 0u || evidence->valid_until <= now || evidence->valid_until <= evidence->env.timestamp ||
+        evidence->limits.max_import_power_w < 0 || evidence->limits.max_export_power_w < 0 ||
+        evidence->limits.max_charge_current_ma < 0 || evidence->limits.max_discharge_current_ma < 0 || evidence->limits.max_voltage_mv == 0u) {
+        OpenV2g_CommEnvelope previous = coordinator->limits[source].env;
+        coordinator->has_limits[source] = false; coordinator->limits[source] = *evidence;
+        if (evidence->env.timestamp == 0u) { coordinator->limits[source].env.timestamp = previous.timestamp;
+            coordinator->limits[source].env.sequence_counter = previous.sequence_counter; }
+        evidence_lost(coordinator); return OPENV2G_RESULT_REJECTED;
+    }
+    if (duplicate(&coordinator->limits[source].env, &evidence->env)) {
+        return coordinator->has_limits[source] ? OPENV2G_RESULT_OK : OPENV2G_RESULT_REJECTED;
+    }
+    if (coordinator->limits[source].env.session_generation == coordinator->generation &&
+        coordinator->limits[source].env.sequence_counter != 0u &&
+        coordinator->limits[source].env.sequence_counter == evidence->env.sequence_counter) { return OPENV2G_RESULT_REJECTED; }
+    coordinator->limits[source] = *evidence; coordinator->has_limits[source] = true;
+    if (coordinator->permission_manager.current.decision == OPENV2G_PERMISSION_ALLOW) {
+        return OpenV2g_ChargingCoordinator_EvaluatePermission(coordinator, now);
+    }
     return OPENV2G_RESULT_OK;
 }
 
@@ -279,6 +318,7 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnLinkStatus(
             coordinator->generation,
             link->env.timestamp);
         if (is_success(result)) {
+            coordinator->link_setup_deadline = 0u;
             (void)OpenV2g_ChargeStateMachine_Dispatch(
                 &coordinator->state_machine,
                 OPENV2G_CSM_EVENT_LINK_READY);
@@ -419,6 +459,10 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnHardwareStatus(
         coordinator->hardware.env.sequence_counter == hardware->env.sequence_counter) { return OPENV2G_RESULT_REJECTED; }
     coordinator->hardware = *hardware;
     coordinator->has_hardware = true;
+    if (coordinator->renegotiation_pending && hardware->env.timestamp >= coordinator->renegotiation_started &&
+        hardware->env.timestamp < coordinator->renegotiation_deadline && hardware->env.sequence_counter > coordinator->renegotiation_hardware_sequence &&
+        hardware->state == OPENV2G_HW_SAFE && !hardware->positive_contactor_closed && !hardware->negative_contactor_closed &&
+        !hardware->precharge_active && hardware->measured_current_ma == 0) { coordinator->renegotiation_safe = true; }
     if (coordinator->safe_requested) { coordinator->stop_measured_safe = false; }
     if (coordinator->safe_requested && is_success(coordinator->stop_result) &&
         hardware->env.timestamp >= coordinator->stop_started && hardware->env.timestamp < coordinator->stop_deadline &&
@@ -455,7 +499,7 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_EvaluatePermission(
     if (now == 0u || now < coordinator->owner_time) { return OPENV2G_RESULT_REJECTED; }
     coordinator->owner_time = now;
     OpenV2g_ChargingCoordinator_Tick(coordinator, now);
-    if (coordinator->teardown_started || coordinator->state_machine.state == OPENV2G_COORDINATOR_STOPPING) { return OPENV2G_RESULT_REJECTED; }
+    if ((coordinator->renegotiation_pending && !coordinator->renegotiation_safe) || coordinator->teardown_started || coordinator->state_machine.state == OPENV2G_COORDINATOR_STOPPING) { return OPENV2G_RESULT_REJECTED; }
     if (coordinator->hlc_event_resync_required) {
         OpenV2g_PermissionManager_Revoke(
             &coordinator->permission_manager,
@@ -468,6 +512,12 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_EvaluatePermission(
     evidence.require_physical_assessment = coordinator->config.require_physical_assessment;
     evidence.assessment_max_age_us = coordinator->config.assessment_max_age_us;
     evidence.assessment = &coordinator->precharge_assessment;
+    {
+        unsigned source;
+        for (source = 0u; source < OPENV2G_LIMIT_SOURCE_COUNT; ++source) {
+            evidence.limits[source] = coordinator->has_limits[source] ? &coordinator->limits[source] : NULL;
+        }
+    }
     evidence.generation = coordinator->generation;
     evidence.coordinator_state = coordinator->state_machine.state;
     evidence.cp_pp = coordinator->has_cp_pp ? &coordinator->cp_pp : NULL;
@@ -564,6 +614,7 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_RequestEnergyTransfer(
         permission,
         now);
     if (is_success(result)) {
+        coordinator->renegotiation_pending = false; coordinator->renegotiation_safe = false;
         (void)OpenV2g_ChargeStateMachine_Dispatch(
             &coordinator->state_machine,
             OPENV2G_CSM_EVENT_ENERGY_STARTED);
@@ -584,6 +635,27 @@ static OpenV2g_Result request_safe(OpenV2g_ChargingCoordinator *coordinator,
             coordinator->ports.hardware.context, coordinator->generation, now, reason);
     }
     return coordinator->stop_result;
+}
+
+OpenV2g_Result OpenV2g_ChargingCoordinator_BeginRenegotiation(
+    OpenV2g_ChargingCoordinator *coordinator, OpenV2g_TimeUs now)
+{
+    OpenV2g_Result result;
+    if (coordinator == NULL || now == 0u || now < coordinator->owner_time || coordinator->teardown_started ||
+        coordinator->renegotiation_pending || coordinator->state_machine.state != OPENV2G_COORDINATOR_ENERGY_TRANSFER ||
+        coordinator->hlc.protocol != OPENV2G_PROTOCOL_ISO_15118_2 || now > UINT64_MAX - coordinator->config.stop_timeout_us) { return OPENV2G_RESULT_REJECTED; }
+    coordinator->owner_time = now;
+    OpenV2g_PermissionManager_Revoke(&coordinator->permission_manager, coordinator->generation, now, OPENV2G_REASON_CANCELLED);
+    coordinator->renegotiation_pending = true; coordinator->renegotiation_safe = false;
+    coordinator->renegotiation_started = now; coordinator->renegotiation_deadline = now + coordinator->config.stop_timeout_us;
+    coordinator->renegotiation_hardware_sequence = coordinator->hardware.env.sequence_counter;
+    coordinator->has_limits[OPENV2G_LIMIT_PEER] = false; coordinator->has_limits[OPENV2G_LIMIT_SCHEDULE] = false;
+    (void)memset(&coordinator->precharge_assessment, 0, sizeof(coordinator->precharge_assessment));
+    (void)OpenV2g_ChargeStateMachine_Dispatch(&coordinator->state_machine, OPENV2G_CSM_EVENT_RENEGOTIATE_REQUESTED);
+    result = coordinator->ports.hardware.request_safe_state(coordinator->ports.hardware.context, coordinator->generation, now, OPENV2G_REASON_CANCELLED);
+    coordinator->renegotiation_result = result;
+    if (!is_success(result)) { (void)OpenV2g_ChargingCoordinator_Stop(coordinator, now, OPENV2G_REASON_HW_MISMATCH); }
+    return result;
 }
 
 OpenV2g_Result OpenV2g_ChargingCoordinator_BeginProtocolStop(
@@ -633,7 +705,14 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_Stop(
         return OPENV2G_RESULT_OK;
     }
 
+    if (coordinator->renegotiation_pending && !coordinator->safe_requested) {
+        coordinator->safe_requested = true; coordinator->stop_started = coordinator->renegotiation_started;
+        coordinator->stop_deadline = coordinator->renegotiation_deadline;
+        coordinator->stop_hardware_sequence = coordinator->renegotiation_hardware_sequence;
+        coordinator->stop_result = coordinator->renegotiation_result; coordinator->stop_measured_safe = coordinator->renegotiation_safe;
+    }
     coordinator->teardown_started = true;
+    coordinator->renegotiation_pending = false; coordinator->renegotiation_safe = false;
 
     (void)OpenV2g_ChargeStateMachine_Dispatch(
         &coordinator->state_machine,
@@ -692,6 +771,14 @@ void OpenV2g_ChargingCoordinator_Tick(
     }
     if (now == 0u || now < coordinator->owner_time) { return; }
     coordinator->owner_time = now;
+    if (coordinator->renegotiation_pending && now >= coordinator->renegotiation_deadline) {
+        (void)OpenV2g_ChargingCoordinator_Stop(coordinator, now, OPENV2G_REASON_TIMEOUT);
+    }
+
+    if (coordinator->state_machine.state == OPENV2G_COORDINATOR_LINK_SETUP && coordinator->link_setup_deadline != 0u && now >= coordinator->link_setup_deadline) {
+        (void)OpenV2g_ChargingCoordinator_Stop(coordinator, now, OPENV2G_REASON_TIMEOUT);
+    }
+
     if (coordinator->safe_requested && !coordinator->stop_completed && !coordinator->stop_measured_safe && now >= coordinator->stop_deadline &&
         coordinator->state_machine.state != OPENV2G_COORDINATOR_FAULT_LATCHED) {
         (void)OpenV2g_ChargingCoordinator_Stop(coordinator, now, OPENV2G_REASON_TIMEOUT);

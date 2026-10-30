@@ -2,6 +2,7 @@
 #define OPENV2G_ISO15118_CHRG_H
 
 #include <stdbool.h>
+#include "openv2g/iso15118_chrg/session_context.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -56,6 +57,7 @@ typedef struct {
 
 #define OPENV2G_PROCESSING_LIMIT_MAX 3u
 #define OPENV2G_HLC_PROCESSING_TIMER_ID 0x7001u
+#define OPENV2G_HLC_RESPONSE_TIMER_ID 0x7002u
 typedef struct {
     OpenV2g_ProtocolMessageKind kind;
     OpenV2g_TimeUs budget_us;
@@ -76,8 +78,18 @@ typedef struct {
     uint32_t generation;
     uint32_t next_event_id;
     OpenV2g_HlcSessionStatus status;
+    OpenV2g_SessionContext session_context;
+    bool require_wire_validation;
+    OpenV2g_RetainedSession retained_session;
+    bool pause_on_stop;
+    bool resume_requested;
+    OpenV2g_TimeUs retention_budget_us;
     OpenV2g_HlcEventQueue event_queue;
     OpenV2g_HlcFeatureConfig features;
+    OpenV2g_TimeUs setup_budget_us;
+    OpenV2g_TimeUs response_budget_us;
+    OpenV2g_TimeUs setup_deadline;
+    OpenV2g_TimeUs response_deadline;
     OpenV2g_ProcessingConfig processing_config;
     OpenV2g_ProcessingStage processing_stage;
     OpenV2g_SdpClient sdp_client;
@@ -118,6 +130,15 @@ typedef struct {
 /* PROJECT policy. Supervisor owns one cumulative stage timer; values are not normative defaults. */
 OpenV2g_Result OpenV2g_Iso15118Chrg_ConfigureProcessing(OpenV2g_Iso15118Chrg *hlc, const OpenV2g_ProcessingConfig *config);
 OpenV2g_Result OpenV2g_Iso15118Chrg_TickProcessing(OpenV2g_Iso15118Chrg *hlc, uint32_t generation, OpenV2g_TimeUs now);
+
+OpenV2g_Result OpenV2g_Iso15118Chrg_ConfigurePause(OpenV2g_Iso15118Chrg *hlc, bool enabled, OpenV2g_TimeUs retention_budget_us);
+OpenV2g_Result OpenV2g_Iso15118Chrg_RequestResume(OpenV2g_Iso15118Chrg *hlc, OpenV2g_TimeUs now);
+OpenV2g_Result OpenV2g_Iso15118Chrg_ConfigureCommunication(OpenV2g_Iso15118Chrg *hlc,
+    OpenV2g_TimeUs setup_budget_us, OpenV2g_TimeUs response_budget_us);
+OpenV2g_Result OpenV2g_Iso15118Chrg_TickCommunication(OpenV2g_Iso15118Chrg *hlc, uint32_t generation, OpenV2g_TimeUs now);
+OpenV2g_Result OpenV2g_Iso15118Chrg_RequireWireValidation(OpenV2g_Iso15118Chrg *hlc, bool required);
+OpenV2g_Result OpenV2g_Iso15118Chrg_ValidateWireResponse(OpenV2g_Iso15118Chrg *hlc,
+    const OpenV2g_SessionResponse *response, OpenV2g_TimeUs now);
 
 void OpenV2g_Iso15118Chrg_Init(
     OpenV2g_Iso15118Chrg *hlc,

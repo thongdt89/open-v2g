@@ -12,6 +12,9 @@ typedef struct {
     OpenV2g_TimeUs hlc_max_age_us;
     OpenV2g_TimeUs hardware_max_age_us;
     OpenV2g_TimeUs permission_validity_us;
+    uint32_t required_limit_sources; /* Zero is explicit legacy semantic-fixture profile. */
+    OpenV2g_TimeUs limit_max_age_us;
+    bool require_protocol_readiness;
     bool allow_ac_eim; /* Explicit host capability; default false. */
 } OpenV2g_PermissionConfig;
 
@@ -33,6 +36,7 @@ typedef struct {
     bool require_physical_assessment;
     OpenV2g_TimeUs assessment_max_age_us;
     const OpenV2g_PhysicalAssessment *assessment;
+    const OpenV2g_LimitEvidence *limits[OPENV2G_LIMIT_SOURCE_COUNT];
 } OpenV2g_PermissionEvidence;
 
 typedef struct {

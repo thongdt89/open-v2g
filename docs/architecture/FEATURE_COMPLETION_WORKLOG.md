@@ -185,3 +185,27 @@ Final validation: **34/34** normal with oracle, **32/32** ASan/UBSan and
 **22/22** default-codec/OpenSSL-OFF tests passed. The wire regressions retain
 43 plaintext/scenario sessions, eight TLS sessions and two secure CLI pairs.
 See [verification and source hashes](evidence/control_boundaries_verification.json).
+
+## Portable limits, session ownership and lifecycle — 30/10/2026
+
+Independent cable/peer/schedule evidence now intersects with immutable vehicle
+limits in PermissionManager. Explicit service/authorization readiness gates the
+real wire path; request projection does not rewrite source snapshots. Permission
+validity is bounded by source age/expiry. ISO15118Chrg owns portable response and
+identity validation plus aggregate setup/per-response supervision.
+
+Actual discovered IPv6 AC/DC EIM pause/resume and in-session PowerDelivery
+Renegotiate run in plaintext and TLS. Resume creates a new generation, repeats
+authorization and physical readiness, and issues new permission. Safe hardware
+generation rebinding invalidates old measurement quality until fresh feedback.
+Renegotiation regenerates peer/schedule/assessment evidence and adopts its safe
+transaction during cancellation. Six lifecycle vectors expand the feature corpus
+from 19 to 25 with independent oracle round-trips; original vectors remain intact.
+
+See [contracts and profile limits](SESSION_LIFECYCLE_IMPLEMENTATION.md). Concrete
+mapper deployment, PnC/security/ISO-20/BPT and external vehicle/supplier gates
+remain open; this increment does not claim full completion.
+
+Final verification for this increment: **38/38** normal, **36/36** ASan/UBSan
+and **25/25** default-codec/OpenSSL-OFF checks passed. See
+[verification and source hashes](evidence/session_lifecycle_verification.json).

@@ -1,9 +1,29 @@
 # Current feature completion status
 
-Revision: Draft 0.3 — 28/10/2026. **Overall implementation remains in progress.**
+Revision: Draft 0.4 — 30/10/2026. **Overall implementation remains in progress.**
 This is the current inventory; older audits/work-log entries describe their own
 snapshots. Implemented means host code, not selected supplier, frozen design,
 vehicle safety allocation or protocol conformance.
+
+## Portable session/lifecycle increment — 30/10/2026
+
+- PermissionManager now intersects independent vehicle/cable/peer/schedule
+  evidence, caps permission by source lifetime, and requires explicit correlated
+  service selection/authorization in the real wire profile. Vehicle snapshots
+  remain immutable; outgoing targets are projected separately.
+- ISO15118Chrg owns portable bounded session/EVSE/service/schedule and response
+  validation. Aggregate link/HLC setup and per-response budgets supplement the
+  earlier cumulative processing and measured-stop supervision.
+- Discovered IPv6 ISO-2 EIM pause/resume and in-session renegotiation complete
+  AC/DC flows in plaintext and with fresh TLS. Resume requires measured connected
+  safety, a new generation, repeated authorization, fresh limits/assessment and
+  new permission. Renegotiation revokes first and regenerates physical readiness.
+
+[Implementation contracts, host profiles and remaining gates](SESSION_LIFECYCLE_IMPLEMENTATION.md).
+The historical review and prior increments below retain their snapshot scope.
+Concrete generated mapper/codec placement, ingress deployment, real acquisition,
+nonvolatile/PnC recovery, physical fallback policy and production qualification
+remain open. New host behavior does not close those external gates.
 
 ## Control-boundary increment — 28/10/2026
 
@@ -54,9 +74,7 @@ settlement, identity or signature-verification evidence.
 |---|---|---|
 | TLS / credential integration | Actual verified host TLS and typed software crypto jobs, with explicit development trust/identity and optional CRL configuration | Selected supplier/HSM integration, OEM provisioning/trust/time/OCSP policy, exact-edition TLS profile and qualified resources; no automatic plaintext fallback |
 | PnC / signed receipts | Disabled feature gates; bounded opaque meter signatures; signed headers rejected | PaymentDetails, certificate install/update, challenge binding, EXI/XMLDSIG signing/verification and transactional credential lifecycle |
-| Pause/resume | ISO-2 Pause and OldSessionJoined mapper fields | Retained session context, binding to peer/service/schedule, expiry, fresh generation/evidence and new permission on resume |
-| Renegotiation | Semantic interface seam; DC/AC owner state machines | PowerDelivery Renegotiate, safe coordinator transition, evidence invalidation, fresh assessment/permission and race tests |
-| Broader timing supervision | Configurable cumulative Authorization/CPD/CableCheck budgets plus exchange/session guards | Setup/response supervision and target watchdog/physical-stop integration; select normative budgets from exact editions and vehicle timing work products |
+| Broader timing supervision | Configurable cumulative Authorization/CPD/CableCheck budgets plus exchange/session guards | Target watchdog/physical-stop integration and exact-edition configuration; select normative budgets from exact editions and vehicle timing work products |
 | Services and schedules | ServiceDetail integer/string sets; bounded three tuples/five intervals with conservative selection | Multiple payment/service/mode offers, more parameter forms, tariffs/profiles, notifications and richer completion/schedule policy |
 | Broader AC | Single-phase EIM through real IPv4/IPv6 sockets | Three-phase, phase-specific limits, actual OBC control/measurement and complete AC protocol feature coverage |
 | Broader metering | ISO-2 unsigned host AC/DC receipt loop | DIN metering branches, authenticated meter data, signed receipt policy and compliant signature generation/verification |

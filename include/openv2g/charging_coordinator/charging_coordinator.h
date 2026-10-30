@@ -29,6 +29,7 @@ typedef struct {
     OpenV2g_PermissionConfig permission;
     bool require_physical_assessment;
     OpenV2g_TimeUs assessment_max_age_us;
+    OpenV2g_TimeUs link_setup_timeout_us; /* Zero disables legacy fixture supervision. */
     OpenV2g_TimeUs stop_timeout_us; /* Required PROJECT host budget, not a normative timer. */
 } OpenV2g_CoordinatorConfig;
 
@@ -57,6 +58,8 @@ typedef struct {
     OpenV2g_HlcSessionStatus hlc;
     OpenV2g_HlcEvent last_hlc_event;
     OpenV2g_ChargeHardwareStatus hardware;
+    OpenV2g_LimitEvidence limits[OPENV2G_LIMIT_SOURCE_COUNT];
+    bool has_limits[OPENV2G_LIMIT_SOURCE_COUNT];
     bool has_cp_pp;
     bool has_energy;
     bool has_link;
@@ -66,7 +69,14 @@ typedef struct {
     OpenV2g_TimeUs hlc_event_overflow_time;
     bool has_hardware;
     bool teardown_started;
+    bool renegotiation_pending;
+    bool renegotiation_safe;
+    OpenV2g_Result renegotiation_result;
+    OpenV2g_TimeUs renegotiation_started;
+    OpenV2g_TimeUs renegotiation_deadline;
+    uint32_t renegotiation_hardware_sequence;
     OpenV2g_TimeUs owner_time;
+    OpenV2g_TimeUs link_setup_deadline;
     OpenV2g_TimeUs stop_started;
     OpenV2g_TimeUs stop_deadline;
     OpenV2g_Result stop_result;
@@ -89,6 +99,11 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_Init(
 OpenV2g_Result OpenV2g_ChargingCoordinator_OnQualifiedCpPp(
     OpenV2g_ChargingCoordinator *coordinator,
     const OpenV2g_QualifiedCpPp *cp_pp,
+    OpenV2g_TimeUs now);
+
+/* Serialized owner operation; copies one independently timestamped bound. */
+OpenV2g_Result OpenV2g_ChargingCoordinator_OnLimitEvidence(
+    OpenV2g_ChargingCoordinator *coordinator, const OpenV2g_LimitEvidence *evidence,
     OpenV2g_TimeUs now);
 
 OpenV2g_Result OpenV2g_ChargingCoordinator_OnEnergySnapshot(
@@ -131,6 +146,9 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_RequestEnergyTransfer(
 OpenV2g_Result OpenV2g_ChargingCoordinator_ApplyAssessment(
     OpenV2g_ChargingCoordinator *coordinator, const OpenV2g_PhysicalAssessment *assessment,
     uint32_t expected_correlation_id, OpenV2g_TimeUs now);
+
+OpenV2g_Result OpenV2g_ChargingCoordinator_BeginRenegotiation(
+    OpenV2g_ChargingCoordinator *coordinator, OpenV2g_TimeUs now);
 
 OpenV2g_Result OpenV2g_ChargingCoordinator_BeginProtocolStop(
     OpenV2g_ChargingCoordinator *coordinator, OpenV2g_TimeUs now);

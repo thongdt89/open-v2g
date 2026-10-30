@@ -5,6 +5,42 @@
 
 #include "openv2g/common/validation.h"
 
+static bool limits_valid(const OpenV2g_PowerLimits *limits)
+{
+    return limits->max_import_power_w >= 0 && limits->max_export_power_w >= 0 &&
+        limits->max_charge_current_ma >= 0 && limits->max_discharge_current_ma >= 0 &&
+        limits->max_voltage_mv > 0u;
+}
+static bool intersect_limits(const OpenV2g_PermissionConfig *config,
+    const OpenV2g_PermissionEvidence *evidence, OpenV2g_TimeUs now, OpenV2g_PowerLimits *out)
+{
+    unsigned i;
+    if ((config->required_limit_sources & ~((1u << OPENV2G_LIMIT_SOURCE_COUNT) - 1u)) != 0u ||
+        !limits_valid(&evidence->energy->limits)) { return false; }
+    *out = evidence->energy->limits;
+    for (i = 0u; i < OPENV2G_LIMIT_SOURCE_COUNT; ++i) {
+        const OpenV2g_LimitEvidence *sample = evidence->limits[i];
+        bool required = (config->required_limit_sources & (1u << i)) != 0u;
+        if (sample == NULL) { if (required) { return false; } else { continue; } }
+        if (sample->source != (OpenV2g_LimitSource)i || sample->mode != evidence->hlc->selected_mode ||
+            !OpenV2g_EnvelopeIsCurrent(&sample->env, evidence->generation, now, config->limit_max_age_us) ||
+            sample->valid_until <= now || sample->valid_until <= sample->env.timestamp ||
+            sample->correlation_id == 0u || !limits_valid(&sample->limits)) { return false; }
+#define INTERSECT(field) if (sample->limits.field < out->field) { out->field = sample->limits.field; }
+        INTERSECT(max_import_power_w) INTERSECT(max_export_power_w)
+        INTERSECT(max_charge_current_ma) INTERSECT(max_discharge_current_ma)
+        INTERSECT(max_voltage_mv) INTERSECT(ramp_limit_w_per_s)
+#undef INTERSECT
+    }
+    return out->max_import_power_w > 0 && out->max_charge_current_ma > 0;
+}
+
+static void cap_validity(OpenV2g_TimeUs timestamp, OpenV2g_TimeUs age, OpenV2g_TimeUs *until)
+{
+    OpenV2g_TimeUs expiry = timestamp > UINT64_MAX - age ? UINT64_MAX : timestamp + age;
+    if (expiry < *until) { *until = expiry; }
+}
+
 static bool evidence_is_complete(
     const OpenV2g_PermissionConfig *config,
     const OpenV2g_PermissionEvidence *evidence,
@@ -125,6 +161,7 @@ OpenV2g_Result OpenV2g_PermissionManager_Evaluate(
     uint32_t permission_id;
     uint32_t publication_sequence;
     bool preparation_only = false;
+    OpenV2g_PowerLimits allowed_limits;
 
     if ((manager == NULL) || (config == NULL) || (evidence == NULL) ||
         (config->permission_validity_us == 0u) ||
@@ -140,7 +177,9 @@ OpenV2g_Result OpenV2g_PermissionManager_Evaluate(
         OPENV2G_REASON_PRECONDITION);
     manager->current.env.sequence_counter = publication_sequence;
 
-    if (!evidence_is_complete(config, evidence, now)) {
+    if (!evidence_is_complete(config, evidence, now) ||
+        !intersect_limits(config, evidence, now, &allowed_limits) ||
+        (config->require_protocol_readiness && (!evidence->hlc->service_selected || !evidence->hlc->authorized))) {
         return OPENV2G_RESULT_REJECTED;
     }
 
@@ -178,8 +217,30 @@ OpenV2g_Result OpenV2g_PermissionManager_Evaluate(
             : OPENV2G_ACTION_PREPARE;
     manager->current.mode = evidence->hlc->selected_mode;
     manager->current.direction = OPENV2G_DIRECTION_IMPORT_TO_EV;
-    manager->current.limits = evidence->energy->limits;
+    manager->current.limits = allowed_limits;
     manager->current.valid_until = now + config->permission_validity_us;
+    cap_validity(evidence->cp_pp->env.timestamp, config->cp_pp_max_age_us, &manager->current.valid_until);
+    cap_validity(evidence->energy->env.timestamp, config->energy_max_age_us, &manager->current.valid_until);
+    cap_validity(evidence->link->env.timestamp, config->link_max_age_us, &manager->current.valid_until);
+    cap_validity(evidence->hlc->env.timestamp, config->hlc_max_age_us, &manager->current.valid_until);
+    cap_validity(evidence->hardware->env.timestamp, config->hardware_max_age_us, &manager->current.valid_until);
+    if (evidence->require_physical_assessment && manager->current.action == OPENV2G_ACTION_ENERGIZE && evidence->assessment != NULL && evidence->coordinator_state != OPENV2G_COORDINATOR_ENERGY_TRANSFER) {
+        cap_validity(evidence->assessment->env.timestamp, evidence->assessment_max_age_us, &manager->current.valid_until);
+    }
+
+    {
+        unsigned i;
+        for (i = 0u; i < OPENV2G_LIMIT_SOURCE_COUNT; ++i) {
+            if (evidence->limits[i] != NULL) { cap_validity(evidence->limits[i]->env.timestamp, config->limit_max_age_us, &manager->current.valid_until); }
+            if (evidence->limits[i] != NULL && evidence->limits[i]->valid_until < manager->current.valid_until) {
+                manager->current.valid_until = evidence->limits[i]->valid_until;
+            }
+        }
+    }
+    if (manager->current.valid_until <= now) {
+        OpenV2g_PermissionManager_Revoke(manager, evidence->generation, now, OPENV2G_REASON_STALE_DATA);
+        return OPENV2G_RESULT_REJECTED;
+    }
     return OPENV2G_RESULT_OK;
 }
 
