@@ -52,7 +52,7 @@ static int test_hardware_mismatch_injection(void)
     feedback.positive_contactor_closed = true;
     TEST_ASSERT(OpenV2g_HostSimulation_InjectHardwareFeedback(
                     &simulation,
-                    &feedback) == OPENV2G_RESULT_REJECTED);
+                    &feedback, 331u) == OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(simulation.coordinator.state_machine.state ==
                 OPENV2G_COORDINATOR_STOPPING);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_GetPermission(

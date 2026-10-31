@@ -1,6 +1,6 @@
 # Coordinator control-boundary changes
 
-Revision: Draft 0.1 — 28/10/2026. PROJECT host implementation, following
+Revision: Draft 0.2 — 31/10/2026. PROJECT host implementation, following
 Atomic Rev.3 §§4, 5, 25 and 26. This revision changes C11 interfaces; it does not
 change imported AUTOSAR datatypes or freeze supplier/vehicle contracts.
 
@@ -65,9 +65,9 @@ provisional host budgets, not protocol timer values or vehicle safety deadlines.
 |---|---|
 | `BeginProtocolStop(now)` | DENY first, request safe hardware once, retain HLC/PLC for the protocol tail, arm the owner deadline |
 | `Stop(now, reason)` | DENY first, retain the hardware result, then request HLC/PLC teardown; repeated calls preserve the result and do not repeat physical commands |
-| `OnHardwareStatus(status)` | Qualify measured SAFE, open contactors, inactive precharge and zero current using a newer hardware sequence after the command and before its deadline |
-| `OnHlcStatus(status)` | An accepted asynchronous stop is completed by current IDLE evidence |
-| `OnLinkStatus(status)` | An accepted asynchronous stop is completed by current DOWN evidence |
+| `OnHardwareStatus(status, now)` | Qualify measured SAFE, open contactors, inactive precharge and zero current using a newer hardware sequence after the command and before its deadline |
+| `OnHlcStatus(status, now)` | An accepted asynchronous stop is completed by current IDLE evidence |
+| `OnLinkStatus(status, now)` | An accepted asynchronous stop is completed by current DOWN evidence |
 | `Tick(now)` | Force protocol-tail teardown at the deadline; missing physical confirmation latches a timeout fault, as does incomplete asynchronous teardown |
 | `RestartConnected(now)` | Explicitly restart from connected-safe completion with fresh CP/hardware and no latched fault; create a new generation and clear old usable session evidence |
 
@@ -106,3 +106,48 @@ Observed final checks: **34/34** normal generated-code/OpenSSL/oracle tests,
 tests passed. [Verification snapshot and source hashes](evidence/control_boundaries_verification.json).
 These counts supersede earlier counts only for this host increment. The prior
 security coverage snapshot remains tied to its own recorded source hashes.
+
+
+## Review fixes: overflow and owner time — 31/10/2026
+
+`MarkHlcEventOverflow(generation, now)` revokes permission first and routes READY
+or ENERGY_TRANSFER (including renegotiation) through the existing idempotent Stop.
+It keeps the resynchronization requirement and first overflow watermark until a
+fresh authoritative HLC status arrives. Resynchronization cannot cancel a stop.
+Repeated overflow preserves the stop result, original deadline and command count.
+Existing hardware acceptance/rejection and measured-confirmation rules apply.
+No actuator retry or new vehicle deadline is introduced.
+
+The three PROJECT ingress operations now take an explicit `OpenV2g_TimeUs now`
+from the serialized owner dispatch/receipt clock. It is separate from the producer
+`env.timestamp`; imported AUTOSAR types and envelope layouts are unchanged.
+
+| Operation | Trusted input and ownership | Evidence and failure contract |
+|---|---|---|
+| `OnHlcStatus(coordinator, hlc, now)` | Owner supplies monotonic receipt time; HLC supplies copied source evidence | Source future/zero/stale/invalid quality fails closed. ERROR reactions use `now`; no source time sets a deadline. |
+| `OnLinkStatus(coordinator, link, now)` | Owner supplies receipt time; PLC owns source state/time | Same time validation; link-generation mismatch invalidates evidence. HLC start and DOWN reactions use `now`. |
+| `OnHardwareStatus(coordinator, hardware, now)` | Owner supplies receipt time; hardware owns measured evidence | Same validation; FAULT reactions use `now`. Safe/renegotiation proof must be sourced and received before the existing deadline. |
+| `HostSimulation_InjectHardwareFeedback(simulation, feedback, now)` | Simulator caller supplies its explicit owner clock | Measured producer timestamp does not become coordinator receipt time. |
+
+All four are serialized nonqueued PROJECT calls with copied bounded payloads;
+`now` is an input, not a producer-supplied envelope field. Zero/rewinding receipt
+time is rejected without state/clock change. Unrelated generation is rejected
+before adopting receipt time. Current-generation invalid evidence removes its
+usable flag and revokes permission; in active charging it starts supervised stop.
+Invalid producer timestamps/sequences are not retained as ordering watermarks.
+Older/reordered normal samples are rejected; fault indications in reordered or
+duplicate envelopes fail closed. A valid duplicate cannot refresh source age.
+There is no invented future-clock tolerance: source time must be at most `now`
+and within the existing configured source age.
+
+Stop rejects zero/rewinding owner time and never rearms an existing transaction.
+Late measured-safe or asynchronous teardown callbacks cannot backdate completion
+past a deadline by carrying an earlier source timestamp. Tick uses the owner clock
+and the existing configured timeout escalation. Fresh later status may restore a
+source's evidence, but STOPPING/teardown guards prevent renewed energy transfer.
+
+Desired-behavior regression: `openv2g_test_coordinator_fault_ingress`, including
+both active states, safe-request OK/ACCEPTED/BUSY/REJECTED, revoke-before-command,
+missing resync/measurement, future/zero/invalid/stale/reordered/duplicate faults on
+all three paths, generation isolation, repeated-fault deadlines, clock rewind,
+and late measured/teardown evidence. Dated historical review probes are preserved.

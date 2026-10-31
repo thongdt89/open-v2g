@@ -110,13 +110,18 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnEnergySnapshot(
     OpenV2g_ChargingCoordinator *coordinator,
     const OpenV2g_EvEnergySnapshot *energy);
 
+/* Serialized PROJECT ingress: now is trusted monotonic owner receipt time,
+ * independent of the producer envelope. Invalid current-generation evidence
+ * fails closed without adopting its timestamp or sequence watermark. */
 OpenV2g_Result OpenV2g_ChargingCoordinator_OnLinkStatus(
     OpenV2g_ChargingCoordinator *coordinator,
-    const OpenV2g_PlcLinkStatus *link);
+    const OpenV2g_PlcLinkStatus *link,
+    OpenV2g_TimeUs now);
 
 OpenV2g_Result OpenV2g_ChargingCoordinator_OnHlcStatus(
     OpenV2g_ChargingCoordinator *coordinator,
-    const OpenV2g_HlcSessionStatus *hlc);
+    const OpenV2g_HlcSessionStatus *hlc,
+    OpenV2g_TimeUs now);
 
 OpenV2g_Result OpenV2g_ChargingCoordinator_OnHlcEvent(
     OpenV2g_ChargingCoordinator *coordinator,
@@ -129,7 +134,8 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_MarkHlcEventOverflow(
 
 OpenV2g_Result OpenV2g_ChargingCoordinator_OnHardwareStatus(
     OpenV2g_ChargingCoordinator *coordinator,
-    const OpenV2g_ChargeHardwareStatus *hardware);
+    const OpenV2g_ChargeHardwareStatus *hardware,
+    OpenV2g_TimeUs now);
 
 OpenV2g_Result OpenV2g_ChargingCoordinator_EvaluatePermission(
     OpenV2g_ChargingCoordinator *coordinator,

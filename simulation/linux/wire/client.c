@@ -39,7 +39,7 @@ static bool sync_hlc(OvWireClient *client)
     uint32_t dropped = 0u;
     if (OpenV2g_Iso15118Chrg_TakeEventOverflow(&sim->hlc, sim->coordinator.generation, &dropped) == OPENV2G_RESULT_OK && dropped != 0u) { return false; }
     if (sim->hlc_status_port.read(sim->hlc_status_port.context, &status) != OPENV2G_RESULT_OK ||
-        !ok(OpenV2g_ChargingCoordinator_OnHlcStatus(&sim->coordinator, &status))) { return false; }
+        !ok(OpenV2g_ChargingCoordinator_OnHlcStatus(&sim->coordinator, &status, Ov2g_OsNow()))) { return false; }
     while (OpenV2g_Iso15118Chrg_PopEvent(&sim->hlc, sim->coordinator.generation, &event) == OPENV2G_RESULT_OK) {
         if (!ok(OpenV2g_ChargingCoordinator_OnHlcEvent(&sim->coordinator, &event))) { return false; }
     }
@@ -108,7 +108,7 @@ static bool supervise(void *context, OpenV2g_TimeUs now)
     }
     if (sim->config.simulate_slac && sim->plc.status.state == OPENV2G_PLC_LINK_READY &&
         OpenV2g_PlcLinkManager_PumpSlac(&sim->plc,client->io.generation,now) != OPENV2G_RESULT_OK) {
-        (void)OpenV2g_ChargingCoordinator_OnLinkStatus(&sim->coordinator,&sim->plc.status); return false;
+        (void)OpenV2g_ChargingCoordinator_OnLinkStatus(&sim->coordinator,&sim->plc.status, now); return false;
     }
     /* Expiry is evaluated before renewal; a late owner turn cannot revive it. */
     OpenV2g_ChargingCoordinator_Tick(&sim->coordinator, now);
@@ -367,7 +367,7 @@ static bool exchange_protocol(OvWireClient *client)
         OpenV2g_ChargeHardwareStatus hardware;
         if (!ok(OpenV2g_ChargingCoordinator_BeginRenegotiation(&sim->coordinator, now)) ||
             sim->hardware_status_port.read(sim->hardware_status_port.context, &hardware) != OPENV2G_RESULT_OK ||
-            !ok(OpenV2g_ChargingCoordinator_OnHardwareStatus(&sim->coordinator, &hardware)) ||
+            !ok(OpenV2g_ChargingCoordinator_OnHardwareStatus(&sim->coordinator, &hardware, now)) ||
             !sim->coordinator.renegotiation_safe || sim->coordinator.permission_manager.current.decision != OPENV2G_PERMISSION_DENY) { return false; }
     }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_STOP) {
@@ -523,7 +523,7 @@ static bool exchange_protocol(OvWireClient *client)
             (pending->kind == OPENV2G_PROTOCOL_MESSAGE_PRECHARGE ? OPENV2G_ASSESS_PRECHARGE : OPENV2G_ASSESS_WELDING);
         if (client->assessment_port.assess == NULL ||
             sim->hardware_status_port.read(sim->hardware_status_port.context, &hardware) != OPENV2G_RESULT_OK ||
-            !ok(OpenV2g_ChargingCoordinator_OnHardwareStatus(&sim->coordinator, &hardware)) ||
+            !ok(OpenV2g_ChargingCoordinator_OnHardwareStatus(&sim->coordinator, &hardware, now)) ||
             !ok(client->assessment_port.assess(client->assessment_port.context, kind, client->io.generation,
                 pending->correlation_id, now, request.voltage_mv, response.voltage_mv, &hardware, &assessment)) ||
             !ok(OpenV2g_ChargingCoordinator_ApplyAssessment(&sim->coordinator, &assessment, pending->correlation_id, now))) { return false; }
@@ -641,7 +641,7 @@ stop:
     {
         OpenV2g_ChargeHardwareStatus hardware;
         if (sim->hardware_status_port.read(sim->hardware_status_port.context, &hardware) == OPENV2G_RESULT_OK) {
-            (void)OpenV2g_ChargingCoordinator_OnHardwareStatus(&sim->coordinator, &hardware);
+            (void)OpenV2g_ChargingCoordinator_OnHardwareStatus(&sim->coordinator, &hardware, Ov2g_OsNow());
         }
         OpenV2g_ChargingCoordinator_Tick(&sim->coordinator, Ov2g_OsNow());
     }

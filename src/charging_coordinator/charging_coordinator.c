@@ -279,44 +279,43 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnEnergySnapshot(
 
 OpenV2g_Result OpenV2g_ChargingCoordinator_OnLinkStatus(
     OpenV2g_ChargingCoordinator *coordinator,
-    const OpenV2g_PlcLinkStatus *link)
+    const OpenV2g_PlcLinkStatus *link,
+    OpenV2g_TimeUs now)
 {
     OpenV2g_Result result;
 
     if (coordinator == NULL || link == NULL || coordinator->generation == 0u ||
-        link->env.session_generation != coordinator->generation ||
-        (link->env.timestamp != 0u && obsolete(&coordinator->link.env, &link->env))) { return OPENV2G_RESULT_REJECTED; }
-    if (link->env.quality != OPENV2G_QUALITY_VALID || link->env.timestamp == 0u || link->link_generation != coordinator->generation) {
-        OpenV2g_CommEnvelope previous = coordinator->link.env;
-        coordinator->link = *link; coordinator->has_link = false;
-        if (link->env.timestamp == 0u) { coordinator->link.env.timestamp = previous.timestamp;
-            coordinator->link.env.sequence_counter = previous.sequence_counter; }
+        link->env.session_generation != coordinator->generation || now == 0u || now < coordinator->owner_time) { return OPENV2G_RESULT_REJECTED; }
+    coordinator->owner_time = now;
+    if (!OpenV2g_EnvelopeIsCurrent(&link->env, coordinator->generation, now, coordinator->config.permission.link_max_age_us) || link->link_generation != coordinator->generation) {
+        coordinator->has_link = false;
         evidence_lost(coordinator); return OPENV2G_RESULT_REJECTED;
     }
-    if ((coordinator == NULL) || (link == NULL) ||
-        (link->env.session_generation != coordinator->generation) ||
-        (link->link_generation != coordinator->generation) ||
-        (link->env.quality != OPENV2G_QUALITY_VALID) ||
-        (link->env.timestamp == 0u)) {
+    if (obsolete(&coordinator->link.env, &link->env) ||
+        (coordinator->link.env.session_generation == coordinator->generation &&
+         coordinator->link.env.sequence_counter != 0u && coordinator->link.env.sequence_counter == link->env.sequence_counter &&
+         !duplicate(&coordinator->link.env, &link->env))) {
+        if (link->state == OPENV2G_PLC_DOWN) { coordinator->has_link = false;
+            evidence_lost(coordinator); }
         return OPENV2G_RESULT_REJECTED;
     }
-
     if (duplicate(&coordinator->link.env, &link->env)) {
+        if (link->state == OPENV2G_PLC_DOWN) {
+            coordinator->has_link = false;
+            evidence_lost(coordinator); return OPENV2G_RESULT_REJECTED;
+        }
         return coordinator->has_link ? OPENV2G_RESULT_OK : OPENV2G_RESULT_REJECTED;
     }
-    if (coordinator->link.env.session_generation == coordinator->generation &&
-        coordinator->link.env.sequence_counter != 0u &&
-        coordinator->link.env.sequence_counter == link->env.sequence_counter) { return OPENV2G_RESULT_REJECTED; }
     coordinator->link = *link;
     coordinator->has_link = true;
-    if (coordinator->teardown_started && link->env.timestamp >= coordinator->stop_started && link->state == OPENV2G_PLC_DOWN) { coordinator->link_stop_completed = true; }
+    if (coordinator->teardown_started && now < coordinator->stop_deadline && link->env.timestamp >= coordinator->stop_started && link->state == OPENV2G_PLC_DOWN) { coordinator->link_stop_completed = true; }
 
     if ((link->state == OPENV2G_PLC_LINK_READY) &&
         (coordinator->state_machine.state == OPENV2G_COORDINATOR_LINK_SETUP)) {
         result = coordinator->ports.hlc.start(
             coordinator->ports.hlc.context,
             coordinator->generation,
-            link->env.timestamp);
+            now);
         if (is_success(result)) {
             coordinator->link_setup_deadline = 0u;
             (void)OpenV2g_ChargeStateMachine_Dispatch(
@@ -332,12 +331,12 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnLinkStatus(
         OpenV2g_FaultCoordinator_Raise(
             &coordinator->fault_coordinator,
             coordinator->generation,
-            link->env.timestamp,
+            now,
             OPENV2G_FAULT_CONTROLLED_STOP,
             OPENV2G_REASON_LINK_LOSS);
         return OpenV2g_ChargingCoordinator_Stop(
             coordinator,
-            link->env.timestamp,
+            now,
             OPENV2G_REASON_LINK_LOSS);
     }
 
@@ -346,47 +345,50 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnLinkStatus(
 
 OpenV2g_Result OpenV2g_ChargingCoordinator_OnHlcStatus(
     OpenV2g_ChargingCoordinator *coordinator,
-    const OpenV2g_HlcSessionStatus *hlc)
+    const OpenV2g_HlcSessionStatus *hlc,
+    OpenV2g_TimeUs now)
 {
     if (coordinator == NULL || hlc == NULL || coordinator->generation == 0u ||
-        hlc->env.session_generation != coordinator->generation ||
-        (hlc->env.timestamp != 0u && obsolete(&coordinator->hlc.env, &hlc->env))) { return OPENV2G_RESULT_REJECTED; }
-    if (hlc->env.quality != OPENV2G_QUALITY_VALID || hlc->env.timestamp == 0u) {
-        OpenV2g_CommEnvelope previous = coordinator->hlc.env;
-        coordinator->hlc = *hlc; coordinator->has_hlc = false;
-        if (hlc->env.timestamp == 0u) { coordinator->hlc.env.timestamp = previous.timestamp;
-            coordinator->hlc.env.sequence_counter = previous.sequence_counter; }
+        hlc->env.session_generation != coordinator->generation || now == 0u || now < coordinator->owner_time) { return OPENV2G_RESULT_REJECTED; }
+    coordinator->owner_time = now;
+    if (!OpenV2g_EnvelopeIsCurrent(&hlc->env, coordinator->generation, now, coordinator->config.permission.hlc_max_age_us)) {
+        coordinator->has_hlc = false;
         evidence_lost(coordinator); return OPENV2G_RESULT_REJECTED;
     }
-    if ((coordinator == NULL) || (hlc == NULL) ||
-        (hlc->env.session_generation != coordinator->generation) ||
-        (hlc->env.quality != OPENV2G_QUALITY_VALID) ||
-        (hlc->env.timestamp == 0u) ||
-        (coordinator->hlc_event_resync_required &&
-         (hlc->env.timestamp < coordinator->hlc_event_overflow_time))) {
+    if (obsolete(&coordinator->hlc.env, &hlc->env) ||
+        (coordinator->hlc.env.session_generation == coordinator->generation &&
+         coordinator->hlc.env.sequence_counter != 0u && coordinator->hlc.env.sequence_counter == hlc->env.sequence_counter &&
+         !duplicate(&coordinator->hlc.env, &hlc->env))) {
+        if (hlc->state == OPENV2G_HLC_ERROR) { coordinator->has_hlc = false;
+            evidence_lost(coordinator); }
+        return OPENV2G_RESULT_REJECTED;
+    }
+    if (coordinator->hlc_event_resync_required && hlc->env.timestamp < coordinator->hlc_event_overflow_time) {
+        if (hlc->state == OPENV2G_HLC_ERROR) { coordinator->has_hlc = false; evidence_lost(coordinator); }
         return OPENV2G_RESULT_REJECTED;
     }
     if (duplicate(&coordinator->hlc.env, &hlc->env)) {
+        if (hlc->state == OPENV2G_HLC_ERROR) {
+            coordinator->has_hlc = false;
+            evidence_lost(coordinator); return OPENV2G_RESULT_REJECTED;
+        }
         return coordinator->has_hlc ? OPENV2G_RESULT_OK : OPENV2G_RESULT_REJECTED;
     }
-    if (coordinator->hlc.env.session_generation == coordinator->generation &&
-        coordinator->hlc.env.sequence_counter != 0u &&
-        coordinator->hlc.env.sequence_counter == hlc->env.sequence_counter) { return OPENV2G_RESULT_REJECTED; }
     coordinator->hlc = *hlc;
     coordinator->has_hlc = true;
-    if (coordinator->teardown_started && hlc->env.timestamp >= coordinator->stop_started && hlc->state == OPENV2G_HLC_IDLE) { coordinator->hlc_stop_completed = true; }
+    if (coordinator->teardown_started && now < coordinator->stop_deadline && hlc->env.timestamp >= coordinator->stop_started && hlc->state == OPENV2G_HLC_IDLE) { coordinator->hlc_stop_completed = true; }
     coordinator->hlc_event_resync_required = false;
     coordinator->hlc_event_overflow_time = 0u;
     if (hlc->state == OPENV2G_HLC_ERROR) {
         OpenV2g_FaultCoordinator_Raise(
             &coordinator->fault_coordinator,
             coordinator->generation,
-            hlc->env.timestamp,
+            now,
             OPENV2G_FAULT_CONTROLLED_STOP,
             hlc->env.reason);
         return OpenV2g_ChargingCoordinator_Stop(
             coordinator,
-            hlc->env.timestamp,
+            now,
             hlc->env.reason);
     }
     return OPENV2G_RESULT_OK;
@@ -415,56 +417,63 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_MarkHlcEventOverflow(
     OpenV2g_TimeUs now)
 {
     if ((coordinator == NULL) || (generation == 0u) ||
-        (generation != coordinator->generation) || (now == 0u)) {
+        (generation != coordinator->generation) || (now == 0u) || now < coordinator->owner_time) {
         return OPENV2G_RESULT_REJECTED;
     }
 
+    coordinator->owner_time = now;
     coordinator->has_hlc_event = false;
+    if (!coordinator->hlc_event_resync_required) { coordinator->hlc_event_overflow_time = now; }
     coordinator->hlc_event_resync_required = true;
-    coordinator->hlc_event_overflow_time = now;
     OpenV2g_PermissionManager_Revoke(
         &coordinator->permission_manager,
         generation,
         now,
         OPENV2G_REASON_RESOURCE);
+    if (coordinator->state_machine.state == OPENV2G_COORDINATOR_READY_FOR_ENERGY ||
+        coordinator->state_machine.state == OPENV2G_COORDINATOR_ENERGY_TRANSFER || coordinator->renegotiation_pending || coordinator->teardown_started) {
+        return OpenV2g_ChargingCoordinator_Stop(coordinator,now,OPENV2G_REASON_RESOURCE);
+    }
     return OPENV2G_RESULT_ACCEPTED;
 }
 
 OpenV2g_Result OpenV2g_ChargingCoordinator_OnHardwareStatus(
     OpenV2g_ChargingCoordinator *coordinator,
-    const OpenV2g_ChargeHardwareStatus *hardware)
+    const OpenV2g_ChargeHardwareStatus *hardware,
+    OpenV2g_TimeUs now)
 {
     if (coordinator == NULL || hardware == NULL || coordinator->generation == 0u ||
-        hardware->env.session_generation != coordinator->generation ||
-        (hardware->env.timestamp != 0u && obsolete(&coordinator->hardware.env, &hardware->env))) { return OPENV2G_RESULT_REJECTED; }
-    if (hardware->env.quality != OPENV2G_QUALITY_VALID || hardware->env.timestamp == 0u) {
-        OpenV2g_CommEnvelope previous = coordinator->hardware.env;
-        coordinator->hardware = *hardware; coordinator->has_hardware = false;
-        if (hardware->env.timestamp == 0u) { coordinator->hardware.env.timestamp = previous.timestamp;
-            coordinator->hardware.env.sequence_counter = previous.sequence_counter; }
+        hardware->env.session_generation != coordinator->generation || now == 0u || now < coordinator->owner_time) { return OPENV2G_RESULT_REJECTED; }
+    coordinator->owner_time = now;
+    if (!OpenV2g_EnvelopeIsCurrent(&hardware->env, coordinator->generation, now, coordinator->config.permission.hardware_max_age_us)) {
+        coordinator->has_hardware = false;
         coordinator->stop_measured_safe = false;
         evidence_lost(coordinator); return OPENV2G_RESULT_REJECTED;
     }
-    if ((coordinator == NULL) || (hardware == NULL) ||
-        (hardware->env.session_generation != coordinator->generation) ||
-        (hardware->env.quality != OPENV2G_QUALITY_VALID) ||
-        (hardware->env.timestamp == 0u)) {
+    if (obsolete(&coordinator->hardware.env, &hardware->env) ||
+        (coordinator->hardware.env.session_generation == coordinator->generation &&
+         coordinator->hardware.env.sequence_counter != 0u && coordinator->hardware.env.sequence_counter == hardware->env.sequence_counter &&
+         !duplicate(&coordinator->hardware.env, &hardware->env))) {
+        if (hardware->state == OPENV2G_HW_FAULT) { coordinator->has_hardware = false;
+            coordinator->stop_measured_safe = false;
+            evidence_lost(coordinator); }
         return OPENV2G_RESULT_REJECTED;
     }
     if (duplicate(&coordinator->hardware.env, &hardware->env)) {
+        if (hardware->state == OPENV2G_HW_FAULT) {
+            coordinator->has_hardware = false; coordinator->stop_measured_safe = false;
+            evidence_lost(coordinator); return OPENV2G_RESULT_REJECTED;
+        }
         return coordinator->has_hardware ? OPENV2G_RESULT_OK : OPENV2G_RESULT_REJECTED;
     }
-    if (coordinator->hardware.env.session_generation == coordinator->generation &&
-        coordinator->hardware.env.sequence_counter != 0u &&
-        coordinator->hardware.env.sequence_counter == hardware->env.sequence_counter) { return OPENV2G_RESULT_REJECTED; }
     coordinator->hardware = *hardware;
     coordinator->has_hardware = true;
-    if (coordinator->renegotiation_pending && hardware->env.timestamp >= coordinator->renegotiation_started &&
+    if (coordinator->renegotiation_pending && now < coordinator->renegotiation_deadline && hardware->env.timestamp >= coordinator->renegotiation_started &&
         hardware->env.timestamp < coordinator->renegotiation_deadline && hardware->env.sequence_counter > coordinator->renegotiation_hardware_sequence &&
         hardware->state == OPENV2G_HW_SAFE && !hardware->positive_contactor_closed && !hardware->negative_contactor_closed &&
         !hardware->precharge_active && hardware->measured_current_ma == 0) { coordinator->renegotiation_safe = true; }
     if (coordinator->safe_requested) { coordinator->stop_measured_safe = false; }
-    if (coordinator->safe_requested && is_success(coordinator->stop_result) &&
+    if (coordinator->safe_requested && now < coordinator->stop_deadline && is_success(coordinator->stop_result) &&
         hardware->env.timestamp >= coordinator->stop_started && hardware->env.timestamp < coordinator->stop_deadline &&
         hardware->env.sequence_counter > coordinator->stop_hardware_sequence && hardware->state == OPENV2G_HW_SAFE &&
         !hardware->positive_contactor_closed && !hardware->negative_contactor_closed &&
@@ -475,12 +484,12 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnHardwareStatus(
         OpenV2g_FaultCoordinator_Raise(
             &coordinator->fault_coordinator,
             coordinator->generation,
-            hardware->env.timestamp,
+            now,
             OPENV2G_FAULT_EMERGENCY_STOP,
             OPENV2G_REASON_HW_MISMATCH);
         return OpenV2g_ChargingCoordinator_Stop(
             coordinator,
-            hardware->env.timestamp,
+            now,
             OPENV2G_REASON_HW_MISMATCH);
     }
     return OPENV2G_RESULT_OK;
@@ -688,9 +697,10 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_Stop(
     OpenV2g_Result hlc_result;
     OpenV2g_Result link_result;
 
-    if (coordinator == NULL) {
+    if (coordinator == NULL || now == 0u || now < coordinator->owner_time) {
         return OPENV2G_RESULT_REJECTED;
     }
+    coordinator->owner_time = now;
     if (coordinator->teardown_started) {
         return coordinator->stop_result;
     }
@@ -718,7 +728,6 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_Stop(
         &coordinator->state_machine,
         OPENV2G_CSM_EVENT_STOP_REQUESTED);
 
-    coordinator->owner_time = now;
     hardware_result = request_safe(coordinator, now, reason);
     hlc_result = coordinator->ports.hlc.stop(
         coordinator->ports.hlc.context,

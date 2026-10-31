@@ -70,12 +70,12 @@ int main(void)
     status.state = OPENV2G_HLC_SDP;
     TEST_ASSERT(OpenV2g_ChargingCoordinator_OnHlcStatus(
                     &coordinator,
-                    &status) == OPENV2G_RESULT_REJECTED);
+                    &status, 130u) == OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(coordinator.hlc_event_resync_required);
     status.env.timestamp = 130u;
     TEST_ASSERT(OpenV2g_ChargingCoordinator_OnHlcStatus(
                     &coordinator,
-                    &status) == OPENV2G_RESULT_OK);
+                    &status, 130u) == OPENV2G_RESULT_OK);
     TEST_ASSERT(!coordinator.hlc_event_resync_required);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_OnHlcEvent(
                     &coordinator,

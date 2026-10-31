@@ -130,7 +130,7 @@ OpenV2g_Result OpenV2g_HostSimulation_InitializeHardwareSafe(
 
 OpenV2g_Result OpenV2g_HostSimulation_InjectHardwareFeedback(
     OpenV2g_HostSimulation *simulation,
-    const OpenV2g_ChargeHardwareFeedback *feedback);
+    const OpenV2g_ChargeHardwareFeedback *feedback, OpenV2g_TimeUs now);
 
 OpenV2g_Result OpenV2g_HostSimulation_PrepareEnergyTransfer(
     OpenV2g_HostSimulation *simulation,

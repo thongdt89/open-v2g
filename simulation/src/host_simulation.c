@@ -163,7 +163,7 @@ static OpenV2g_CoordinatorPorts coordinator_ports(
 }
 
 static OpenV2g_Result synchronize_hardware(
-    OpenV2g_HostSimulation *simulation)
+    OpenV2g_HostSimulation *simulation, OpenV2g_TimeUs now)
 {
     OpenV2g_ChargeHardwareStatus status;
     OpenV2g_Result result = simulation->hardware_status_port.read(
@@ -175,7 +175,7 @@ static OpenV2g_Result synchronize_hardware(
     }
     return OpenV2g_ChargingCoordinator_OnHardwareStatus(
         &simulation->coordinator,
-        &status);
+        &status, now);
 }
 
 OpenV2g_HostSimulationConfig OpenV2g_HostSimulation_DefaultConfig(void)
@@ -467,7 +467,7 @@ OpenV2g_Result OpenV2g_HostSimulation_AdvancePlcToReady(
     if (result == OPENV2G_RESULT_OK) {
         result = OpenV2g_ChargingCoordinator_OnLinkStatus(
             &simulation->coordinator,
-            &status);
+            &status, now + 3u);
     }
     record(simulation, OPENV2G_HOST_SIM_OP_LINK_READY, now + 3u, result);
     return result;
@@ -498,7 +498,7 @@ OpenV2g_Result OpenV2g_HostSimulation_InjectLinkLoss(
     if (result == OPENV2G_RESULT_OK) {
         result = OpenV2g_ChargingCoordinator_OnLinkStatus(
             &simulation->coordinator,
-            &status);
+            &status, now);
     }
     return result;
 }
@@ -575,7 +575,7 @@ OpenV2g_Result OpenV2g_HostSimulation_EstablishHlc(
         } else {
             result = OpenV2g_ChargingCoordinator_OnHlcStatus(
                 &simulation->coordinator,
-                &status);
+                &status, sap_response_time);
         }
     }
     record(
@@ -634,7 +634,7 @@ OpenV2g_Result OpenV2g_HostSimulation_RespondToNextProtocolRequest(
     if (synchronize_result == OPENV2G_RESULT_OK) {
         synchronize_result = OpenV2g_ChargingCoordinator_OnHlcStatus(
             &simulation->coordinator,
-            &status);
+            &status, now);
     }
     result = result_is_success(response_result)
                  ? synchronize_result
@@ -666,18 +666,18 @@ OpenV2g_Result OpenV2g_HostSimulation_InitializeHardwareSafe(
         now,
         OPENV2G_REASON_NONE);
     if (result == OPENV2G_RESULT_OK) {
-        result = synchronize_hardware(simulation);
+        result = synchronize_hardware(simulation, now);
     }
     return result;
 }
 
 OpenV2g_Result OpenV2g_HostSimulation_InjectHardwareFeedback(
     OpenV2g_HostSimulation *simulation,
-    const OpenV2g_ChargeHardwareFeedback *feedback)
+    const OpenV2g_ChargeHardwareFeedback *feedback, OpenV2g_TimeUs now)
 {
     OpenV2g_Result result;
 
-    if ((simulation == NULL) || (feedback == NULL)) {
+    if ((simulation == NULL) || (feedback == NULL) || now == 0u || now < simulation->coordinator.owner_time) {
         return OPENV2G_RESULT_REJECTED;
     }
     result = OpenV2g_ChargeHardwareAdapter_ApplyMeasuredFeedback(
@@ -686,7 +686,7 @@ OpenV2g_Result OpenV2g_HostSimulation_InjectHardwareFeedback(
     if ((result == OPENV2G_RESULT_OK) ||
         (result == OPENV2G_RESULT_REJECTED)) {
         OpenV2g_Result synchronize_result =
-            synchronize_hardware(simulation);
+            synchronize_hardware(simulation, now);
         if (synchronize_result != OPENV2G_RESULT_OK) {
             return synchronize_result;
         }
@@ -712,7 +712,7 @@ OpenV2g_Result OpenV2g_HostSimulation_PrepareEnergyTransfer(
     if (!result_is_success(result)) {
         return result;
     }
-    result = synchronize_hardware(simulation);
+    result = synchronize_hardware(simulation, now);
     if (result != OPENV2G_RESULT_OK) {
         return result;
     }
@@ -736,7 +736,7 @@ OpenV2g_Result OpenV2g_HostSimulation_StartEnergyTransfer(
     if (!result_is_success(result)) {
         return result;
     }
-    result = synchronize_hardware(simulation);
+    result = synchronize_hardware(simulation, now);
     return result;
 }
 

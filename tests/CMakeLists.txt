@@ -66,3 +66,7 @@ if(TARGET openv2g_host_sim)
 endif()
 
 add_openv2g_test(openv2g_test_pnc_context unit/test_pnc_context.c)
+
+if(TARGET openv2g_host_sim)
+    add_openv2g_simulation_test(openv2g_test_coordinator_fault_ingress integration/test_coordinator_fault_ingress.c)
+endif()

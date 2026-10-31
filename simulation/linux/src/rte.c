@@ -25,6 +25,7 @@ typedef struct {
     Ov2g_LinuxEnvironment *environment;
     OpenV2g_ProtocolMessage response;
     bool success;
+    OpenV2g_TimeUs dispatch_time; /* Owner-selected synthetic OS dispatch clock. */
 } Delivery;
 static void deliver(void *context, uint32_t generation)
 {
@@ -33,10 +34,10 @@ static void deliver(void *context, uint32_t generation)
     OpenV2g_HostSimulation *sim = &delivery->environment->rte;
     if (generation != sim->coordinator.generation) { return; }
     delivery->success = ok(OpenV2g_Iso15118Chrg_OnProtocolMessage(
-        &sim->hlc, delivery->response.now, &delivery->response));
+        &sim->hlc, delivery->dispatch_time, &delivery->response));
     if (delivery->success) {
         delivery->success = ok(sim->hlc_status_port.read(sim->hlc_status_port.context, &status)) &&
-            ok(OpenV2g_ChargingCoordinator_OnHlcStatus(&sim->coordinator, &status));
+            ok(OpenV2g_ChargingCoordinator_OnHlcStatus(&sim->coordinator, &status, delivery->dispatch_time));
     }
 }
 bool Ov2g_EnvironmentRun(Ov2g_LinuxEnvironment *environment, int station_fd)
@@ -97,7 +98,7 @@ bool Ov2g_EnvironmentRun(Ov2g_LinuxEnvironment *environment, int station_fd)
     delivery.response.kind = (OpenV2g_ProtocolMessageKind)message.kind;
     delivery.response.accepted = message.accepted != 0u;
     now = Ov2g_OsNow() + 100u;
-    delivery.response.now = now;
+    delivery.response.now = now; delivery.dispatch_time = now;
     event.run = deliver; event.context = &delivery;
     event.generation = message.generation; event.due = now;
     if (!Ov2g_OsPost(&environment->os, &event) ||
@@ -114,6 +115,7 @@ bool Ov2g_EnvironmentRun(Ov2g_LinuxEnvironment *environment, int station_fd)
     (void)printf("Linux stub: socket SessionSetup complete; host transfer=%s\n", success ? "yes" : "no");
 stop:
     now = Ov2g_OsNow() + 100u;
+    if (now < sim->coordinator.owner_time) { now = sim->coordinator.owner_time; } /* This smoke fixture advances a synthetic owner clock. */
     if (!ok(OpenV2g_HostSimulation_Stop(sim, now, OPENV2G_REASON_CANCELLED))) { success = false; }
     Ov2g_OsCancel(&environment->os, 0u);
     sim->hlc.tcp_tls_session.tcp_tx_required_port.context = NULL;

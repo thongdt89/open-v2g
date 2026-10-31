@@ -117,7 +117,7 @@ int main(void)
     TEST_ASSERT(OpenV2g_TestRig_ReadPlc(&rig, &plc_status) == OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_OnLinkStatus(
                     &coordinator,
-                    &plc_status) == OPENV2G_RESULT_ACCEPTED);
+                    &plc_status, rig.now) == OPENV2G_RESULT_ACCEPTED);
     TEST_ASSERT(coordinator.state_machine.state == OPENV2G_COORDINATOR_HLC_NEGOTIATION);
     TEST_ASSERT(rig.operations[1] == TEST_OP_HLC_START);
 
@@ -178,7 +178,7 @@ int main(void)
                 (uint16_t)OPENV2G_PROTOCOL_STATE_SERVICE_DISCOVERY);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_OnHlcStatus(
                     &coordinator,
-                    &hlc_status) == OPENV2G_RESULT_OK);
+                    &hlc_status, rig.now) == OPENV2G_RESULT_OK);
 
     energy = energy_snapshot(generation, 171u);
     TEST_ASSERT(OpenV2g_EnergyDataProvider_Publish(&rig.energy, &energy) ==
@@ -196,7 +196,7 @@ int main(void)
                 OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_OnHardwareStatus(
                     &coordinator,
-                    &hardware_status) == OPENV2G_RESULT_OK);
+                    &hardware_status, 172u) == OPENV2G_RESULT_OK);
 
     rig.now = 180u;
     TEST_ASSERT(OpenV2g_ChargingCoordinator_EvaluatePermission(
@@ -208,7 +208,7 @@ int main(void)
                 OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_OnHardwareStatus(
                     &coordinator,
-                    &hardware_status) == OPENV2G_RESULT_OK);
+                    &hardware_status, rig.now) == OPENV2G_RESULT_OK);
 
     rig.now = 190u;
     TEST_ASSERT(OpenV2g_ChargingCoordinator_EvaluatePermission(
