@@ -1,6 +1,6 @@
 # Coordinator buglist disposition
 
-Revision 0.1 — 31 October 2026. Host implementation and verification only; no
+Revision 0.2 — 31 October 2026. Host implementation and verification only; no
 vehicle safety allocation, supplier ABI change or target architecture freeze.
 
 Input: `buglist.txt`, local TASK-1 / TASK-2, review baseline
@@ -61,3 +61,36 @@ The TLS configuration retains the previously pinned generated codecs/oracle and
 optional OpenSSL host service. The old custom-frame smoke fixture now supplies
 its explicit synthetic scheduler dispatch time; the EXI runner uses the OS
 monotonic clock. No timing tolerance was added to accept future source evidence.
+
+
+## Re-review follow-ups: TASK-3 and TASK-4
+
+Implementation commit: `5d76f653f4a786ecf65ff9cbaa725ba5fac3cf54`.
+
+| Task | Disposition | Desired-behavior regression |
+|---|---|---|
+| TASK-3 | Fixed: Tick invalidates expired measured proof and uses the same current prerequisites for completion and deadline escalation. Missing CP/PP or hardware cannot suppress the existing timeout. Original deadline and command count remain unchanged. | `stop_evidence_expiry`: short proof lifetime, stale/missing/invalid completion evidence, fresh completion, new proof before deadline, late evidence after a latched fault. |
+| TASK-4 | Fixed: rejected current CP/PP samples clear usability without replacing the accepted timestamp/sequence watermark. Genuine recovery/unplug updates remain ordered and cannot reauthorize a stopping session. | `cp_recovery`: future, invalid quality, zero, stale, invalid CP and unknown plug with invalid high sequences; connected/unplug recovery, generation isolation, accepted ordering and same-sequence rejection. |
+
+These functions run in `openv2g_test_coordinator_fault_ingress`. The dated
+`coordinator_rereview_2026-10-31.c` probe remains unchanged: its defect assertions
+apply to `c1c6b21` and are not acceptance tests for this fixed revision.
+
+All three suites below passed on the final implementation: portable **27/27**,
+portable ASAN/UBSAN **27/27**, generated EXI/Linux/OpenSSL/TLS/PnC integration
+**51/51**. No implementation change followed these runs. No imported ABI changed.
+
+```sh
+cmake -S . -B /tmp/openv2g-bugfix34-vc8haxe1 -DOPENV2G_BUILD_LINUX_STUBS=OFF -DOPENV2G_ENABLE_CBV2G_SAP_POC=OFF
+cmake --build /tmp/openv2g-bugfix34-vc8haxe1 -j 4
+ctest --test-dir /tmp/openv2g-bugfix34-vc8haxe1 --output-on-failure
+cmake --build /tmp/openv2g-bugfix-sanitize -j 4
+ctest --test-dir /tmp/openv2g-bugfix-sanitize --output-on-failure
+cmake --build /tmp/openv2g-tls-build -j 4
+ctest --test-dir /tmp/openv2g-tls-build --output-on-failure
+```
+
+The fresh portable directory was created immediately before configuration.
+Sanitizer flags and the pinned optional TLS/codec configuration remain those
+specified above. Source/log hashes and exact verification scope are recorded in
+[follow-up evidence](evidence/coordinator_bugfix34_verification.json).

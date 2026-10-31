@@ -119,8 +119,8 @@ Re-review — 2026-10-31
     docs/architecture/evidence/coordinator_rereview_2026-10-31.json
   Review-only probe assertions describe observed defects, not desired behavior.
 
-[ ] TASK-3 | P1 | Escalate an incomplete stop when measured-safe evidence expires
-Status: OPEN
+[x] TASK-3 | P1 | Escalate an incomplete stop when measured-safe evidence expires | done
+Status: FIXED — implementation 5d76f653f4a786ecf65ff9cbaa725ba5fac3cf54
 Primary file: src/charging_coordinator/charging_coordinator.c
 Operations: Tick, OnHardwareStatus
 Reviewed lines: 791-814 at c1c6b21
@@ -159,8 +159,8 @@ Acceptance criteria:
   - No late evidence resurrects a fault-latched stop; commands remain idempotent.
   - Add desired-behavior tests separate from the dated review probe.
 
-[ ] TASK-4 | P2 | Do not retain rejected CP/PP timestamps as ordering watermarks
-Status: OPEN
+[x] TASK-4 | P2 | Do not retain rejected CP/PP timestamps as ordering watermarks | done
+Status: FIXED — implementation 5d76f653f4a786ecf65ff9cbaa725ba5fac3cf54
 Primary file: src/charging_coordinator/charging_coordinator.c
 Operation: OnQualifiedCpPp
 Reviewed lines: 95-101 at c1c6b21
@@ -196,3 +196,19 @@ Acceptance criteria:
   - Invalid evidence still revokes before coordinated stop during active charging.
   - Unrelated generations and genuinely reordered accepted evidence remain rejected.
   - Add desired-behavior recovery tests separate from the dated review probe.
+
+TASK-3 / TASK-4 closure — 2026-10-31
+  Current measured-safe proof is revalidated on Tick. Missing or stale required
+  completion evidence now reaches the existing timeout/fault path at the original
+  deadline; accepted commands do not substitute for measurements or get retried.
+  Invalid current-generation CP/PP updates preserve the accepted ordering
+  watermark. Fresh connected/unplug evidence can recover without reviving power.
+  Regression: openv2g_test_coordinator_fault_ingress::stop_evidence_expiry and
+              openv2g_test_coordinator_fault_ingress::cp_recovery.
+  Final verification: fresh portable 27/27, portable ASAN/UBSAN 27/27,
+                      generated EXI/Linux/TLS/PnC integration 51/51 passed.
+  Traceable disposition and commands/hashes:
+    docs/architecture/BUGLIST_FIX_DISPOSITION_2026-10-31.md
+    docs/architecture/evidence/coordinator_bugfix34_verification.json
+  All four current buglist tasks are done. Historical review probes are unchanged;
+  no whole-project defect-free, target safety or production freeze claim follows.

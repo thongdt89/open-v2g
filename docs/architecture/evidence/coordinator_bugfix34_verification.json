@@ -1,0 +1,57 @@
+{
+  "date": "2026-10-31",
+  "review_baseline": "bc86f7b",
+  "implementation_commit": "5d76f653f4a786ecf65ff9cbaa725ba5fac3cf54",
+  "closed_tasks": [
+    "TASK-3",
+    "TASK-4"
+  ],
+  "scope": "PROJECT coordinator stop freshness and CP/PP accepted-watermark fixes; host only",
+  "regression_executable": "openv2g_test_coordinator_fault_ingress",
+  "new_regression_functions": [
+    "stop_evidence_expiry",
+    "cp_recovery"
+  ],
+  "fresh_portable_build": "/tmp/openv2g-bugfix34-vc8haxe1",
+  "builds": {
+    "fresh_portable": {
+      "passed": 27,
+      "failed": 0,
+      "log": "/tmp/bugfix34-fresh-tests.log",
+      "log_sha256": "dbba3fd01f4540e23de0d7156b5308b33b688f27672d86b2d6b2757a05297ebc"
+    },
+    "portable_asan_ubsan": {
+      "passed": 27,
+      "failed": 0,
+      "log": "/tmp/bugfix34-sanitize-tests.log",
+      "log_sha256": "64ab1511e87bca4295d7b7f0229dadb668d545a18d767075ad8abb00754a3e0f"
+    },
+    "generated_linux_tls_pnc": {
+      "passed": 51,
+      "failed": 0,
+      "log": "/tmp/bugfix34-tls-tests.log",
+      "log_sha256": "75f867ddf1b1efe7f5f74be60bce402b42a2c64e0ef390402b07a95fd932861d"
+    }
+  },
+  "source_sha256": {
+    "src/charging_coordinator/charging_coordinator.c": "dd52ab397fccc9946de76e73b3ec994defc60453d47493daacb1172463d5c661",
+    "tests/integration/test_coordinator_fault_ingress.c": "34fa1ec11a2fbb43256f42c1a03b2dabb7028c4ac0ef725e1c274e6414454d22",
+    "docs/architecture/CONTROL_BOUNDARY_HARDENING.md": "41f7344ccdf7169fe0e09dcd0feb5bbf95c42957203301b747f54f7b4833017d"
+  },
+  "behavior": [
+    "Tick revalidates measured-safe proof; stale proof cannot suppress deadline escalation",
+    "Completion and deadline decisions share current prerequisites",
+    "Fresh replacement proof before the deadline still permits normal completion",
+    "Late evidence cannot complete a fault-latched stop",
+    "Invalid CP/PP never replaces the accepted ordering watermark",
+    "Valid subsequent connected/unplug samples restore evidence without reauthorizing transfer",
+    "Unrelated active generations, reordered accepted samples and same-sequence mutations remain rejected",
+    "Original stop deadline and single safe-state request remain unchanged"
+  ],
+  "limitations": [
+    "Synthetic host evidence ages and budgets are not vehicle safety timing allocations",
+    "Portable sanitizer run covers changed core behavior; system OpenSSL libraries are not instrumented",
+    "Historical defect probes retain their original baseline assertions",
+    "No production integration, full-project defect-free conclusion or target freeze"
+  ]
+}
