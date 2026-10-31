@@ -118,3 +118,7 @@ if(OPENV2G_BUILD_TESTS)
     openv2g_enable_strict_warnings(openv2g_test_cbv2g_offers)
     add_test(NAME openv2g_test_cbv2g_offers COMMAND openv2g_test_cbv2g_offers)
 endif()
+
+if(OPENV2G_ENABLE_CBV2G_ISO20_POC)
+    add_subdirectory(iso20)
+endif()

@@ -90,7 +90,12 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND OPENV2G_BUILD_SIMULATION)
 endif()
 
 # Optional host candidate; no third-party source downloads in configure/build.
+option(OPENV2G_ENABLE_CBV2G_ISO20_POC "Build pinned ISO-20 Common/AC/DC generated model qualification probes" OFF)
 option(OPENV2G_ENABLE_CBV2G_SAP_POC "Build pinned SAP/DIN/ISO-2 EXI host candidate (legacy option name)" OFF)
+if(OPENV2G_ENABLE_CBV2G_ISO20_POC AND NOT OPENV2G_ENABLE_CBV2G_SAP_POC)
+    message(FATAL_ERROR "ISO-20 candidate requires OPENV2G_ENABLE_CBV2G_SAP_POC=ON for the pinned common EXI runtime")
+endif()
+
 set(OPENV2G_CBV2G_SOURCE_DIR "" CACHE PATH "External pinned libcbv2g checkout")
 if(OPENV2G_ENABLE_CBV2G_SAP_POC)
     add_subdirectory(integration/protocol/adapters/cbv2g)

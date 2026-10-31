@@ -17,7 +17,8 @@ missing supplier/OEM/vehicle artifacts do not block independent host work.
 - [ ] DIN metering branches where represented by the pinned model.
 - [x] Restricted host contract role/identity, PaymentDetails and signed challenge Authorization; pre-provisioned contract, explicit TLS, AC/DC/three-phase and signed receipts. See [PnC host scope](PNC_HOST.md).
 - [ ] Host certificate installation/update wire and encrypted key import transaction.
-- [ ] ISO-20 Common/AC/DC source hashes and separately selected bounded EXI backends.
+- [x] ISO-20 Common/AC/DC source hashes, isolated generated-target compilation and initial guarded model probes.
+- [ ] ISO-20 Common/AC/DC separately selected bounded PROJECT EXI backends.
 - [ ] ISO-20 scheduled/dynamic EIM socket sessions and negative coverage.
 - [ ] ISO-20 AC/DC BPT wire loops with explicit simulated capability, measured zero and new permission on reversal.
 - [ ] Expand malformed/fuzz/coverage and independent cross-codec evidence to new schemas/features.

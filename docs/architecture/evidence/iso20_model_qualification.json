@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-31",
+  "base_commit": "ab7f375",
+  "scope": "ISO-20 candidate model compilation and initial internal probes only; no runtime/schema binding enabled",
+  "candidate": "03350be048b35b179905129005a97144a4bdcf93",
+  "pinned_artifacts": 18,
+  "implementation_files": 9,
+  "checks": {
+    "normal_model_probe": "passed",
+    "asan_ubsan_model_probe": "passed",
+    "missing_common_runtime_configuration": "rejected as expected",
+    "default_off_configuration": "passed",
+    "external_checkout": "unchanged"
+  },
+  "documents": [
+    "Common SessionSetupReq",
+    "AC ChargeParameterDiscoveryReq",
+    "DC PreChargeReq"
+  ],
+  "limits": [
+    "Self-consistency only, no independent ISO-20 oracle",
+    "Only three initial documents probed; full candidate is not qualified",
+    "Exact consumption/padding required in addition to raw decoder success; owned guard byte required",
+    "No bounded PROJECT mapping, protocol adapter, scheduled/dynamic socket session or BPT enabled",
+    "No selected supplier, licensed XSD edition or normative conformance established"
+  ],
+  "sha256": {
+    "CMakeLists.txt": "24288ee6a340250a0144539354e3f0aee6ed4e97280cc96af8af95f5b1f3811d",
+    "docs/architecture/HOST_COMPLETION_PLAN.md": "7cb2e71bf33a33e367aa860de258d3b71d49cef40e2994407e91ec31d43d6313",
+    "docs/architecture/INCOMPLETE_ITEMS.md": "1472dbadaf13279cac1d517a6636de43e78eb2a3ba173169bd670acf46da7151",
+    "integration/protocol/adapters/cbv2g/CMakeLists.txt": "0ff7f2cd943d0679312488dae6f6663ec85bc101c27b320fdada275260f1fbf7",
+    "integration/protocol/adapters/cbv2g/iso20/test_models.c": "36e885b3e52f613b1353c70df622d0330f96ec169126abc692a4b30b248823a0",
+    "integration/protocol/adapters/cbv2g/iso20/SHA256SUMS": "009c621459dcd2bb0f4e91c71d9414fc193aa43a3bd52173b27175a9a6eb3aa4",
+    "integration/protocol/adapters/cbv2g/iso20/CMakeLists.txt": "4649a8e6ebe4500e5f86d2729fc886fd4c98c5e7417cb41b96bbeb94ee65fa9b",
+    "integration/protocol/adapters/cbv2g/iso20/README.md": "6b1b10a2eaac9379f031f1537153a877af3ead79678091054c28cf3a19e64dc7"
+  }
+}

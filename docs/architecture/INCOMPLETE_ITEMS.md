@@ -1,9 +1,19 @@
 # Current feature completion status
 
-Revision: Draft 0.13 — 31/10/2026. **Overall implementation remains in progress.**
+Revision: Draft 0.14 — 31/10/2026. **Overall implementation remains in progress.**
 This is the current inventory; older audits/work-log entries describe their own
 snapshots. Implemented means host code, not selected supplier, frozen design,
 vehicle safety allocation or protocol conformance.
+
+## ISO-20 generated model qualification — 31/10/2026
+
+An isolated optional target now checks hashes for 18 CommonMessages/AC/DC candidate
+artifacts and compiles their nine implementation files from the pinned checkout.
+Initial internal probes cover three documents, selected fields, all byte-prefix
+truncations with exact-consumption/padding checks, and one wrong-schema case.
+This does not bind ISO-20 SchemaRegistry slots or enable session/BPT features.
+The older independent codec does not contain ISO-20 and supplies no ISO-20 oracle.
+See [candidate scope](../../integration/protocol/adapters/cbv2g/iso20/README.md).
 
 ## Secondary service detail increment — 31/10/2026
 
