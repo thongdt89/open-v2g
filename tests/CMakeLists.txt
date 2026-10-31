@@ -60,3 +60,7 @@ endif()
 if(TARGET openv2g_host_sim)
     add_openv2g_simulation_test(openv2g_test_certificate_manager unit/test_certificate_manager.c)
 endif()
+
+if(TARGET openv2g_host_sim)
+    add_openv2g_simulation_test(openv2g_test_pev_slac unit/test_pev_slac.c)
+endif()

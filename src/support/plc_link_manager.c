@@ -32,6 +32,38 @@ void OpenV2g_PlcLinkManager_Init(OpenV2g_PlcLinkManager *manager)
     }
 }
 
+OpenV2g_Result OpenV2g_PlcLinkManager_BindSlac(OpenV2g_PlcLinkManager *manager, const OpenV2g_SlacConfig *config, const OpenV2g_SlacPorts *ports)
+{
+    if (manager == NULL || manager->status.state != OPENV2G_PLC_DOWN || manager->pev_slac.bound) { return OPENV2G_RESULT_REJECTED; }
+    return OpenV2g_PevSlac_Init(&manager->pev_slac,config,ports);
+}
+OpenV2g_Result OpenV2g_PlcLinkManager_BeginSlac(OpenV2g_PlcLinkManager *manager, uint32_t generation, OpenV2g_TimeUs now, const uint8_t run_id[8], const uint8_t pev[6])
+{
+    if (!accepts(manager,generation) || manager->status.state != OPENV2G_PLC_SLAC_MATCHING) { return OPENV2G_RESULT_REJECTED; }
+    return OpenV2g_PevSlac_Start(&manager->pev_slac,generation,now,run_id,pev);
+}
+OpenV2g_Result OpenV2g_PlcLinkManager_EnqueueSlac(OpenV2g_PlcLinkManager *manager, const OpenV2g_SlacFrame *frame)
+{
+    if (manager == NULL) { return OPENV2G_RESULT_REJECTED; }
+    return OpenV2g_PevSlac_Enqueue(&manager->pev_slac,frame);
+}
+OpenV2g_Result OpenV2g_PlcLinkManager_PumpSlac(OpenV2g_PlcLinkManager *manager, uint32_t generation, OpenV2g_TimeUs now)
+{
+    OpenV2g_Result result;
+    if (!accepts(manager,generation) || !manager->pev_slac.bound ||
+        (manager->status.state != OPENV2G_PLC_SLAC_MATCHING && manager->status.state != OPENV2G_PLC_ASSOCIATING &&
+         manager->status.state != OPENV2G_PLC_IP_CONFIGURING && manager->status.state != OPENV2G_PLC_LINK_READY)) { return OPENV2G_RESULT_REJECTED; }
+    result = OpenV2g_PevSlac_Pump(&manager->pev_slac,generation,now);
+    if (result == OPENV2G_RESULT_OK && manager->status.state == OPENV2G_PLC_SLAC_MATCHING) { return OpenV2g_PlcLinkManager_OnSlacMatched(manager,generation,now); }
+    if (result == OPENV2G_RESULT_REJECTED) {
+        manager->status.slac_matched = manager->status.associated = manager->status.ipv6_ready = false;
+        OpenV2g_TimeUs fault_time = manager->pev_slac.status.env.timestamp;
+        if (fault_time < manager->status.env.timestamp) { fault_time = manager->status.env.timestamp; }
+        update_status(manager,fault_time,OPENV2G_PLC_FAULT,manager->pev_slac.status.env.reason);
+    }
+    return result;
+}
+
 OpenV2g_Result OpenV2g_PlcLinkManager_Start(
     OpenV2g_PlcLinkManager *manager,
     uint32_t generation,
@@ -64,13 +96,20 @@ OpenV2g_Result OpenV2g_PlcLinkManager_OnModemReady(
     return OPENV2G_RESULT_OK;
 }
 
+static bool slac_ready(const OpenV2g_PlcLinkManager *manager, uint32_t generation, OpenV2g_TimeUs now)
+{
+    const OpenV2g_PevSlac *slac = &manager->pev_slac;
+    return !slac->bound || (slac->status.state == OPENV2G_SLAC_MATCHED && slac->status.env.session_generation == generation &&
+        now >= slac->owner_time && slac->ports.key_is_current(slac->ports.context,generation,slac->status.network_id,slac->status.key_handle,slac->status.key_version));
+}
 OpenV2g_Result OpenV2g_PlcLinkManager_OnSlacMatched(
     OpenV2g_PlcLinkManager *manager,
     uint32_t generation,
     OpenV2g_TimeUs now)
 {
     if (!accepts(manager, generation) ||
-        (manager->status.state != OPENV2G_PLC_SLAC_MATCHING)) {
+        (manager->status.state != OPENV2G_PLC_SLAC_MATCHING) ||
+        !slac_ready(manager,generation,now)) {
         return OPENV2G_RESULT_REJECTED;
     }
     manager->status.slac_matched = true;
@@ -84,7 +123,7 @@ OpenV2g_Result OpenV2g_PlcLinkManager_OnAssociated(
     OpenV2g_TimeUs now)
 {
     if (!accepts(manager, generation) ||
-        (manager->status.state != OPENV2G_PLC_ASSOCIATING)) {
+        (manager->status.state != OPENV2G_PLC_ASSOCIATING) || !slac_ready(manager,generation,now)) {
         return OPENV2G_RESULT_REJECTED;
     }
     manager->status.associated = true;
@@ -98,7 +137,7 @@ OpenV2g_Result OpenV2g_PlcLinkManager_OnIpv6Ready(
     OpenV2g_TimeUs now)
 {
     if (!accepts(manager, generation) ||
-        (manager->status.state != OPENV2G_PLC_IP_CONFIGURING)) {
+        (manager->status.state != OPENV2G_PLC_IP_CONFIGURING) || !slac_ready(manager,generation,now)) {
         return OPENV2G_RESULT_REJECTED;
     }
     manager->status.ipv6_ready = true;
@@ -120,6 +159,9 @@ OpenV2g_Result OpenV2g_PlcLinkManager_Stop(
     }
     if (!accepts(manager, generation)) {
         return OPENV2G_RESULT_REJECTED;
+    }
+    if (manager->pev_slac.bound && manager->pev_slac.status.env.session_generation == generation) {
+        (void)OpenV2g_PevSlac_Cancel(&manager->pev_slac,generation,now);
     }
     update_status(manager, now, OPENV2G_PLC_STOPPING, reason);
     manager->status.modem_ready = false;

@@ -1,6 +1,7 @@
 add_library(openv2g_host_sim STATIC
     src/host_simulation.c
-    src/certificate_storage.c)
+    src/certificate_storage.c
+    src/slac_peer.c)
 
 target_link_libraries(openv2g_host_sim PUBLIC openv2g_core)
 target_include_directories(openv2g_host_sim PUBLIC

@@ -118,6 +118,7 @@ static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenari
         if (!OvWireIo_Receive(&io, &received, Ov2g_OsNow() + OV_WIRE_TIMEOUT_US) ||
             !OvWireDecode(&codec, 1u, schema, (uint16_t)steps[index], &received, &request, sizeof(request))) {
             if ((scenario == OV_WIRE_BAD_SERVICE || scenario == OV_WIRE_BAD_PARAMETER_SET) && steps[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION) { success = true; }
+            if (scenario == OV_WIRE_SLAC_KEY_LOSS && (steps[index] == OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START || steps[index] == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND)) { success = true; }
             goto stop;
         }
         if (steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER && ac_mode && request.ac_phases != response.ac_phases) { goto stop; }

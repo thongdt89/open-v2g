@@ -8,7 +8,7 @@ missing supplier/OEM/vehicle artifacts do not block independent host work.
 - [x] Portable certificate transactions, fake NvM and optional real host PKI.
 - [x] Managed certificate proof in signed-receipt consumers; in-flight expiry and invalidation tests.
 - [x] Scoped multicast/link-local IPv6 discovery/TCP, bounded retry and runner configuration (real physical-interface multicast/link-local execution remains unverified).
-- [ ] PEV-SLAC bounded host peer simulation and owner integration, distinct from SDP.
+- [x] PEV-SLAC bounded typed host peer simulation and owner integration, distinct from SDP (raw MME/PHY/modem behavior is not represented).
 - [x] All bounded DIN/ISO-2 parameter forms and ISO-2 multi-parameter sets.
 - [x] Broader ISO-2 payment/service/mode offers and explicit EIM primary/ancillary selection.
 - [ ] Secondary ServiceDetail parameter negotiation (ancillary application implementations remain separate).

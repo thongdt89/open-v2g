@@ -287,3 +287,16 @@ exact-hash build-copy overlay corrects both generated paths without changing the
 external checkout. The previous candidate payload is a permanent rejection case.
 See [contracts](../../simulation/linux/SERVICE_OFFERS.md) and
 [evidence](evidence/service_offer_verification.json).
+
+## Owned typed PEV-SLAC host simulation — 31/10/2026
+
+Added PlcLinkManager-owned matching, copied bounded ingress, stage/total timers,
+retries, RunID/peer/freshness/quality checks, sound/attenuation validation and
+opaque key-reference liveness. Added deterministic peer and enabled it before
+SDP across EXI runners/resume. Established-link proof loss invalidates evidence
+before coordinated provider teardown. Matching/key loss/cancel/overflow/late and
+timeout tests supplement a before-transmission link-key loss socket case.
+The optional NULL-config initializer regression is fixed and tested. No raw MME
+or physical modem/PHY behavior is represented. See
+[contracts](../../simulation/linux/SLAC_HOST.md) and
+[evidence](evidence/slac_host_verification.json).

@@ -102,6 +102,13 @@ static bool supervise(void *context, OpenV2g_TimeUs now)
     if (OpenV2g_Iso15118Chrg_TickCommunication(&sim->hlc, client->io.generation, now) != OPENV2G_RESULT_OK) {
         (void)OpenV2g_HostSimulation_Stop(sim, now, OPENV2G_REASON_TIMEOUT); return false;
     }
+    if (client->lose_slac_after_start && client->energy_started) {
+        sim->slac_peer.key_installed = false; client->lose_slac_after_start = false;
+    }
+    if (sim->config.simulate_slac && sim->plc.status.state == OPENV2G_PLC_LINK_READY &&
+        OpenV2g_PlcLinkManager_PumpSlac(&sim->plc,client->io.generation,now) != OPENV2G_RESULT_OK) {
+        (void)OpenV2g_ChargingCoordinator_OnLinkStatus(&sim->coordinator,&sim->plc.status); return false;
+    }
     /* Expiry is evaluated before renewal; a late owner turn cannot revive it. */
     OpenV2g_ChargingCoordinator_Tick(&sim->coordinator, now);
     if (sim->coordinator.teardown_started) { return false; }
@@ -129,6 +136,7 @@ bool OvWireClient_InitMode(OvWireClient *client, int fd, OpenV2g_ProtocolId prot
     config.coordinator.permission.allow_ac_eim = ac_mode;
     config.coordinator.permission.energy_max_age_us = 50000u;
     config.coordinator.require_physical_assessment = true;
+    config.simulate_slac = true;
     config.coordinator.permission.require_protocol_readiness = true;
     config.coordinator.permission.required_limit_sources = (1u << OPENV2G_LIMIT_SOURCE_COUNT) - 1u;
     config.coordinator.permission.limit_max_age_us = 2000000u;

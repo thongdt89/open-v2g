@@ -11,6 +11,7 @@
 #include "openv2g/support/cp_pp_manager.h"
 #include "openv2g/support/energy_data_provider.h"
 #include "openv2g/support/plc_link_manager.h"
+#include "openv2g/simulation/slac_peer.h"
 
 #define OPENV2G_HOST_SIM_V2GTP_STORAGE_CAPACITY 1024u
 #define OPENV2G_HOST_SIM_TRACE_CAPACITY 64u
@@ -45,6 +46,7 @@ typedef struct {
     OpenV2g_ProtocolId peer_protocol;
     OpenV2g_SchemaId peer_schema;
     OpenV2g_Endpoint peer_endpoint;
+    bool simulate_slac;
 } OpenV2g_HostSimulationConfig;
 
 /*
@@ -58,6 +60,7 @@ typedef struct {
     OpenV2g_CpPpManager cp_pp;
     OpenV2g_EnergyDataProvider energy;
     OpenV2g_PlcLinkManager plc;
+    OpenV2g_HostSlacPeer slac_peer;
     OpenV2g_Iso15118Chrg hlc;
     OpenV2g_ChargeHardwareAdapter hardware;
 

@@ -58,6 +58,7 @@ add_library(openv2g_core STATIC
     src/support/cp_pp_manager.c
     src/support/energy_data_provider.c
     src/support/plc_link_manager.c
+    src/support/pev_slac.c
     src/support/charge_hardware_adapter.c)
 
 target_include_directories(openv2g_core PUBLIC

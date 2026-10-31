@@ -1,9 +1,22 @@
 # Current feature completion status
 
-Revision: Draft 0.10 — 31/10/2026. **Overall implementation remains in progress.**
+Revision: Draft 0.11 — 31/10/2026. **Overall implementation remains in progress.**
 This is the current inventory; older audits/work-log entries describe their own
 snapshots. Implemented means host code, not selected supplier, frozen design,
 vehicle safety allocation or protocol conformance.
+
+## PEV-SLAC typed host increment — 31/10/2026
+
+PlcLinkManager now owns bounded PEV-SLAC matching with copied ingress, RunID/MAC/
+generation/freshness checks, bounded sounds/groups, attenuation policy, retries,
+stage/aggregate budgets and key-reference liveness. The deterministic typed peer
+is enabled before SDP in EXI runners, including resume. Established-link proof
+loss revokes evidence immediately and defers provider teardown to coordinated
+Stop; key loss during energy start reaches DENY and simulated safe hardware.
+See [host contracts](../../simulation/linux/SLAC_HOST.md).
+Raw HomePlug MME bytes/PHY pacing, multiple physical candidates and real modem/
+association/IP acquisition are not claimed by this typed fixture. SDP ownership
+and the no-HLC-to-actuator boundary remain unchanged.
 
 ## Multiple-offer/selection increment — 31/10/2026
 

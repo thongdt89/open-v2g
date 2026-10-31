@@ -243,6 +243,12 @@ OpenV2g_Result OpenV2g_HostSimulation_Init(
         return OPENV2G_RESULT_REJECTED;
     }
     OpenV2g_PlcLinkManager_Init(&simulation->plc);
+    if (selected.simulate_slac) {
+        OpenV2g_SlacConfig slac = OpenV2g_HostSlacConfig(); OpenV2g_SlacPorts ports;
+        OpenV2g_HostSlacPeer_Init(&simulation->slac_peer,&simulation->plc,&slac);
+        ports = OpenV2g_HostSlacPeer_Ports(&simulation->slac_peer);
+        if (OpenV2g_PlcLinkManager_BindSlac(&simulation->plc,&slac,&ports) != OPENV2G_RESULT_OK) { return OPENV2G_RESULT_REJECTED; }
+    }
     if ((OpenV2g_PlcLinkManager_CreateControlClientServerPort(
              &simulation->plc,
              &simulation->plc_control_port) != OPENV2G_RESULT_OK) ||
@@ -428,10 +434,18 @@ OpenV2g_Result OpenV2g_HostSimulation_AdvancePlcToReady(
         generation,
         now);
     if (result == OPENV2G_RESULT_OK) {
-        result = simulation->plc_control_port.slac_matched(
-            simulation->plc_control_port.context,
-            generation,
-            now + 1u);
+        if (simulation->config.simulate_slac) {
+            uint8_t run_id[8] = {0u,0u,0u,0u,'H','O','S','T'};
+            const uint8_t pev[6] = {2u,0u,0u,0u,0u,1u}; unsigned i;
+            for (i = 0u; i < 4u; ++i) { run_id[i] = (uint8_t)(generation>>(i*8u)); }
+            result = OpenV2g_PlcLinkManager_BeginSlac(&simulation->plc,generation,now+1u,run_id,pev);
+            for (i = 0u; i < 64u && (result == OPENV2G_RESULT_ACCEPTED || result == OPENV2G_RESULT_BUSY); ++i) {
+                result = OpenV2g_PlcLinkManager_PumpSlac(&simulation->plc,generation,now+1u);
+            }
+            if (result != OPENV2G_RESULT_OK) { return OPENV2G_RESULT_REJECTED; }
+        } else {
+            result = simulation->plc_control_port.slac_matched(simulation->plc_control_port.context,generation,now+1u);
+        }
     }
     if (result == OPENV2G_RESULT_OK) {
         result = simulation->plc_control_port.associated(

@@ -33,6 +33,7 @@ static int run(OpenV2g_ProtocolId protocol, OvWireScenario scenario)
         TEST_ASSERT(OvWireClient_SetSelectedServices(&client,&extra,1u,true,1));
     }
     if (scenario == OV_WIRE_BAD_PARAMETER_SET) { TEST_ASSERT(OvWireClient_SetSelectedServices(&client,NULL,0u,true,2)); }
+    client.lose_slac_after_start = scenario == OV_WIRE_SLAC_KEY_LOSS;
     client.allow_unsigned_receipts = scenario == OV_WIRE_METERING || scenario == OV_WIRE_AC_METERING || scenario == OV_WIRE_SIGNED_METER;
     success = OvWireClient_Run(&client); Ov2g_TcpClose(&fd);
     TEST_ASSERT(waitpid(child, &status, 0) == child);
@@ -47,6 +48,10 @@ static int run(OpenV2g_ProtocolId protocol, OvWireScenario scenario)
     TEST_ASSERT(!client.io.queued && client.environment.os.count == 0u);
     if (success) { TEST_ASSERT(client.messages == ((scenario == OV_WIRE_AC || scenario == OV_WIRE_AC3 || scenario == OV_WIRE_MULTI_AC) ? 12u : (scenario == OV_WIRE_METERING ? 18u : (scenario == OV_WIRE_PENDING ? 16u : 15u))) && client.loops == 3u && client.energy_started); }
     if (scenario == OV_WIRE_AC || scenario == OV_WIRE_AC_METERING) { TEST_ASSERT(client.peer_limits.max_charge_current_ma == 16000); }
+    if (scenario == OV_WIRE_SLAC_KEY_LOSS) {
+        TEST_ASSERT(client.energy_started && client.environment.rte.hardware.status.state == OPENV2G_HW_SAFE && client.environment.rte.slac_peer.cancels == 1u);
+        TEST_ASSERT(!client.environment.rte.hardware.status.positive_contactor_closed && !client.environment.rte.hardware.status.negative_contactor_closed);
+    }
     if (scenario == OV_WIRE_AC_RCD) {
         TEST_ASSERT(client.energy_started && client.environment.rte.hardware.status.state == OPENV2G_HW_SAFE);
         TEST_ASSERT(!client.environment.rte.hardware.status.positive_contactor_closed && !client.environment.rte.hardware.status.negative_contactor_closed);
@@ -112,6 +117,7 @@ int main(void)
 {
     unsigned scenario;
     TEST_ASSERT(assessment_guards() == 0);
+    TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2,OV_WIRE_SLAC_KEY_LOSS) == 0);
     TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2,OV_WIRE_BAD_SERVICE) == 0);
     TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2,OV_WIRE_BAD_PARAMETER_SET) == 0);
     TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2,OV_WIRE_MULTI_AC) == 0);

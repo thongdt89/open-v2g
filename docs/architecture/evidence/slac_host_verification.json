@@ -1,0 +1,58 @@
+{
+  "date": "2026-10-31",
+  "base_commit": "0fe422b",
+  "scope": "PlcLinkManager-owned PEV-SLAC typed host matching and deterministic peer/key-reference fixture before actual EXI socket sessions. Not raw MME encoding, PHY pacing, multiple physical candidates, modem integration or conformance. System OpenSSL libraries are not sanitizer-instrumented.",
+  "builds": {
+    "normal_generated_openssl_oracle": {
+      "passed": 45,
+      "failed": 0,
+      "ctest_log_sha256": "5ee3cfc87db85ef829d5cd15e708763b5c737e2e6d5227fa32299b8178e1b439"
+    },
+    "asan_ubsan_generated_openssl": {
+      "passed": 43,
+      "failed": 0,
+      "ctest_log_sha256": "63db5efe4b81b9b7da0e130e253f77ca5fc2f103f925b2b38a78e4ede2b478bc"
+    },
+    "generated_oracle_openssl_off": {
+      "passed": 38,
+      "failed": 0,
+      "ctest_log_sha256": "335a1a95b4f9eaf8285eb9d74bc52a08561f0767c41f8606b842ca0e44b1a2ed"
+    },
+    "default_codecs_openssl_off": {
+      "passed": 27,
+      "failed": 0,
+      "ctest_log_sha256": "9f483a5c5663b09c28279e233f55f6235a0a8679cb50f20b45bde09d26875dbb"
+    }
+  },
+  "source_sha256": {
+    "CMakeLists.txt": "cd910ce0e9ee818d225f2159a90171755b7c866395cd6d34ab87739526e70a5d",
+    "include/openv2g/support/plc_link_manager.h": "b538583b346f37f6f7f6cf1d090c72733b00ebaa7e2a3bfd2617b1e44315778c",
+    "simulation/CMakeLists.txt": "3370e4343db0e18c96c0261d57586881a5b283675cb8c90da2d2e8a7eaf686e6",
+    "simulation/include/openv2g/simulation/host_simulation.h": "f63c5f20033d6d649ad2deff26b2ab479c9628f7eadc46e6d9e603bce3726122",
+    "simulation/linux/wire/client.c": "32a81f7453e6aad663a9985843f7824f77f5db15b13bd759854488a4296d9a32",
+    "simulation/linux/wire/station.c": "46cc4398a630c57b24d518a843aafc0e8fa2ee260ea528de3fcb6f212a1339fc",
+    "simulation/linux/wire/test_wire.c": "767bac4603483e9ce5949446b4ef4bc810fccb3145a9c45d30a76febd7cf9fa5",
+    "simulation/linux/wire/wire.h": "cb4349ef2d885844b0b95cbda708acc2a140d02311a853cc7a49c2d07fd02c9b",
+    "simulation/src/host_simulation.c": "1e06699bc53a5cedc5ef67f70a1929be9bf753dd8c77727d6cbb5312372034ed",
+    "src/support/plc_link_manager.c": "7e26fe840ff6ab80f71045fd391a44d992821404a31e9e46ef8872bfb7aaf61f",
+    "tests/CMakeLists.txt": "cdda7fd125be718d3f89c7783af3b80d9198cb087de7e535364ea470723295ed",
+    "include/openv2g/support/pev_slac.h": "6bbfa9545be615257bab5d2b7b7503da394ec66f0e5de63853874e5627bb4566",
+    "src/support/pev_slac.c": "238c7abd234bc55eeca8960f1c4c1a4bc0c555b860a38c4a0420e4f5d79a07ff",
+    "simulation/include/openv2g/simulation/slac_peer.h": "5fe5e1ccb11e5ef92a3230210097370e32b3a7f0b3e9c7c452981dad2f1b2f96",
+    "simulation/src/slac_peer.c": "8d998159769eb49e8e96ffd371ec39616b30d3bfbe4f3c7569d696fd31a655a1",
+    "tests/unit/test_pev_slac.c": "f885e66337ac9ac47498287939783366a6dd834ab0997e5d77093fbe72512dcb"
+  },
+  "wire_scenarios": 52,
+  "negative_cases": [
+    "noise/match rejection",
+    "dropped request recovery and bounded retransmissions",
+    "per-stage and total deadline expiry",
+    "copied RX and overflow latch",
+    "old generation/RunID/cancel",
+    "same-run invalidated key cannot revive",
+    "clock rewind",
+    "established-link proof lost before coordinated provider teardown",
+    "link-key loss during energy start reaches DENY and simulated safe hardware",
+    "optional NULL configuration initialization"
+  ]
+}
