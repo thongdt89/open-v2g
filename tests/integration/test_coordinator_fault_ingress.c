@@ -145,4 +145,97 @@ static int fault_times(void)
     }
     return 0;
 }
-int main(void) { TEST_ASSERT(overflow() == 0); TEST_ASSERT(fault_times() == 0); return 0; }
+static int stop_evidence_expiry(void)
+{
+    unsigned mode;
+    for (mode = 0u; mode < 6u; ++mode) {
+        OpenV2g_HostSimulation s;
+        TEST_ASSERT(setup(&s,true,OPENV2G_RESULT_OK) == 0);
+        if (mode == 0u || mode == 5u) { s.coordinator.config.permission.hardware_max_age_us = 20u; }
+        if (mode == 1u) {
+            OpenV2g_QualifiedCpPp cp = s.coordinator.cp_pp; ++cp.env.sequence_counter; cp.env.timestamp = 165u;
+            TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_OnQualifiedCpPp(&s.coordinator,&cp,165u)));
+            s.coordinator.config.permission.cp_pp_max_age_us = 20u;
+        }
+        TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_Stop(&s.coordinator,170u,OPENV2G_REASON_CANCELLED)));
+        TEST_ASSERT(measured_safe(&s,180u,180u) == 0 && s.coordinator.stop_measured_safe);
+        if (mode == 2u) {
+            OpenV2g_QualifiedCpPp cp = s.coordinator.cp_pp; cp.env.timestamp = 181u; cp.env.quality = OPENV2G_QUALITY_INVALID;
+            TEST_ASSERT(OpenV2g_ChargingCoordinator_OnQualifiedCpPp(&s.coordinator,&cp,181u) == OPENV2G_RESULT_REJECTED && !s.coordinator.has_cp_pp);
+        }
+        if (mode == 3u) {
+            OpenV2g_ChargeHardwareStatus h = s.coordinator.hardware; h.env.timestamp = 181u; h.env.quality = OPENV2G_QUALITY_INVALID;
+            TEST_ASSERT(OpenV2g_ChargingCoordinator_OnHardwareStatus(&s.coordinator,&h,181u) == OPENV2G_RESULT_REJECTED && !s.coordinator.has_hardware);
+        }
+        if (mode == 4u || mode == 5u) {
+            if (mode == 5u) {
+                OpenV2g_ChargingCoordinator_Tick(&s.coordinator,201u);
+                TEST_ASSERT(!s.coordinator.stop_measured_safe && !s.coordinator.stop_completed && s.coordinator.stop_deadline == 270u);
+                TEST_ASSERT(measured_safe(&s,202u,202u) == 0 && s.coordinator.stop_measured_safe);
+            }
+            OpenV2g_ChargingCoordinator_Tick(&s.coordinator,mode == 4u ? 190u : 210u);
+            TEST_ASSERT(s.coordinator.stop_completed && s.coordinator.state_machine.state == OPENV2G_COORDINATOR_CONNECTED_IDLE);
+        } else {
+            OpenV2g_ChargingCoordinator_Tick(&s.coordinator,270u);
+            TEST_ASSERT(!s.coordinator.stop_completed && s.coordinator.state_machine.state == OPENV2G_COORDINATOR_FAULT_LATCHED);
+            TEST_ASSERT(s.coordinator.fault_coordinator.status.latched && s.coordinator.stop_result == OPENV2G_RESULT_NOT_OK);
+            TEST_ASSERT(measured_safe(&s,271u,271u) == 0);
+            {
+                OpenV2g_QualifiedCpPp cp = s.coordinator.cp_pp; cp.env.timestamp = 272u; ++cp.env.sequence_counter;
+                TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_OnQualifiedCpPp(&s.coordinator,&cp,272u)));
+            }
+            OpenV2g_ChargingCoordinator_Tick(&s.coordinator,273u);
+            TEST_ASSERT(!s.coordinator.stop_completed && s.coordinator.state_machine.state == OPENV2G_COORDINATOR_FAULT_LATCHED);
+            TEST_ASSERT(OpenV2g_ChargingCoordinator_RequestEnergyTransfer(&s.coordinator,274u) == OPENV2G_RESULT_REJECTED);
+        }
+        TEST_ASSERT(safe_calls == 1u && s.coordinator.stop_deadline == 270u);
+    }
+    return 0;
+}
+static int cp_recovery(void)
+{
+    unsigned bad, unplug;
+    for (bad = 0u; bad < 6u; ++bad) for (unplug = 0u; unplug < 2u; ++unplug) {
+        OpenV2g_HostSimulation s; OpenV2g_QualifiedCpPp accepted, cp;
+        TEST_ASSERT(setup(&s,true,OPENV2G_RESULT_OK) == 0); accepted = s.coordinator.cp_pp;
+        cp = accepted; cp.env.session_generation++; cp.env.timestamp = 1000000u;
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_OnQualifiedCpPp(&s.coordinator,&cp,170u) == OPENV2G_RESULT_REJECTED);
+        TEST_ASSERT(s.coordinator.owner_time == 160u && safe_calls == 0u);
+        cp = accepted; cp.env.timestamp = 170u; cp.env.sequence_counter = UINT32_MAX;
+        if (bad == 0u) { cp.env.timestamp = 1000000u; }
+        if (bad == 1u) { cp.env.quality = OPENV2G_QUALITY_INVALID; }
+        if (bad == 2u) { cp.env.timestamp = 0u; }
+        if (bad == 3u) { cp.env.timestamp = 1u; s.coordinator.config.permission.cp_pp_max_age_us = 100u; }
+        if (bad == 4u) { cp.cp_state = OPENV2G_CP_INVALID; }
+        if (bad == 5u) { cp.plug_state = OPENV2G_PLUG_UNKNOWN; }
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_OnQualifiedCpPp(&s.coordinator,&cp,170u) == OPENV2G_RESULT_REJECTED);
+        TEST_ASSERT(!s.coordinator.has_cp_pp && revoke_seen && safe_calls == 1u && s.coordinator.teardown_started);
+        TEST_ASSERT(memcmp(&s.coordinator.cp_pp,&accepted,sizeof(accepted)) == 0 && s.coordinator.stop_deadline == 270u);
+        cp = accepted; cp.env.timestamp = 180u; ++cp.env.sequence_counter;
+        if (unplug != 0u) { cp.plug_state = OPENV2G_PLUG_UNPLUGGED; }
+        TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_OnQualifiedCpPp(&s.coordinator,&cp,180u)) && s.coordinator.has_cp_pp);
+        TEST_ASSERT(s.coordinator.cp_pp.env.timestamp == 180u && s.coordinator.cp_pp.plug_state == cp.plug_state);
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_RequestEnergyTransfer(&s.coordinator,181u) == OPENV2G_RESULT_REJECTED);
+        TEST_ASSERT(measured_safe(&s,182u,182u) == 0);
+        OpenV2g_ChargingCoordinator_Tick(&s.coordinator,183u);
+        TEST_ASSERT(s.coordinator.stop_completed && s.coordinator.state_machine.state == (unplug != 0u ? OPENV2G_COORDINATOR_UNPLUGGED : OPENV2G_COORDINATOR_CONNECTED_IDLE));
+        TEST_ASSERT(safe_calls == 1u && s.coordinator.permission_manager.current.decision == OPENV2G_PERMISSION_DENY);
+    }
+    /* Accepted samples remain ordered, and rejected same-sequence mutations cannot report unplug. */
+    {
+        OpenV2g_HostSimulation s; OpenV2g_QualifiedCpPp cp, accepted;
+        TEST_ASSERT(setup(&s,true,OPENV2G_RESULT_OK) == 0);
+        cp = s.coordinator.cp_pp; cp.env.timestamp = 170u; cp.env.sequence_counter = 10u;
+        TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_OnQualifiedCpPp(&s.coordinator,&cp,170u))); accepted = cp;
+        cp.env.timestamp = 171u; cp.env.sequence_counter = 9u; cp.plug_state = OPENV2G_PLUG_UNPLUGGED;
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_OnQualifiedCpPp(&s.coordinator,&cp,171u) == OPENV2G_RESULT_REJECTED);
+        cp.env.sequence_counter = 10u;
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_OnQualifiedCpPp(&s.coordinator,&cp,172u) == OPENV2G_RESULT_REJECTED);
+        TEST_ASSERT(memcmp(&accepted,&s.coordinator.cp_pp,sizeof(cp)) == 0 && safe_calls == 0u);
+    }
+    return 0;
+}
+int main(void) {
+    TEST_ASSERT(overflow() == 0); TEST_ASSERT(fault_times() == 0);
+    TEST_ASSERT(stop_evidence_expiry() == 0); TEST_ASSERT(cp_recovery() == 0); return 0;
+}

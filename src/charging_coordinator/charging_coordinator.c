@@ -90,21 +90,23 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnQualifiedCpPp(
     OpenV2g_Result result;
 
     if (coordinator == NULL || cp_pp == NULL || now == 0u || now < coordinator->owner_time) { return OPENV2G_RESULT_REJECTED; }
+    if (coordinator->state_machine.state != OPENV2G_COORDINATOR_UNPLUGGED &&
+        cp_pp->env.session_generation != coordinator->generation) { return OPENV2G_RESULT_REJECTED; }
     coordinator->owner_time = now;
-    if (coordinator->state_machine.state != OPENV2G_COORDINATOR_UNPLUGGED) {
-        if (cp_pp->env.session_generation != coordinator->generation || (cp_pp->env.timestamp != 0u && obsolete(&coordinator->cp_pp.env, &cp_pp->env))) { return OPENV2G_RESULT_REJECTED; }
-        if (cp_pp->env.quality != OPENV2G_QUALITY_VALID || cp_pp->env.timestamp == 0u || cp_pp->env.timestamp > now || cp_pp->cp_state == OPENV2G_CP_INVALID || cp_pp->plug_state == OPENV2G_PLUG_UNKNOWN) {
-            OpenV2g_CommEnvelope previous = coordinator->cp_pp.env;
-            coordinator->cp_pp = *cp_pp; coordinator->has_cp_pp = false;
-            if (cp_pp->env.timestamp == 0u) { coordinator->cp_pp.env.timestamp = previous.timestamp;
-                coordinator->cp_pp.env.sequence_counter = previous.sequence_counter; }
-            evidence_lost(coordinator); return OPENV2G_RESULT_REJECTED;
+    if (cp_pp->env.quality != OPENV2G_QUALITY_VALID || cp_pp->env.timestamp == 0u || cp_pp->env.timestamp > now ||
+        now - cp_pp->env.timestamp > coordinator->config.permission.cp_pp_max_age_us ||
+        cp_pp->cp_state == OPENV2G_CP_INVALID || cp_pp->plug_state == OPENV2G_PLUG_UNKNOWN) {
+        if (coordinator->state_machine.state != OPENV2G_COORDINATOR_UNPLUGGED) {
+            /* Invalid evidence revokes usability, never the accepted ordering watermark. */
+            coordinator->has_cp_pp = false; evidence_lost(coordinator);
         }
-    }
-    if ((coordinator == NULL) || (cp_pp == NULL) ||
-        (cp_pp->env.quality != OPENV2G_QUALITY_VALID) ||
-        (cp_pp->env.timestamp == 0u) || (cp_pp->env.timestamp > now)) {
         return OPENV2G_RESULT_REJECTED;
+    }
+    if (coordinator->state_machine.state != OPENV2G_COORDINATOR_UNPLUGGED) {
+        if (obsolete(&coordinator->cp_pp.env, &cp_pp->env) ||
+            (coordinator->cp_pp.env.sequence_counter != 0u && coordinator->cp_pp.env.sequence_counter == cp_pp->env.sequence_counter &&
+             !duplicate(&coordinator->cp_pp.env, &cp_pp->env))) { return OPENV2G_RESULT_REJECTED; }
+        if (duplicate(&coordinator->cp_pp.env, &cp_pp->env)) { return coordinator->has_cp_pp ? OPENV2G_RESULT_OK : OPENV2G_RESULT_REJECTED; }
     }
 
     if (cp_pp->plug_state == OPENV2G_PLUG_UNPLUGGED) {
@@ -769,11 +771,24 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_RestartConnected(
     return OpenV2g_ChargingCoordinator_OnQualifiedCpPp(coordinator, &cp, now);
 }
 
+/* A command acknowledgement and a historical boolean are not current measured proof. */
+static bool stop_measurement_current(const OpenV2g_ChargingCoordinator *coordinator, OpenV2g_TimeUs now)
+{
+    const OpenV2g_ChargeHardwareStatus *hardware = &coordinator->hardware;
+    return coordinator->stop_measured_safe && coordinator->has_hardware &&
+        OpenV2g_EnvelopeIsCurrent(&hardware->env, coordinator->generation, now, coordinator->config.permission.hardware_max_age_us) &&
+        hardware->env.timestamp >= coordinator->stop_started && hardware->env.timestamp < coordinator->stop_deadline &&
+        hardware->env.sequence_counter > coordinator->stop_hardware_sequence &&
+        hardware->state == OPENV2G_HW_SAFE && !hardware->positive_contactor_closed && !hardware->negative_contactor_closed &&
+        !hardware->precharge_active && hardware->measured_current_ma == 0;
+}
+
 void OpenV2g_ChargingCoordinator_Tick(
     OpenV2g_ChargingCoordinator *coordinator,
     OpenV2g_TimeUs now)
 {
     const OpenV2g_ChargePermission *permission;
+    bool completion_ready;
 
     if (coordinator == NULL) {
         return;
@@ -788,6 +803,9 @@ void OpenV2g_ChargingCoordinator_Tick(
         (void)OpenV2g_ChargingCoordinator_Stop(coordinator, now, OPENV2G_REASON_TIMEOUT);
     }
 
+    if (coordinator->safe_requested && !coordinator->stop_completed && !stop_measurement_current(coordinator,now)) {
+        coordinator->stop_measured_safe = false;
+    }
     if (coordinator->safe_requested && !coordinator->stop_completed && !coordinator->stop_measured_safe && now >= coordinator->stop_deadline &&
         coordinator->state_machine.state != OPENV2G_COORDINATOR_FAULT_LATCHED) {
         (void)OpenV2g_ChargingCoordinator_Stop(coordinator, now, OPENV2G_REASON_TIMEOUT);
@@ -798,20 +816,18 @@ void OpenV2g_ChargingCoordinator_Tick(
     } else if (coordinator->safe_requested && !coordinator->teardown_started && now >= coordinator->stop_deadline) {
         (void)OpenV2g_ChargingCoordinator_Stop(coordinator, now, OPENV2G_REASON_TIMEOUT);
     }
-    if (coordinator->teardown_started && coordinator->stop_measured_safe && !coordinator->stop_completed &&
-        now >= coordinator->stop_deadline && (!coordinator->hlc_stop_completed || !coordinator->link_stop_completed) &&
+    completion_ready = coordinator->teardown_started && coordinator->hlc_stop_completed && coordinator->link_stop_completed &&
+        stop_measurement_current(coordinator,now) && is_success(coordinator->stop_result) && coordinator->has_cp_pp &&
+        OpenV2g_EnvelopeIsCurrent(&coordinator->cp_pp.env, coordinator->generation, now, coordinator->config.permission.cp_pp_max_age_us);
+    if (coordinator->teardown_started && coordinator->safe_requested && !coordinator->stop_completed &&
+        now >= coordinator->stop_deadline && !completion_ready &&
         coordinator->state_machine.state != OPENV2G_COORDINATOR_FAULT_LATCHED) {
         coordinator->stop_result = OPENV2G_RESULT_NOT_OK;
         OpenV2g_FaultCoordinator_Raise(&coordinator->fault_coordinator, coordinator->generation,
             now, OPENV2G_FAULT_CONTROLLED_STOP, OPENV2G_REASON_TIMEOUT);
         (void)OpenV2g_ChargeStateMachine_Dispatch(&coordinator->state_machine, OPENV2G_CSM_EVENT_BLOCKING_FAULT);
     }
-    if (coordinator->teardown_started && coordinator->hlc_stop_completed && coordinator->link_stop_completed &&
-        coordinator->stop_measured_safe && !coordinator->stop_completed &&
-        is_success(coordinator->stop_result) && coordinator->has_cp_pp && coordinator->has_hardware &&
-        OpenV2g_EnvelopeIsCurrent(&coordinator->cp_pp.env, coordinator->generation, now, coordinator->config.permission.cp_pp_max_age_us) &&
-        OpenV2g_EnvelopeIsCurrent(&coordinator->hardware.env, coordinator->generation, now, coordinator->config.permission.hardware_max_age_us) &&
-        coordinator->state_machine.state == OPENV2G_COORDINATOR_STOPPING) {
+    if (completion_ready && !coordinator->stop_completed && coordinator->state_machine.state == OPENV2G_COORDINATOR_STOPPING) {
         bool unplugged = coordinator->cp_pp.plug_state == OPENV2G_PLUG_UNPLUGGED;
         coordinator->stop_completed = true;
         (void)OpenV2g_ChargeStateMachine_Dispatch(&coordinator->state_machine,

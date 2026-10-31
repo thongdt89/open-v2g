@@ -1,6 +1,6 @@
 # Coordinator control-boundary changes
 
-Revision: Draft 0.2 — 31/10/2026. PROJECT host implementation, following
+Revision: Draft 0.3 — 31/10/2026. PROJECT host implementation, following
 Atomic Rev.3 §§4, 5, 25 and 26. This revision changes C11 interfaces; it does not
 change imported AUTOSAR datatypes or freeze supplier/vehicle contracts.
 
@@ -151,3 +151,33 @@ both active states, safe-request OK/ACCEPTED/BUSY/REJECTED, revoke-before-comman
 missing resync/measurement, future/zero/invalid/stale/reordered/duplicate faults on
 all three paths, generation isolation, repeated-fault deadlines, clock rewind,
 and late measured/teardown evidence. Dated historical review probes are preserved.
+
+
+## Review follow-ups: current stop proof and CP/PP recovery — 31/10/2026
+
+TASK-3: Tick now requalifies retained measured-safe proof using hardware freshness,
+generation, post-command sequence/time, SAFE/open contactors, inactive precharge
+and zero measured current. Expiry clears the retained proof flag. A new qualified
+sample can restore proof before the original deadline; no new command or deadline
+is issued. Completion and timeout use the same current prerequisites. If CP/PP,
+measurement or service completion prevents the stop from completing at the existing
+deadline, the existing timeout/fault path runs. Hardware proof loss uses the
+existing missing-measurement escalation; missing other completion evidence uses
+the existing incomplete-stop escalation. No actuator retry policy is introduced.
+Late evidence cannot complete a fault-latched stop or authorize transfer.
+
+TASK-4: Invalid current-generation CP/PP data clears usability and revokes before
+coordinated stopping, while retaining the last accepted snapshot as the ordering
+watermark. Future, zero, stale, invalid-quality and invalid-semantic samples cannot
+poison the accepted timestamp/sequence. Valid newer connected or unplug samples
+can restore source evidence, while STOPPING still denies transfer. Valid reordered
+samples and same-sequence mutations remain rejected, including before the unplug
+branch. Unrelated active generations are rejected before advancing owner time.
+Initial connection retains the existing owner-assigned session-generation behavior.
+
+`openv2g_test_coordinator_fault_ingress` now includes `stop_evidence_expiry` and
+`cp_recovery`. They cover the two additional dated review reproductions with
+desired behavior, short synthetic evidence ages, missing/invalid CP/PP and hardware,
+fresh normal completion, pre-deadline proof recovery, late evidence after fault,
+connected/unplug recovery after six invalid CP/PP forms, accepted-sample ordering
+and generation isolation. Historical probes and observations remain unchanged.
