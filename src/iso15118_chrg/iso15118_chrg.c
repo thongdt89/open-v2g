@@ -19,6 +19,9 @@ static void update_status(
     hlc->status.env.quality = OPENV2G_QUALITY_VALID;
     hlc->status.env.reason = reason;
     hlc->status.state = state;
+    if (state == OPENV2G_HLC_ERROR || state == OPENV2G_HLC_IDLE || state == OPENV2G_HLC_CLOSING) {
+        OpenV2g_CertificateManager_Invalidate(&hlc->certificate_manager,hlc->generation);
+    }
     if (state == OPENV2G_HLC_ERROR) { hlc->retained_session.valid = false; hlc->resume_requested = false; }
     if (state == OPENV2G_HLC_PROTOCOL_SESSION) { hlc->setup_deadline = 0u; }
     if (state == OPENV2G_HLC_ERROR || state == OPENV2G_HLC_IDLE) { hlc->setup_deadline = 0u; hlc->response_deadline = 0u; }
@@ -63,6 +66,7 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_ConfigureCommunication(OpenV2g_Iso15118Chrg 
 OpenV2g_Result OpenV2g_Iso15118Chrg_TickCommunication(OpenV2g_Iso15118Chrg *hlc, uint32_t generation, OpenV2g_TimeUs now)
 {
     if (hlc == NULL || generation == 0u || generation != hlc->generation || now == 0u || hlc->status.state == OPENV2G_HLC_ERROR) { return OPENV2G_RESULT_REJECTED; }
+    OpenV2g_CertificateManager_Tick(&hlc->certificate_manager,generation,now);
     if (hlc->setup_deadline != 0u && now >= hlc->setup_deadline) {
         update_status(hlc, now, OPENV2G_HLC_ERROR, OPENV2G_REASON_TIMEOUT); return OPENV2G_RESULT_REJECTED;
     }
@@ -469,7 +473,7 @@ void OpenV2g_Iso15118Chrg_Init(
         &hlc->adapter_factory_status_required_port);
     OpenV2g_Subsystem_Init(&hlc->iso_15118_20_adapter, "Iso15118_20Adapter", hlc->features.iso_15118_20);
     OpenV2g_Subsystem_Init(&hlc->pki_security_adapter, "PkiSecurityAdapter", hlc->features.iso_15118_2_pnc || hlc->features.iso_15118_20);
-    OpenV2g_Subsystem_Init(&hlc->certificate_manager, "CertificateManager", hlc->features.iso_15118_2_pnc || hlc->features.iso_15118_20);
+    /* CertificateManager remains unbound until explicit storage/security ports are supplied. */
 }
 
 OpenV2g_Result OpenV2g_Iso15118Chrg_BindEvContextPorts(
@@ -507,6 +511,13 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_BindEvContextPorts(
             permission_port);
     }
     return result;
+}
+
+OpenV2g_Result OpenV2g_Iso15118Chrg_BindCertificateManager(
+    OpenV2g_Iso15118Chrg *hlc, const OpenV2g_CertificatePorts *ports, bool allow_delete)
+{
+    if (hlc == NULL || hlc->status.state != OPENV2G_HLC_IDLE || hlc->certificate_manager.state != OPENV2G_CERT_INIT) { return OPENV2G_RESULT_REJECTED; }
+    return OpenV2g_CertificateManager_Init(&hlc->certificate_manager,ports,allow_delete);
 }
 
 OpenV2g_Result OpenV2g_Iso15118Chrg_AttachV2gtpStorage(
@@ -547,6 +558,8 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_Start(
     }
 
     if (now == 0u || hlc->setup_budget_us > UINT64_MAX - now) { return OPENV2G_RESULT_REJECTED; }
+    if (hlc->certificate_manager.state != OPENV2G_CERT_INIT &&
+        OpenV2g_CertificateManager_BeginGeneration(&hlc->certificate_manager,generation,now) != OPENV2G_RESULT_OK) { return OPENV2G_RESULT_REJECTED; }
     hlc->setup_deadline = hlc->setup_budget_us == 0u ? 0u : now + hlc->setup_budget_us;
     hlc->response_deadline = 0u;
     (void)memset(&hlc->processing_stage, 0, sizeof(hlc->processing_stage));

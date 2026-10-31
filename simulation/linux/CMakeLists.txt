@@ -29,7 +29,7 @@ endif()
 option(OPENV2G_ENABLE_OPENSSL_HOST "Build real OpenSSL host TLS/crypto provider" OFF)
 if(OPENV2G_ENABLE_OPENSSL_HOST)
     find_package(OpenSSL 3.0 REQUIRED COMPONENTS SSL Crypto)
-    add_library(openv2g_openssl_host STATIC src/tls.c src/crypto.c)
+    add_library(openv2g_openssl_host STATIC src/tls.c src/crypto.c src/pki.c)
     target_link_libraries(openv2g_openssl_host PUBLIC openv2g_linux_bsw PRIVATE OpenSSL::SSL OpenSSL::Crypto)
     target_include_directories(openv2g_openssl_host PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
     # Also support a distro development package extracted outside /usr.
@@ -62,4 +62,14 @@ if(OPENV2G_ENABLE_OPENSSL_HOST AND OPENV2G_BUILD_TESTS)
     add_test(NAME openv2g_test_linux_crypto COMMAND ${Python3_EXECUTABLE}
         ${PROJECT_SOURCE_DIR}/tests/security/fixture.py $<TARGET_FILE:openv2g_test_linux_crypto>)
     set_tests_properties(openv2g_test_linux_crypto PROPERTIES TIMEOUT 30)
+endif()
+
+if(OPENV2G_ENABLE_OPENSSL_HOST AND OPENV2G_BUILD_TESTS)
+    add_executable(openv2g_test_linux_pki tests/test_pki.c)
+    target_link_libraries(openv2g_test_linux_pki PRIVATE openv2g_openssl_host)
+    target_include_directories(openv2g_test_linux_pki PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+    openv2g_enable_strict_warnings(openv2g_test_linux_pki)
+    add_test(NAME openv2g_test_linux_pki COMMAND ${Python3_EXECUTABLE}
+        ${PROJECT_SOURCE_DIR}/tests/security/fixture.py $<TARGET_FILE:openv2g_test_linux_pki>)
+    set_tests_properties(openv2g_test_linux_pki PROPERTIES TIMEOUT 30)
 endif()

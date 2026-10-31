@@ -152,3 +152,13 @@ integration into the EXI runner, then scoped multicast/link-local and TLS.
 The `station6`/`evcc6` runner now integrates real UDP discovery before IPv6 TCP
 and SAP/EXI, for both DIN and ISO-2. This supersedes the preceding pending-runner
 integration note. Multicast/link-local interface handling, retries and TLS remain.
+
+## Certificate transaction update — 31/10/2026
+
+Concrete optional-bound HLC CertificateManager, memory NvM transaction/fault
+model and real optional OpenSSL host validation are implemented. See
+[certificate contracts](simulation/linux/CERTIFICATE_TRANSACTIONS.md) and the
+[current remaining inventory](docs/architecture/INCOMPLETE_ITEMS.md).
+Next: bind managed proof to the signed-receipt consumer; select exact editions
+and OEM contract certificate/key/time/revocation roles before PnC wire bindings.
+Keep richer AC/services/profiles, scoped multicast/SLAC and ISO-20/BPT open.

@@ -227,3 +227,18 @@ policy. See [host signature guide](../../simulation/linux/SIGNED_RECEIPTS.md).
 Verification for signed receipts: **40/40** normal, **38/38** sanitizer,
 **34/34** generated-code/OpenSSL-OFF and **25/25** default-build checks passed.
 See [verification/source hashes](evidence/signed_receipt_verification.json).
+
+## Certificate owner and host PKI — 31/10/2026
+
+Replaced the HLC CertificateManager placeholder with a concrete optional-bound
+owner. Added bounded public-chain records, transactional staging/commit/rollback,
+generation and deadline checks, lease-bound key versions, explicit deletion and
+fail-closed recovery after uncertain writes. Added a memory NvM fault model and
+real optional OpenSSL chain/SAN/EKU/P-256/key-match/trusted-time/CRL validation.
+
+Verification and limits: [host certificate contracts](../../simulation/linux/CERTIFICATE_TRANSACTIONS.md)
+and [executed evidence](evidence/certificate_transaction_verification.json).
+This increment does not enable PnC or connect managed credentials to signed wire
+receipts. Exact editions/OEM PKI remain unanswered external decisions; continue
+those bindings only with explicit roles/trust/credential policy. Broader AC,
+service/profile negotiation, network scope/SLAC and ISO-20/BPT remain open.

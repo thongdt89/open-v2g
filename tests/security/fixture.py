@@ -48,6 +48,7 @@ def credentials(folder):
                 .add_extension(x509.KeyUsage(True, False, False, False, False, False, False, False, False), critical=True)
                 .sign(issuer_key, hashes.SHA256()))
         write(name + ".pem", cert.public_bytes(serialization.Encoding.PEM))
+        write(name + ".der", cert.public_bytes(serialization.Encoding.DER))
         write(name + ".key", key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
         serials[name] = cert.serial_number
         return key, cert
@@ -55,11 +56,15 @@ def credentials(folder):
     r, s = utils.decode_dss_signature(server_key.sign(b"abc", ec.ECDSA(hashes.SHA256())))
     write("external.sig", r.to_bytes(32, "big") + s.to_bytes(32, "big"))
     leaf("client", root, root_key, "evcc.test", client=True)
+    leaf("client-expired", root, root_key, "evcc.test", start=-3, end=-2, client=True)
+    leaf("client-future", root, root_key, "evcc.test", start=1, end=2, client=True)
+    leaf("client-untrusted", other, other_key, "evcc.test", client=True)
+    leaf("client-wrong-name", root, root_key, "other.test", client=True)
     leaf("untrusted", other, other_key)
     leaf("expired", root, root_key, start=-3, end=-2)
     leaf("future", root, root_key, start=1, end=2)
     revoked = x509.RevokedCertificateBuilder().serial_number(serials["server"]).revocation_date(now - dt.timedelta(minutes=1)).build()
-    for name, entries in [("revoked.crl", [revoked]), ("clean.crl", [])]:
+    for name, entries in [("revoked.crl", [revoked]), ("clean.crl", []), ("client-revoked.crl", [x509.RevokedCertificateBuilder().serial_number(serials["client"]).revocation_date(now - dt.timedelta(minutes=1)).build()])]:
         crl = x509.CertificateRevocationListBuilder().issuer_name(root.subject).last_update(now - dt.timedelta(minutes=2)).next_update(now + dt.timedelta(days=1))
         for entry in entries:
             crl = crl.add_revoked_certificate(entry)

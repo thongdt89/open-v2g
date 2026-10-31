@@ -1,0 +1,66 @@
+{
+  "date": "2026-10-31",
+  "base_commit": "403cb9f",
+  "scope": "Portable optional-bound HLC certificate transactions, deterministic memory NvM fault model and optional OpenSSL host DNS client-signing validation. Not PnC protocol support, selected OEM policy, durable flash or target/conformance evidence. System OpenSSL shared libraries are outside sanitizer instrumentation.",
+  "builds": {
+    "normal_generated_openssl_oracle": {
+      "passed": 42,
+      "failed": 0,
+      "ctest_log_sha256": "7b6dd2eda5ac166a7de94a34ec451be72c89c882f7471febfdf2768324f38af8"
+    },
+    "asan_ubsan_generated_openssl": {
+      "passed": 40,
+      "failed": 0,
+      "ctest_log_sha256": "2e106c4be039810327cef2cde09874049b984dbb48f68e6cc4083fc676a192fa"
+    },
+    "generated_oracle_openssl_off": {
+      "passed": 35,
+      "failed": 0,
+      "ctest_log_sha256": "0849e819d0817ccdc81d75f731a8817d0d78ea997cea299ffd89c5c854d30e41"
+    },
+    "default_codecs_openssl_off": {
+      "passed": 26,
+      "failed": 0,
+      "ctest_log_sha256": "d85661ee604befa928e4ae0e880b70bf7ac8d39673dd3a74e42fd8cbfa1ca132"
+    }
+  },
+  "source_sha256": {
+    "CMakeLists.txt": "a0ad66167b7d70973425cdafac372665772a81a1e10dfe160d7c01e6d619d891",
+    "simulation/CMakeLists.txt": "10038c18e77b4c1a649103e1199362c33a1e2970bdb1d7fae3b894075d6cf893",
+    "simulation/linux/CMakeLists.txt": "5a8efd913602f48f2eb5ae1af119058d613bb880e17d58a36947961b3ab25f8d",
+    "tests/CMakeLists.txt": "c34506dec43c974e24586663ebed8b9b012e0199b0f2de8175888e259d29e503",
+    "include/openv2g/iso15118_chrg/certificate_manager.h": "54bcbdb822d2cc13471f6dc7499506f9c2cedc78f79717317c28d8fecada30e1",
+    "include/openv2g/iso15118_chrg/iso15118_chrg.h": "52c011e58e37e30965a8b3e9891d60747296001d0896505b3b2079e4ea493a17",
+    "src/iso15118_chrg/certificate_manager.c": "a69a99b8c5f365d8620e9ddd0a4b8a85d8d9a8fbb8eb8b5fc72abc7fb7562d4a",
+    "src/iso15118_chrg/iso15118_chrg.c": "df62a273794f0213d258587b0675e616c9f09df803c27d41ad911f36c5ae4cd0",
+    "simulation/include/openv2g/simulation/certificate_storage.h": "f452488e897ca4dcbe598e77b6481b97a87a72bd37bc50ae73eab830cf430bc1",
+    "simulation/src/certificate_storage.c": "caad3bb5935f2b256195cb2cee7897c34b7e7455811ea4ec73f3c963f6ec87fc",
+    "simulation/linux/include/openv2g/linux/pki.h": "e5620d7a2764d87bfb4acbb59f435355de98b5580dacf513abb52d4fe9d12ea0",
+    "simulation/linux/src/pki.c": "c371278f1b188fa82ceaccd5c72873cf5c2c82ff8e5532d8058df7484cb7733a",
+    "simulation/linux/tests/test_pki.c": "9997d3e42b9cf69a674288330cf4766354dcb426843cfcf89de9e071448165b3",
+    "tests/unit/test_certificate_manager.c": "2815a81363af0fdb0693cf7611a3d3f64671805232c33742e751264f86981cac",
+    "tests/security/fixture.py": "1e89974dd9beb3fd8920cf7e80b49e90e1a0d555ccd3852791a4a7f1df77a7a6"
+  },
+  "candidate_codec_commit": "03350be048b35b179905129005a97144a4bdcf93",
+  "independent_oracle_commit": "733d4f43cb6579c705d59c7386786ce12a0a0026",
+  "openssl_runtime": "3.0.13",
+  "negative_coverage": [
+    "wrong generation/transaction and old rollback",
+    "pending expiry and late validation",
+    "failed candidate retains active; failed active revalidation revokes",
+    "failure before write, after stage, and lost commit acknowledgement",
+    "selected slot corruption; mandatory revalidation after recovery",
+    "delete policy/versioned tombstone",
+    "HLC stop invalidates candidate and key lease",
+    "revoked/untrusted/expired/future/wrong SAN/wrong EKU",
+    "trailing DER, wrong key/version, wrong generation, invalid trusted-time quality"
+  ],
+  "remaining": [
+    "Managed proof to signed-receipt consumer binding",
+    "PnC PaymentDetails/challenge/certificate-install/update wire",
+    "OEM roles, roots, secure time, revocation policy, encrypted key import",
+    "Supplier NvM/KeyM/Csm and durable anti-rollback",
+    "Broader AC/services/profiles, multicast/SLAC, ISO-20/BPT",
+    "Target, physical interoperability and conformance"
+  ]
+}

@@ -56,3 +56,7 @@ add_openv2g_test(openv2g_test_session_context unit/test_session_context.c)
 if(TARGET openv2g_host_sim)
     add_openv2g_simulation_test(openv2g_test_communication_budgets integration/test_communication_budgets.c)
 endif()
+
+if(TARGET openv2g_host_sim)
+    add_openv2g_simulation_test(openv2g_test_certificate_manager unit/test_certificate_manager.c)
+endif()

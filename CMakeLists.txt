@@ -40,6 +40,7 @@ add_library(openv2g_core STATIC
     src/charging_coordinator/fault_coordinator.c
     src/charging_coordinator/bpt_coordinator.c
     src/charging_coordinator/charging_coordinator.c
+    src/iso15118_chrg/certificate_manager.c
     src/iso15118_chrg/session_context.c
     src/iso15118_chrg/iso15118_chrg.c
     src/iso15118_chrg/hlc_event_queue.c

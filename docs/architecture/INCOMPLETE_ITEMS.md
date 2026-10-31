@@ -1,9 +1,27 @@
 # Current feature completion status
 
-Revision: Draft 0.5 — 31/10/2026. **Overall implementation remains in progress.**
+Revision: Draft 0.6 — 31/10/2026. **Overall implementation remains in progress.**
 This is the current inventory; older audits/work-log entries describe their own
 snapshots. Implemented means host code, not selected supplier, frozen design,
 vehicle safety allocation or protocol conformance.
+
+## Certificate-transaction increment — 31/10/2026
+
+Implemented a portable bounded CertificateManager with HLC generation/stop
+binding, copied candidate staging, key-version leases, compare-and-commit,
+idempotent rollback, policy-gated deletion, recovery and required revalidation
+after uncertain writes. A memory-backed two-slot NvM fault model and optional
+real OpenSSL host chain/SAN/EKU/key-match/trusted-time/CRL validator now exist.
+See [certificate contracts](../../simulation/linux/CERTIFICATE_TRANSACTIONS.md).
+
+These supersede the absence of host certificate transactions and validation in
+older rows below. Still open: signed-receipt consumer binding to managed proof,
+actual PnC PaymentDetails/challenge and certificate installation/update wire,
+contract/eMAID roles, encrypted key import and selected OEM root/time/revocation
+policy. The fixed host DNS client-signing profile does not select those policies.
+Supplier NvM/KeyM/Csm, durable storage/anti-rollback and target evidence remain
+external gates. Broader AC/services/profiles, scoped multicast/SLAC, ISO-20/BPT
+and physical interoperability/conformance remain incomplete.
 
 ## Signed-receipt increment — 31/10/2026
 
