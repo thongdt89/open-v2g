@@ -116,6 +116,14 @@ static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenari
             response.parameter_count = 1u;
             response.parameters[0].set_id = 1; response.parameters[0].name_length = 4u;
             (void)memcpy(response.parameters[0].name, "host", 4u); response.parameters[0].integer_value = 1;
+            response.parameter_count = 3u;
+            response.parameters[1].set_id = protocol == OPENV2G_PROTOCOL_DIN_70121 ? 2 : 1;
+            response.parameters[1].name_length = 7u; (void)memcpy(response.parameters[1].name,"enabled",7u);
+            response.parameters[1].kind = OPENV2G_PARAM_BOOL; response.parameters[1].integer_value = 1;
+            response.parameters[2].set_id = protocol == OPENV2G_PROTOCOL_DIN_70121 ? 3 : 1;
+            response.parameters[2].name_length = 5u; (void)memcpy(response.parameters[2].name,"power",5u);
+            response.parameters[2].kind = OPENV2G_PARAM_PHYSICAL; response.parameters[2].physical_value = 7;
+            response.parameters[2].physical_multiplier = 3; response.parameters[2].physical_unit = OPENV2G_PARAM_WATT;
         }
         (void)memcpy(response.session_id, session_id, 8u);
         if (scenario == OV_WIRE_PENDING && steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER && !pending_sent) {

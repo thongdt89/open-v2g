@@ -146,6 +146,79 @@ static bool signature_in(const struct iso2_SignatureType *source, OpenV2g_ExiSig
     return true;
 }
 
+static bool parameter_out(const OpenV2g_ExiParameter *source, struct iso2_ParameterType *target)
+{
+    OpenV2g_ParameterKind kind = source->kind == OPENV2G_PARAM_LEGACY ?
+        (source->is_string ? OPENV2G_PARAM_STRING : OPENV2G_PARAM_INT) : source->kind;
+    if (source->name_length == 0u || source->name_length > sizeof(source->name) || source->name_length > sizeof(target->Name.characters)) { return false; }
+    target->Name.charactersLen = source->name_length; (void)memcpy(target->Name.characters,source->name,source->name_length);
+    switch (kind) {
+    case OPENV2G_PARAM_BOOL:
+        if (source->integer_value != 0 && source->integer_value != 1) { return false; }
+        target->boolValue_isUsed = 1u; target->boolValue = source->integer_value;  break;
+    case OPENV2G_PARAM_BYTE:
+        if (source->integer_value < INT8_MIN || source->integer_value > INT8_MAX) { return false; }
+        target->byteValue_isUsed = 1u; target->byteValue = (int8_t)source->integer_value;  break;
+    case OPENV2G_PARAM_SHORT:
+        if (source->integer_value < INT16_MIN || source->integer_value > INT16_MAX) { return false; }
+        target->shortValue_isUsed = 1u; target->shortValue = (int16_t)source->integer_value;  break;
+    case OPENV2G_PARAM_INT:
+        target->intValue_isUsed = 1u; target->intValue = source->integer_value;  break;
+    case OPENV2G_PARAM_PHYSICAL:
+        if (source->physical_multiplier < -3 || source->physical_multiplier > 3) { return false; }
+        target->physicalValue_isUsed = 1u; target->physicalValue.Value = source->physical_value;
+        target->physicalValue.Multiplier = source->physical_multiplier;
+        switch (source->physical_unit) {
+        case OPENV2G_PARAM_HOUR: target->physicalValue.Unit = iso2_unitSymbolType_h; break;
+        case OPENV2G_PARAM_METER: target->physicalValue.Unit = iso2_unitSymbolType_m; break;
+        case OPENV2G_PARAM_SECOND: target->physicalValue.Unit = iso2_unitSymbolType_s; break;
+        case OPENV2G_PARAM_AMPERE: target->physicalValue.Unit = iso2_unitSymbolType_A; break;
+        case OPENV2G_PARAM_VOLT: target->physicalValue.Unit = iso2_unitSymbolType_V; break;
+        case OPENV2G_PARAM_WATT: target->physicalValue.Unit = iso2_unitSymbolType_W; break;
+        case OPENV2G_PARAM_WATT_HOUR: target->physicalValue.Unit = iso2_unitSymbolType_Wh; break;
+        default: return false;
+        }
+        break;
+    case OPENV2G_PARAM_STRING:
+        if (source->text_length > sizeof(source->text) || source->text_length > sizeof(target->stringValue.characters)) { return false; }
+        target->stringValue_isUsed = 1u; target->stringValue.charactersLen = source->text_length;
+        (void)memcpy(target->stringValue.characters,source->text,source->text_length);  break;
+    default: return false;
+    }
+    return true;
+}
+static bool parameter_in(const struct iso2_ParameterType *source, int16_t set_id, OpenV2g_ExiParameter *target)
+{
+    if ((unsigned)source->boolValue_isUsed+(unsigned)source->byteValue_isUsed+(unsigned)source->shortValue_isUsed+
+        (unsigned)source->intValue_isUsed+(unsigned)source->physicalValue_isUsed+(unsigned)source->stringValue_isUsed != 1u ||
+        source->Name.charactersLen == 0u || source->Name.charactersLen > sizeof(target->name)) { return false; }
+    target->set_id = set_id; target->name_length = source->Name.charactersLen; (void)memcpy(target->name,source->Name.characters,target->name_length);
+    if (source->boolValue_isUsed) { if (source->boolValue != 0 && source->boolValue != 1) { return false; } target->kind = OPENV2G_PARAM_BOOL; target->integer_value = source->boolValue;  }
+    else if (source->byteValue_isUsed) { target->kind = OPENV2G_PARAM_BYTE; target->integer_value = source->byteValue;  }
+    else if (source->shortValue_isUsed) { target->kind = OPENV2G_PARAM_SHORT; target->integer_value = source->shortValue;  }
+    else if (source->intValue_isUsed) { target->kind = OPENV2G_PARAM_INT; target->integer_value = source->intValue;  }
+    else if (source->stringValue_isUsed) {
+
+        if (source->stringValue.charactersLen > sizeof(target->text)) { return false; }
+        target->kind = OPENV2G_PARAM_STRING; target->is_string = true; target->text_length = source->stringValue.charactersLen;
+        (void)memcpy(target->text,source->stringValue.characters,target->text_length);
+    } else {
+
+        if (source->physicalValue.Multiplier < -3 || source->physicalValue.Multiplier > 3) { return false; }
+        target->kind = OPENV2G_PARAM_PHYSICAL; target->physical_value = source->physicalValue.Value; target->physical_multiplier = source->physicalValue.Multiplier;
+        switch (source->physicalValue.Unit) {
+        case iso2_unitSymbolType_h: target->physical_unit = OPENV2G_PARAM_HOUR; break;
+        case iso2_unitSymbolType_m: target->physical_unit = OPENV2G_PARAM_METER; break;
+        case iso2_unitSymbolType_s: target->physical_unit = OPENV2G_PARAM_SECOND; break;
+        case iso2_unitSymbolType_A: target->physical_unit = OPENV2G_PARAM_AMPERE; break;
+        case iso2_unitSymbolType_V: target->physical_unit = OPENV2G_PARAM_VOLT; break;
+        case iso2_unitSymbolType_W: target->physical_unit = OPENV2G_PARAM_WATT; break;
+        case iso2_unitSymbolType_Wh: target->physical_unit = OPENV2G_PARAM_WATT_HOUR; break;
+        default: return false;
+        }
+    }
+    return true;
+}
 static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocument *generated)
 {
     struct iso2_BodyType *body = &generated->V2G_Message.Body;
@@ -256,19 +329,22 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
             REQUIRE(value->parameter_count <= OPENV2G_EXI_PARAMETER_MAX);
             body->ServiceDetailRes.ServiceParameterList_isUsed = value->parameter_count != 0u;
             body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen = value->parameter_count;
+            body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen = 0u;
             for (i = 0u; i < value->parameter_count; ++i) {
                 const OpenV2g_ExiParameter *source = &value->parameters[i];
-                struct iso2_ParameterSetType *set = &body->ServiceDetailRes.ServiceParameterList.ParameterSet.array[i];
-                struct iso2_ParameterType *parameter = &set->Parameter.array[0];
-                set->ParameterSetID = source->set_id; set->Parameter.arrayLen = 1u;
-                REQUIRE(source->name_length > 0u && source->name_length <= sizeof(source->name) && source->name_length < sizeof(parameter->Name.characters));
-                parameter->Name.charactersLen = source->name_length;
-                (void)memcpy(parameter->Name.characters, source->name, source->name_length);
-                if (source->is_string) {
-                    REQUIRE(source->text_length <= sizeof(source->text) && source->text_length < sizeof(parameter->stringValue.characters));
-                    parameter->stringValue_isUsed = 1u; parameter->stringValue.charactersLen = source->text_length;
-                    (void)memcpy(parameter->stringValue.characters, source->text, source->text_length);
-                } else { parameter->intValue_isUsed = 1u; parameter->intValue = source->integer_value; }
+                unsigned j, k, set_index = body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen;
+                struct iso2_ParameterSetType *set;
+                for (j = 0u; j < i; ++j) {
+                    const OpenV2g_ExiParameter *prior = &value->parameters[j];
+                    REQUIRE(!(prior->set_id == source->set_id && prior->name_length == source->name_length &&
+                        source->name_length <= sizeof(source->name) && memcmp(prior->name,source->name,source->name_length) == 0));
+                }
+                for (k = 0u; k < body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen; ++k) {
+                    if (body->ServiceDetailRes.ServiceParameterList.ParameterSet.array[k].ParameterSetID == source->set_id) { set_index = k; break; }
+                }
+                if (set_index == body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen) { ++body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen; }
+                set = &body->ServiceDetailRes.ServiceParameterList.ParameterSet.array[set_index]; set->ParameterSetID = source->set_id;
+                REQUIRE(parameter_out(source,&set->Parameter.array[set->Parameter.arrayLen])); ++set->Parameter.arrayLen;
             }
             break;
         }
@@ -445,27 +521,24 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
         value->service_id = body->ServiceDetailReq.ServiceID;
     }
     if (body->ServiceDetailRes_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL; value->response = true;
-        unsigned i;
-        value->accepted = body->ServiceDetailRes.ResponseCode == iso2_responseCodeType_OK;
-        value->service_id = body->ServiceDetailRes.ServiceID;
+        unsigned i, j;
+        value->accepted = body->ServiceDetailRes.ResponseCode == iso2_responseCodeType_OK; value->service_id = body->ServiceDetailRes.ServiceID;
         if (body->ServiceDetailRes.ServiceParameterList_isUsed) {
-            REQUIRE(body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen > 0u && body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen <= OPENV2G_EXI_PARAMETER_MAX);
-            value->parameter_count = (uint8_t)body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen;
-            for (i = 0u; i < value->parameter_count; ++i) {
+            unsigned count = body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen;
+            REQUIRE(count > 0u && count <= OPENV2G_EXI_PARAMETER_MAX);
+            for (i = 0u; i < count; ++i) {
                 const struct iso2_ParameterSetType *set = &body->ServiceDetailRes.ServiceParameterList.ParameterSet.array[i];
-                const struct iso2_ParameterType *parameter = &set->Parameter.array[0];
-                OpenV2g_ExiParameter *source = &value->parameters[i];
-                REQUIRE(set->Parameter.arrayLen == 1u);
-                REQUIRE(!parameter->boolValue_isUsed && !parameter->byteValue_isUsed && !parameter->shortValue_isUsed && !parameter->physicalValue_isUsed);
-                REQUIRE((unsigned)parameter->intValue_isUsed + (unsigned)parameter->stringValue_isUsed == 1u);
-                source->set_id = set->ParameterSetID; source->is_string = parameter->stringValue_isUsed;
-
-                REQUIRE(parameter->Name.charactersLen > 0u && parameter->Name.charactersLen <= sizeof(source->name));
-                source->name_length = parameter->Name.charactersLen; (void)memcpy(source->name, parameter->Name.characters, source->name_length);
-                if (source->is_string) {
-                    REQUIRE(parameter->stringValue.charactersLen <= sizeof(source->text));
-                    source->text_length = parameter->stringValue.charactersLen; (void)memcpy(source->text, parameter->stringValue.characters, source->text_length);
-                } else { source->integer_value = parameter->intValue; }
+                for (j = 0u; j < i; ++j) { REQUIRE(body->ServiceDetailRes.ServiceParameterList.ParameterSet.array[j].ParameterSetID != set->ParameterSetID); }
+                REQUIRE(set->Parameter.arrayLen > 0u && set->Parameter.arrayLen <= OPENV2G_EXI_PARAMETER_MAX-value->parameter_count);
+                for (j = 0u; j < set->Parameter.arrayLen; ++j) {
+                    unsigned k; OpenV2g_ExiParameter *target = &value->parameters[value->parameter_count];
+                    REQUIRE(parameter_in(&set->Parameter.array[j],set->ParameterSetID,target));
+                    for (k = 0u; k < value->parameter_count; ++k) {
+                        REQUIRE(!(value->parameters[k].set_id == target->set_id && value->parameters[k].name_length == target->name_length &&
+                            memcmp(value->parameters[k].name,target->name,target->name_length) == 0));
+                    }
+                    ++value->parameter_count;
+                }
             }
         }
     }

@@ -263,3 +263,14 @@ mismatch and overflow guards. Added two independent EXI cases and retained the
 old 25 feature/50 baseline references. Broader services/profiles and asymmetric
 phase control are still open. See simulation/linux/AC_THREE_PHASE.md and
 [evidence](evidence/ac_three_phase_verification.json).
+
+## Typed service parameters — 31/10/2026
+
+Added boolean/byte/short/physical choices to existing int/string DTO mapping in
+DIN and ISO-2. ISO-2 groups multiple parameters per SetID; DIN retains its actual
+single-parameter set shape and validates ValueType. Added explicit units, signed
+bounds, duplicate/capacity guards, real socket parameter responses, a dedicated
+codec test and two independent bundles (29 feature vectors, earlier cases intact).
+Broader service/payment/mode offers and profiles remain open. See
+[contracts](../../simulation/linux/SERVICE_PARAMETERS.md) and
+[evidence](evidence/service_parameter_verification.json).

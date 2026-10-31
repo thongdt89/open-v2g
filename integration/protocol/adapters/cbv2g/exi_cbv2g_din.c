@@ -58,6 +58,85 @@ static bool request_status_in(const struct din_DC_EVStatusType *status, OpenV2g_
 #define OUT_PHYS(target, amount, unit) REQUIRE(physical_out(&(target), (amount), din_unitSymbolType_##unit))
 #define IN_PHYS(source, unit, destination) REQUIRE(physical_in(&(source), din_unitSymbolType_##unit, &(destination)))
 
+static bool parameter_out(const OpenV2g_ExiParameter *source, struct din_ParameterType *target)
+{
+    OpenV2g_ParameterKind kind = source->kind == OPENV2G_PARAM_LEGACY ?
+        (source->is_string ? OPENV2G_PARAM_STRING : OPENV2G_PARAM_INT) : source->kind;
+    if (source->name_length == 0u || source->name_length > sizeof(source->name) || source->name_length > sizeof(target->Name.characters)) { return false; }
+    target->Name.charactersLen = source->name_length; (void)memcpy(target->Name.characters,source->name,source->name_length);
+    switch (kind) {
+    case OPENV2G_PARAM_BOOL:
+        if (source->integer_value != 0 && source->integer_value != 1) { return false; }
+        target->boolValue_isUsed = 1u; target->boolValue = source->integer_value; target->ValueType = din_valueType_bool; break;
+    case OPENV2G_PARAM_BYTE:
+        if (source->integer_value < INT8_MIN || source->integer_value > INT8_MAX) { return false; }
+        target->byteValue_isUsed = 1u; target->byteValue = (int8_t)source->integer_value; target->ValueType = din_valueType_byte; break;
+    case OPENV2G_PARAM_SHORT:
+        if (source->integer_value < INT16_MIN || source->integer_value > INT16_MAX) { return false; }
+        target->shortValue_isUsed = 1u; target->shortValue = (int16_t)source->integer_value; target->ValueType = din_valueType_short; break;
+    case OPENV2G_PARAM_INT:
+        target->intValue_isUsed = 1u; target->intValue = source->integer_value; target->ValueType = din_valueType_int; break;
+    case OPENV2G_PARAM_PHYSICAL:
+        if (source->physical_multiplier < -3 || source->physical_multiplier > 3) { return false; }
+        target->physicalValue_isUsed = 1u; target->physicalValue.Value = source->physical_value;
+        target->physicalValue.Multiplier = source->physical_multiplier; target->ValueType = din_valueType_physicalValue; target->physicalValue.Unit_isUsed = 1u;
+        switch (source->physical_unit) {
+        case OPENV2G_PARAM_HOUR: target->physicalValue.Unit = din_unitSymbolType_h; break;
+        case OPENV2G_PARAM_METER: target->physicalValue.Unit = din_unitSymbolType_m; break;
+        case OPENV2G_PARAM_SECOND: target->physicalValue.Unit = din_unitSymbolType_s; break;
+        case OPENV2G_PARAM_AMPERE: target->physicalValue.Unit = din_unitSymbolType_A; break;
+        case OPENV2G_PARAM_VOLT: target->physicalValue.Unit = din_unitSymbolType_V; break;
+        case OPENV2G_PARAM_WATT: target->physicalValue.Unit = din_unitSymbolType_W; break;
+        case OPENV2G_PARAM_WATT_HOUR: target->physicalValue.Unit = din_unitSymbolType_Wh; break;
+        case OPENV2G_PARAM_AMPERE_HOUR: target->physicalValue.Unit = din_unitSymbolType_Ah; break;
+        case OPENV2G_PARAM_VOLT_AMPERE: target->physicalValue.Unit = din_unitSymbolType_VA; break;
+        case OPENV2G_PARAM_WATT_SECOND: target->physicalValue.Unit = din_unitSymbolType_W_s; break;
+        default: return false;
+        }
+        break;
+    case OPENV2G_PARAM_STRING:
+        if (source->text_length > sizeof(source->text) || source->text_length > sizeof(target->stringValue.characters)) { return false; }
+        target->stringValue_isUsed = 1u; target->stringValue.charactersLen = source->text_length;
+        (void)memcpy(target->stringValue.characters,source->text,source->text_length); target->ValueType = din_valueType_string; break;
+    default: return false;
+    }
+    return true;
+}
+static bool parameter_in(const struct din_ParameterType *source, int16_t set_id, OpenV2g_ExiParameter *target)
+{
+    if ((unsigned)source->boolValue_isUsed+(unsigned)source->byteValue_isUsed+(unsigned)source->shortValue_isUsed+
+        (unsigned)source->intValue_isUsed+(unsigned)source->physicalValue_isUsed+(unsigned)source->stringValue_isUsed != 1u ||
+        source->Name.charactersLen == 0u || source->Name.charactersLen > sizeof(target->name)) { return false; }
+    target->set_id = set_id; target->name_length = source->Name.charactersLen; (void)memcpy(target->name,source->Name.characters,target->name_length);
+    if (source->boolValue_isUsed) { if (source->boolValue != 0 && source->boolValue != 1) { return false; } target->kind = OPENV2G_PARAM_BOOL; target->integer_value = source->boolValue; if (source->ValueType != din_valueType_bool) { return false; } }
+    else if (source->byteValue_isUsed) { target->kind = OPENV2G_PARAM_BYTE; target->integer_value = source->byteValue; if (source->ValueType != din_valueType_byte) { return false; } }
+    else if (source->shortValue_isUsed) { target->kind = OPENV2G_PARAM_SHORT; target->integer_value = source->shortValue; if (source->ValueType != din_valueType_short) { return false; } }
+    else if (source->intValue_isUsed) { target->kind = OPENV2G_PARAM_INT; target->integer_value = source->intValue; if (source->ValueType != din_valueType_int) { return false; } }
+    else if (source->stringValue_isUsed) {
+        if (source->ValueType != din_valueType_string) { return false; }
+        if (source->stringValue.charactersLen > sizeof(target->text)) { return false; }
+        target->kind = OPENV2G_PARAM_STRING; target->is_string = true; target->text_length = source->stringValue.charactersLen;
+        (void)memcpy(target->text,source->stringValue.characters,target->text_length);
+    } else {
+        if (source->ValueType != din_valueType_physicalValue || !source->physicalValue.Unit_isUsed) { return false; }
+        if (source->physicalValue.Multiplier < -3 || source->physicalValue.Multiplier > 3) { return false; }
+        target->kind = OPENV2G_PARAM_PHYSICAL; target->physical_value = source->physicalValue.Value; target->physical_multiplier = source->physicalValue.Multiplier;
+        switch (source->physicalValue.Unit) {
+        case din_unitSymbolType_h: target->physical_unit = OPENV2G_PARAM_HOUR; break;
+        case din_unitSymbolType_m: target->physical_unit = OPENV2G_PARAM_METER; break;
+        case din_unitSymbolType_s: target->physical_unit = OPENV2G_PARAM_SECOND; break;
+        case din_unitSymbolType_A: target->physical_unit = OPENV2G_PARAM_AMPERE; break;
+        case din_unitSymbolType_V: target->physical_unit = OPENV2G_PARAM_VOLT; break;
+        case din_unitSymbolType_W: target->physical_unit = OPENV2G_PARAM_WATT; break;
+        case din_unitSymbolType_Wh: target->physical_unit = OPENV2G_PARAM_WATT_HOUR; break;
+        case din_unitSymbolType_Ah: target->physical_unit = OPENV2G_PARAM_AMPERE_HOUR; break;
+        case din_unitSymbolType_VA: target->physical_unit = OPENV2G_PARAM_VOLT_AMPERE; break;
+        case din_unitSymbolType_W_s: target->physical_unit = OPENV2G_PARAM_WATT_SECOND; break;
+        default: return false;
+        }
+    }
+    return true;
+}
 static bool to_generated(const OpenV2g_ExiDcDocument *value, struct din_exiDocument *generated)
 {
     struct din_BodyType *body = &generated->V2G_Message.Body;
@@ -137,18 +216,10 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct din_exiDocum
             body->ServiceDetailRes.ServiceParameterList_isUsed = value->parameter_count != 0u;
             body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen = value->parameter_count;
             for (i = 0u; i < value->parameter_count; ++i) {
-                const OpenV2g_ExiParameter *source = &value->parameters[i];
-                struct din_ParameterSetType *set = &body->ServiceDetailRes.ServiceParameterList.ParameterSet.array[i];
-                struct din_ParameterType *parameter = &set->Parameter;
-                set->ParameterSetID = source->set_id;  parameter->ValueType = source->is_string ? din_valueType_string : din_valueType_int;
-                REQUIRE(source->name_length > 0u && source->name_length <= sizeof(source->name) && source->name_length < sizeof(parameter->Name.characters));
-                parameter->Name.charactersLen = source->name_length;
-                (void)memcpy(parameter->Name.characters, source->name, source->name_length);
-                if (source->is_string) {
-                    REQUIRE(source->text_length <= sizeof(source->text) && source->text_length < sizeof(parameter->stringValue.characters));
-                    parameter->stringValue_isUsed = 1u; parameter->stringValue.charactersLen = source->text_length;
-                    (void)memcpy(parameter->stringValue.characters, source->text, source->text_length);
-                } else { parameter->intValue_isUsed = 1u; parameter->intValue = source->integer_value; }
+                unsigned j;
+                for (j = 0u; j < i; ++j) { REQUIRE(value->parameters[j].set_id != value->parameters[i].set_id); }
+                body->ServiceDetailRes.ServiceParameterList.ParameterSet.array[i].ParameterSetID = value->parameters[i].set_id;
+                REQUIRE(parameter_out(&value->parameters[i],&body->ServiceDetailRes.ServiceParameterList.ParameterSet.array[i].Parameter));
             }
             break;
         }
@@ -272,27 +343,15 @@ static bool from_generated(const struct din_exiDocument *generated, OpenV2g_ExiD
         value->service_id = body->ServiceDetailReq.ServiceID;
     }
     if (body->ServiceDetailRes_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL; value->response = true;
-        unsigned i;
-        value->accepted = body->ServiceDetailRes.ResponseCode == din_responseCodeType_OK;
-        value->service_id = body->ServiceDetailRes.ServiceID;
+        unsigned i, j;
+        value->accepted = body->ServiceDetailRes.ResponseCode == din_responseCodeType_OK; value->service_id = body->ServiceDetailRes.ServiceID;
         if (body->ServiceDetailRes.ServiceParameterList_isUsed) {
-            REQUIRE(body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen > 0u && body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen <= OPENV2G_EXI_PARAMETER_MAX);
-            value->parameter_count = (uint8_t)body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen;
-            for (i = 0u; i < value->parameter_count; ++i) {
+            unsigned count = body->ServiceDetailRes.ServiceParameterList.ParameterSet.arrayLen;
+            REQUIRE(count > 0u && count <= OPENV2G_EXI_PARAMETER_MAX);
+            for (i = 0u; i < count; ++i) {
                 const struct din_ParameterSetType *set = &body->ServiceDetailRes.ServiceParameterList.ParameterSet.array[i];
-                const struct din_ParameterType *parameter = &set->Parameter;
-                OpenV2g_ExiParameter *source = &value->parameters[i];
-
-                REQUIRE(!parameter->boolValue_isUsed && !parameter->byteValue_isUsed && !parameter->shortValue_isUsed && !parameter->physicalValue_isUsed);
-                REQUIRE((unsigned)parameter->intValue_isUsed + (unsigned)parameter->stringValue_isUsed == 1u);
-                source->set_id = set->ParameterSetID; source->is_string = parameter->stringValue_isUsed;
-                REQUIRE(parameter->ValueType == (source->is_string ? din_valueType_string : din_valueType_int));
-                REQUIRE(parameter->Name.charactersLen > 0u && parameter->Name.charactersLen <= sizeof(source->name));
-                source->name_length = parameter->Name.charactersLen; (void)memcpy(source->name, parameter->Name.characters, source->name_length);
-                if (source->is_string) {
-                    REQUIRE(parameter->stringValue.charactersLen <= sizeof(source->text));
-                    source->text_length = parameter->stringValue.charactersLen; (void)memcpy(source->text, parameter->stringValue.characters, source->text_length);
-                } else { source->integer_value = parameter->intValue; }
+                for (j = 0u; j < i; ++j) { REQUIRE(body->ServiceDetailRes.ServiceParameterList.ParameterSet.array[j].ParameterSetID != set->ParameterSetID); }
+                REQUIRE(parameter_in(&set->Parameter,set->ParameterSetID,&value->parameters[value->parameter_count])); ++value->parameter_count;
             }
         }
     }

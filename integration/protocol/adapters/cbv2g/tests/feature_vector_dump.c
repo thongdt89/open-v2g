@@ -8,7 +8,7 @@ static int emit(const char *profile, OpenV2g_ExiDcDocument *document)
     OpenV2g_ExiResult result;
     size_t index;
     uint16_t id = (uint16_t)((unsigned)document->kind + (document->response ? OPENV2G_EXI_DC_RESPONSE_OFFSET : 0u));
-    OpenV2g_ExiEncodeRequest request = {OPENV2G_SCHEMA_ISO_15118_2, id, document, sizeof(*document), bytes, sizeof(bytes)};
+    OpenV2g_ExiEncodeRequest request = {strncmp(profile,"din-",4u) == 0 ? OPENV2G_SCHEMA_DIN_70121 : OPENV2G_SCHEMA_ISO_15118_2, id, document, sizeof(*document), bytes, sizeof(bytes)};
     if (OpenV2g_ExiCodec_Encode(&codec, 1u, &request, &result) != OPENV2G_RESULT_OK) { return 1; }
     (void)printf("%s %u ", profile, id);
     for (index = 0u; index < result.encoded_length; ++index) { (void)printf("%02x", bytes[index]); }
@@ -34,7 +34,7 @@ int main(void)
     size_t index;
     unsigned response;
     OpenV2g_SchemaRegistry_Init(&registry); OpenV2g_ExiCodec_Init(&codec, &registry);
-    if (OpenV2g_Cbv2gIso2_Bind(&codec) != OPENV2G_RESULT_OK || OpenV2g_ExiCodec_Start(&codec, 1u) != OPENV2G_RESULT_OK) { return 1; }
+    if (OpenV2g_Cbv2gDin_Bind(&codec) != OPENV2G_RESULT_OK || OpenV2g_Cbv2gIso2_Bind(&codec) != OPENV2G_RESULT_OK || OpenV2g_ExiCodec_Start(&codec, 1u) != OPENV2G_RESULT_OK) { return 1; }
     for (index = 0u; index < sizeof(ac_kinds) / sizeof(ac_kinds[0]); ++index) {
         for (response = 0u; response < 2u; ++response) {
             OpenV2g_ExiDcDocument document = OpenV2g_ExiDc_Default(ac_kinds[index], response != 0u);
@@ -83,6 +83,23 @@ int main(void)
         document.ac_mode = true; document.ac_phases = 3u; document.ac_energy_wh = 1000u;
         document.max_voltage_mv = 250000u; document.max_current_ma = 32000; document.min_current_ma = 6000;
         if (emit("iso2-ac3",&document) != 0) { return 1; }
+    }
+    {
+        unsigned din, i;
+        const OpenV2g_ParameterKind kinds[5] = {OPENV2G_PARAM_BOOL,OPENV2G_PARAM_BYTE,OPENV2G_PARAM_SHORT,OPENV2G_PARAM_PHYSICAL,OPENV2G_PARAM_STRING};
+        for (din = 0u; din < 2u; ++din) {
+            OpenV2g_ExiDcDocument document = OpenV2g_ExiDc_Default(OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL,true);
+            document.parameter_count = 5u;
+            for (i = 0u; i < 5u; ++i) {
+                OpenV2g_ExiParameter *parameter = &document.parameters[i];
+                parameter->set_id = din != 0u ? (int16_t)(i+1u) : 1;
+                parameter->name_length = 1u; parameter->name[0] = (char)('A'+i); parameter->kind = kinds[i];
+                parameter->integer_value = i == 0u ? 1 : -17;
+                parameter->physical_value = -123; parameter->physical_multiplier = -3; parameter->physical_unit = OPENV2G_PARAM_WATT;
+                parameter->text_length = 3u; (void)memcpy(parameter->text,"abc",3u);
+            }
+            if (emit(din != 0u ? "din-parameters" : "iso2-parameters",&document) != 0) { return 1; }
+        }
     }
     return 0;
 }

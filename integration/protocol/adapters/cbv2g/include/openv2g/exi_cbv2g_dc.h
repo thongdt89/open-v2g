@@ -8,7 +8,20 @@
 #define OPENV2G_EXI_DC_RESPONSE_OFFSET 100u
 #define OPENV2G_EXI_DC_ID_MAX 32u
 #define OPENV2G_EXI_PARAMETER_MAX 5u
-typedef struct { int16_t set_id; char name[32]; uint16_t name_length; bool is_string; int32_t integer_value; char text[32]; uint16_t text_length; } OpenV2g_ExiParameter;
+typedef enum {
+    OPENV2G_PARAM_LEGACY = 0, OPENV2G_PARAM_BOOL, OPENV2G_PARAM_BYTE,
+    OPENV2G_PARAM_SHORT, OPENV2G_PARAM_INT, OPENV2G_PARAM_PHYSICAL, OPENV2G_PARAM_STRING
+} OpenV2g_ParameterKind;
+typedef enum { OPENV2G_PARAM_HOUR = 0, OPENV2G_PARAM_METER, OPENV2G_PARAM_SECOND,
+    OPENV2G_PARAM_AMPERE, OPENV2G_PARAM_VOLT, OPENV2G_PARAM_WATT, OPENV2G_PARAM_WATT_HOUR, OPENV2G_PARAM_AMPERE_HOUR,
+    OPENV2G_PARAM_VOLT_AMPERE, OPENV2G_PARAM_WATT_SECOND } OpenV2g_ParameterUnit;
+typedef struct {
+    int16_t set_id; char name[32]; uint16_t name_length;
+    bool is_string; /* Legacy kind only; explicit kind takes precedence. */
+    int32_t integer_value; char text[32]; uint16_t text_length;
+    OpenV2g_ParameterKind kind;
+    int16_t physical_value; int8_t physical_multiplier; OpenV2g_ParameterUnit physical_unit;
+} OpenV2g_ExiParameter;
 #define OPENV2G_EXI_SCHEDULE_MAX 3u
 #define OPENV2G_EXI_SCHEDULE_POINTS_MAX 5u
 typedef struct { uint32_t start_s; uint32_t duration_s; int32_t power_w; } OpenV2g_ExiSchedulePoint;

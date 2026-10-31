@@ -1,9 +1,20 @@
 # Current feature completion status
 
-Revision: Draft 0.8 — 31/10/2026. **Overall implementation remains in progress.**
+Revision: Draft 0.9 — 31/10/2026. **Overall implementation remains in progress.**
 This is the current inventory; older audits/work-log entries describe their own
 snapshots. Implemented means host code, not selected supplier, frozen design,
 vehicle safety allocation or protocol conformance.
+
+## Typed service-parameter increment — 31/10/2026
+
+Both DIN and ISO-2 now map all six bounded parameter value choices with explicit
+physical units, signed-width checks and truncation/capacity rejection. ISO-2
+groups multiple parameters per set; DIN preserves one parameter per generated
+set. Real socket ServiceDetail responses exercise typed parameter data. Two
+independent bundles extend the feature corpus to 29, preserving earlier cases.
+See [host parameter contracts](../../simulation/linux/SERVICE_PARAMETERS.md).
+Multiple offers, selection, charging profiles and tariffs remain open; the
+parameter mapper does not silently treat arbitrary names as charging authority.
 
 ## Balanced three-phase AC increment — 31/10/2026
 

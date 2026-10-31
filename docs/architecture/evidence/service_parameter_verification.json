@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-31",
+  "base_commit": "e10d0e9",
+  "scope": "Bounded typed DIN/ISO-2 service parameter codec and simulated socket responses. No semantic authorization from arbitrary parameter names. System OpenSSL libraries are not sanitizer-instrumented.",
+  "builds": {
+    "normal_generated_openssl_oracle": {
+      "passed": 43,
+      "failed": 0,
+      "ctest_log_sha256": "ad7d4dbb541e4892b48068954c98399085802dd1dace7814bcd83c0b2b9e8b46"
+    },
+    "asan_ubsan_generated_openssl": {
+      "passed": 41,
+      "failed": 0,
+      "ctest_log_sha256": "43ba97ff338b0078e44e92a60a834bc82198c4024b869e82f03b5f03769a56c3"
+    },
+    "generated_oracle_openssl_off": {
+      "passed": 36,
+      "failed": 0,
+      "ctest_log_sha256": "2f72c04bdd46d075cca207f803f0905abdb82445f35dc2662aab4d7524a78de0"
+    }
+  },
+  "source_sha256": {
+    "integration/protocol/adapters/cbv2g/CMakeLists.txt": "06f017203bf35fed4b9b35154f52ef40de5913cb4736c85fb15347ec405a0303",
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_din.c": "873560f75e355074f6585b9767c64c6007391334c94cbd28e70dc666d5be7ecd",
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_iso2.c": "d759bf854a8837b27d6a3fd14f09f71ebc856c4b522da4ab82b9f6949be400f5",
+    "integration/protocol/adapters/cbv2g/include/openv2g/exi_cbv2g_dc.h": "41fffebc5e20df1a9a1d57731e28b492a92fc7e0f6ed306619b0508a33d52c23",
+    "integration/protocol/adapters/cbv2g/tests/feature_vector_dump.c": "b14fa5f9c53857d00128bfc96c1ff036a2266a6255eab1233e9f60611b1ab528",
+    "simulation/linux/wire/station.c": "92d9aeffa65a02bf860c1dcaa07c0289d1f100d3529ec93d0171ce6fe99f4efb",
+    "tests/oracle/differential.py": "ef3489a0c7dd6a3855ce2741797d49922c2d452237115e2226fdd2f643c25519",
+    "tests/oracle/feature_vectors.json": "afaba7078b93b261a046c5942245ae12930dcfc2253a45d27916e0796a4a912d",
+    "integration/protocol/adapters/cbv2g/tests/test_cbv2g_parameters.c": "918af641710c58d412ddac1f6fe681f7f4dd3afae685792b98871f393e2f7de0"
+  },
+  "baseline_vectors_unchanged": 50,
+  "earlier_feature_vectors_unchanged": 27,
+  "new_independent_parameter_bundles": 2,
+  "post_test_change": "Trailing whitespace cleanup only in ISO-2 mapper; no functional change."
+}
