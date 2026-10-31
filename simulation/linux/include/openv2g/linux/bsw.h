@@ -59,6 +59,7 @@ bool Ov2g_Decode(const uint8_t frame[OV2G_STUB_FRAME_SIZE], Ov2g_StubMessage *me
 /* IPv4 loopback only. All I/O has a single absolute monotonic deadline. */
 int Ov2g_TcpListen(uint16_t port, uint16_t *bound_port);
 /* Separate IPv6 loopback host transport; discovery/crypto remain separate owners. */
+int Ov2g_Tcp6ListenEndpoint(const OpenV2g_Endpoint *local, uint16_t *bound_port);
 int Ov2g_Tcp6Listen(uint16_t port, uint16_t *bound_port);
 int Ov2g_Tcp6Connect(const OpenV2g_Endpoint *endpoint, OpenV2g_TimeUs deadline);
 int Ov2g_TcpAccept(int listener, OpenV2g_TimeUs deadline);

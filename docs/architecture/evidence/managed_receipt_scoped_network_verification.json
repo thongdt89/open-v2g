@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-31",
+  "base_commit": "ffb90fc",
+  "scope": "Managed client certificate receipt signing and scoped IPv6 discovery/TCP/retry host implementation. Actual physical-interface multicast/link-local execution unverified; no PnC contract authorization or production claim. System OpenSSL libraries are not sanitizer-instrumented.",
+  "signed_tls_sessions": 13,
+  "managed_signed_tls_sessions": 7,
+  "builds": {
+    "normal_generated_openssl_oracle": {
+      "passed": 42,
+      "failed": 0,
+      "ctest_log_sha256": "7469db9617ae067f63f880ad493d3065431cb9202ad00ca5cebf0181449971e0"
+    },
+    "asan_ubsan_generated_openssl": {
+      "passed": 40,
+      "failed": 0,
+      "ctest_log_sha256": "62f1861589877f614e849071e1f75a04e541549d6bb96dddc4029835fcf434de"
+    },
+    "generated_oracle_openssl_off": {
+      "passed": 35,
+      "failed": 0,
+      "ctest_log_sha256": "cc8a04e17e818e9465bd9e19fc4d80f6c6cd201efd58fb1e9e192a80410262d7"
+    },
+    "default_codecs_openssl_off": {
+      "passed": 26,
+      "failed": 0,
+      "ctest_log_sha256": "6c02f67bbf3216fab602774fd3b3d2e5db7e01fd4e28bc19c7a6834ac75e8810"
+    }
+  },
+  "source_sha256": {
+    "simulation/linux/include/openv2g/linux/bsw.h": "82df13cccb61807489953a7534b9411114cb63a1b86fd8e2864538d17ee6ac9a",
+    "simulation/linux/include/openv2g/linux/sdp6.h": "15ac8b0664901d5c09d73d8a7d9378250d012af9006f0674b7ba6b6c8845ccfc",
+    "simulation/linux/src/sdp6.c": "69102c8c4c8d3fde8932400e29e7b1e8094728982970cd76bc9b86aa419893f3",
+    "simulation/linux/src/tcpip.c": "b894efc7d42af0926016b4e6978d3ad9f81defe278db56bdf3e1aa4f13546641",
+    "simulation/linux/tests/test_sdp6.c": "d0425f0e50a9b304ac81e7bdba0c32374c22b103c833d5b218bf0f99deccf30d",
+    "simulation/linux/wire/client.c": "c9bc0538492cb0e234316bd077e48efb47a5619b73841218cc17342d3f4647db",
+    "simulation/linux/wire/wire.h": "3608d6f75fe80e92566f9260d7439e9c401a3d747f39022c9a9e2b93b17e6bd7",
+    "simulation/linux/wire/test_wire_signed.c": "be8e5c4804985bfd1a04d596e5fe9c24dd3bb87629d1713239ed275bc848f4c9"
+  }
+}

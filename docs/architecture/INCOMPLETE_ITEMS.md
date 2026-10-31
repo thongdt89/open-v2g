@@ -1,9 +1,26 @@
 # Current feature completion status
 
-Revision: Draft 0.6 — 31/10/2026. **Overall implementation remains in progress.**
+Revision: Draft 0.7 — 31/10/2026. **Overall implementation remains in progress.**
 This is the current inventory; older audits/work-log entries describe their own
 snapshots. Implemented means host code, not selected supplier, frozen design,
 vehicle safety allocation or protocol conformance.
+
+## Managed consumer and scoped network increment — 31/10/2026
+
+Managed CertificateManager proof now guards signed-receipt creation and pending
+transport. Certificate version/fingerprint/key-version changes, invalidation and
+expiry fail closed. Thirteen signed TLS session cases cover pinned and managed
+AC/DC profiles, revocation, invalid time and invalidation before transmission.
+Scoped IPv6 SDP/TCP, ingress-interface validation, all-nodes membership and
+bounded retries are implemented with runner configuration. Loopback ingress and
+retry execution are verified; actual physical-interface multicast delivery and
+link-local TCP execution remain unverified in this environment.
+
+The user excluded production integration from the remaining request. Continue
+all independent host work in [HOST_COMPLETION_PLAN.md](HOST_COMPLETION_PLAN.md).
+Missing production artifacts do not block the remaining host protocol features.
+Older rows below preserve their historical scope; managed receipt binding and
+host scoped network/retry implementation are superseded by this increment.
 
 ## Certificate-transaction increment — 31/10/2026
 

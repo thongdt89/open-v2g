@@ -64,6 +64,11 @@ typedef struct {
     uint32_t receipt_key_version;
     uint32_t receipt_key_lease;
     uint32_t receipt_job;
+    bool managed_receipts;
+    void *trusted_time_context;
+    bool (*trusted_time)(void *, uint32_t, OpenV2g_TimeUs, OpenV2g_TrustedTime *);
+    uint32_t receipt_certificate_version;
+    uint8_t receipt_certificate_fingerprint[32];
     OpenV2g_ExiDcDocument prepared_receipt;
 #endif
     OpenV2g_SapTxRequest pending_sap;
@@ -71,6 +76,9 @@ typedef struct {
     OpenV2g_TimeUs refresh_at;
     uint8_t wire_ids[OPENV2G_EXI_SAP_OFFERS_MAX];
     uint16_t discovery_port;
+    OpenV2g_Endpoint discovery_destination;
+    uint8_t discovery_attempts;
+    OpenV2g_TimeUs discovery_retry_interval;
     OpenV2g_PowerLimits peer_limits;
     OpenV2g_ExiMeterInfo meter_info;
     uint32_t meter_correlation;
@@ -89,6 +97,8 @@ typedef struct {
 } OvWireClient;
 
 #ifdef OPENV2G_HAVE_OPENSSL_HOST
+bool OvWireClient_SetManagedReceiptSigner(OvWireClient *, Ov2g_Crypto *, const OpenV2g_CertificatePorts *,
+    bool (*trusted_time)(void *, uint32_t, OpenV2g_TimeUs, OpenV2g_TrustedTime *), void *time_context);
 bool OvWireClient_SetReceiptSigner(OvWireClient *client, Ov2g_Crypto *crypto, uint32_t key);
 bool OvWireStation_RunSigned(int listener, bool ac_mode, const Ov2g_TlsConfig *tls_config,
     Ov2g_Crypto *verification_crypto, uint32_t key);
@@ -120,6 +130,7 @@ bool OvWireClient_Init(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol
 bool OvWireClient_InitMode(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol, bool freeze_energy, bool ac_mode);
 bool OvWireClient_InitDiscoveryMode(OvWireClient *client, OpenV2g_ProtocolId protocol, uint16_t discovery_port, bool ac_mode);
 bool OvWireClient_InitDiscovery(OvWireClient *client, OpenV2g_ProtocolId protocol, uint16_t discovery_port);
+bool OvWireClient_SetDiscoveryEndpoint(OvWireClient *, const OpenV2g_Endpoint *, uint8_t attempts, OpenV2g_TimeUs retry_interval);
 bool OvWireClient_Run(OvWireClient *client);
 /* Prepare a new generation after measured connected-safe stop; real SDP endpoint required. */
 bool OvWireClient_PrepareResume(OvWireClient *client);

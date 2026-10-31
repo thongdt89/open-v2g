@@ -91,3 +91,29 @@ during transport. Wrong-key rejection stops the simulated energy path with DENY.
 Observed final checks: **40/40** normal, **38/38** ASan/UBSan, **34/34**
 generated-code/OpenSSL-OFF and **25/25** default-build tests passed.
 [Verification snapshot and source hashes](../../docs/architecture/evidence/signed_receipt_verification.json).
+
+## Managed credential consumer — 31/10/2026
+
+`OvWireClient_SetManagedReceiptSigner` optionally binds the HLC's concrete
+CertificateManager and a caller-supplied trusted-time acquisition callback before
+the first generation, after explicit TLS selection. Public credentials must
+already be committed through the configured storage service. The crypto and PKI
+providers share the same explicit key service and session generation.
+
+Each receipt revalidates the selected credential, then records its storage
+version, leaf fingerprint, key handle and key version. The normal per-receipt
+lease also remains held until acknowledgement/cancel. Before submission and on
+every transport supervision turn while the prepared receipt is pending, the
+consumer rereads the manager reference and requires the same certificate/key and
+unexpired proof. A current invalidation, replacement, failed revalidation or
+expiry stops the session without an unsigned fallback. HLC stop releases manager
+proof/leases as well as the prepared receipt. Storage is retained as public data;
+its presence alone cannot reauthorize the next session.
+
+Thirteen signed-session cases now cover the original six pinned-key sessions,
+four managed AC/DC IPv4/IPv6 TLS sessions, revoked managed credentials, invalid
+trusted-time quality and invalidation before the first receipt write. Managed
+IPv6 positives use explicit loopback ingress scope and retry configuration.
+The station's verification key remains explicitly provisioned; this is managed
+client-signing validation with pinned station verification, not negotiated PnC
+contract authorization or a selected OEM certificate profile.

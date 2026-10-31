@@ -242,3 +242,14 @@ This increment does not enable PnC or connect managed credentials to signed wire
 receipts. Exact editions/OEM PKI remain unanswered external decisions; continue
 those bindings only with explicit roles/trust/credential policy. Broader AC,
 service/profile negotiation, network scope/SLAC and ISO-20/BPT remain open.
+
+## Managed receipts and scoped host network — 31/10/2026
+
+Connected managed certificate proof to receipt signing and pending transport:
+version/fingerprint/key-version/freshness are checked; revocation, invalid time
+and current invalidation fail closed. Added seven managed TLS session cases to
+the original six. Scoped SDP/TCP APIs preserve link-local interfaces, validate
+kernel ingress, join all-nodes membership and retry within one aggregate budget.
+Loopback interface/retry behavior is exercised; real physical multicast/link-local
+connectivity remains unverified. Production integration is excluded by user scope;
+remaining host features continue in HOST_COMPLETION_PLAN.md.

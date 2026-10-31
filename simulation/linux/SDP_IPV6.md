@@ -52,3 +52,36 @@ sockets, with simulated CP/PLC/hardware. Remaining network work includes multica
 link-local interface selection, retry/processing budgets, genuine TLS/credentials
 and PLC integration. The provider is a unicast loopback fixture and does not
 claim on-cable discovery or PLC/SLAC support.
+
+## Scoped host extension — 31/10/2026
+
+The provider now additionally accepts explicitly scoped link-local unicast and
+`ff02::1` all-nodes multicast discovery destinations. A nonzero `interface_id`
+is mandatory for those addresses; arbitrary global/multicast destinations are
+rejected. `Ov2g_Sdp6ListenScoped` binds a UDP listener and can join the all-nodes
+group on that interface. Responses must advertise a link-local address matching
+the responding peer, retain the selected scope and requested security, and arrive
+on the selected kernel ingress interface (`IPV6_PKTINFO`). A payload cannot invent
+its ingress interface. Loopback remains available for deterministic tests.
+
+`Ov2g_Sdp6ConfigureRetries` selects one through eight total sends and a nonzero
+interval before Begin. Retries keep the original generation/request and aggregate
+deadline; exhaustion never resets that deadline. Clock rewind, cancel/new owner
+request, bad packet/source/scope/security and timeout fail closed. Default remains
+one send. `OvWireClient_SetDiscoveryEndpoint` exposes destination and bounded retry
+configuration to the EXI runner before its first generation. Explicit TLS config
+continues to choose requested SDP security; no plaintext retry is introduced.
+
+`Ov2g_Tcp6Connect` and `Ov2g_Tcp6ListenEndpoint` preserve the interface scope for
+link-local TCP. They accept loopback or scoped link-local endpoints; global and
+unscoped link-local endpoints are rejected. Caller-provided interface, listening
+address and route must actually exist in the host network.
+
+Tests join the IPv6 group on `lo`, verify kernel ingress scope with real UDP,
+drop an initial request and recover on retry, exhaust the bounded send count,
+check the aggregate timeout and validate multicast/link-local response payloads.
+Managed TLS receipt sessions also use the runner's scoped loopback configuration.
+These tests do **not** establish real ff02 multicast delivery to a physical
+interface or actual fe80 TCP connectivity: this environment provides only the
+loopback fixture. Those paths are implemented but real interface/route execution
+remains unverified. No modem/SLAC responsibility moves into SdpClient.

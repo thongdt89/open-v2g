@@ -2,6 +2,8 @@
 #include "openv2g/linux/bsw.h"
 #include "test.h"
 #include <string.h>
+#include <net/if.h>
+#include <sys/socket.h>
 
 static OpenV2g_Endpoint endpoint(uint16_t port, OpenV2g_SecurityMode security)
 {
@@ -46,6 +48,49 @@ static int roundtrip(OpenV2g_SecurityMode security)
     Ov2g_TcpClose(&server);
     return 0;
 }
+static int scoped_and_retries(void)
+{
+    uint16_t port; unsigned index = if_nametoindex("lo");
+    OpenV2g_Endpoint server, advertised, output, multicast = {0};
+    OpenV2g_SdpClient owner; Ov2g_Sdp6Job job;
+    uint8_t request[10], response[28] = {1u,0xfeu,0x90u,1u,0u,0u,0u,20u};
+    int listener; OpenV2g_TimeUs next;
+    TEST_ASSERT(index != 0u && index <= UINT16_MAX);
+    listener = Ov2g_Sdp6ListenScoped(0u,(uint16_t)index,true,&port); TEST_ASSERT(listener >= 0);
+    server = endpoint(port,OPENV2G_SECURITY_NONE); server.interface_id = (uint16_t)index;
+    advertised = server;
+    OpenV2g_SdpClient_Init(&owner); Ov2g_Sdp6Init(&job);
+    TEST_ASSERT(Ov2g_Sdp6ConfigureRetries(&job,3u,10000u));
+    TEST_ASSERT(!Ov2g_Sdp6ConfigureRetries(&job,9u,10000u));
+    TEST_ASSERT(OpenV2g_SdpClient_Start(&owner,13u) == OPENV2G_RESULT_ACCEPTED);
+    TEST_ASSERT(Ov2g_Sdp6Begin(&job,&owner,&server,Ov2g_OsNow()+100000u) == OPENV2G_RESULT_ACCEPTED);
+    TEST_ASSERT(recv(listener,request,sizeof(request),0) == 10); /* Drop the first request. */
+    next = job.retry_at;
+    TEST_ASSERT(Ov2g_Sdp6Pump(&job,next) == OPENV2G_RESULT_BUSY && job.attempts == 2u);
+    TEST_ASSERT(Ov2g_Sdp6ServeOnce(listener,&advertised) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(Ov2g_Sdp6Pump(&job,next) == OPENV2G_RESULT_OK && owner.endpoint.interface_id == index);
+    multicast = server; (void)memset(multicast.address,0,16u);
+    multicast.address[0] = 0xffu; multicast.address[1] = 2u; multicast.address[15] = 1u;
+    TEST_ASSERT(Ov2g_Sdp6DestinationValid(&multicast));
+    response[8] = 0xfeu; response[9] = 0x80u; response[23] = 2u; response[24] = 0xc0u; response[26] = 0x10u;
+    TEST_ASSERT(Ov2g_Sdp6DecodeResponse(response,28u,&multicast,&output) && output.interface_id == index && output.address[0] == 0xfeu);
+    multicast.interface_id = 0u;
+    TEST_ASSERT(!Ov2g_Sdp6DecodeResponse(response,28u,&multicast,&output));
+    multicast.interface_id = (uint16_t)index; response[8] = 0x20u;
+    TEST_ASSERT(!Ov2g_Sdp6DecodeResponse(response,28u,&multicast,&output));
+    TEST_ASSERT(OpenV2g_SdpClient_Cancel(&owner,13u) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(OpenV2g_SdpClient_Start(&owner,14u) == OPENV2G_RESULT_ACCEPTED);
+    TEST_ASSERT(Ov2g_Sdp6Begin(&job,&owner,&server,Ov2g_OsNow()+100000u) == OPENV2G_RESULT_ACCEPTED);
+    TEST_ASSERT(recv(listener,request,sizeof(request),0) == 10);
+    next = job.retry_at; TEST_ASSERT(Ov2g_Sdp6Pump(&job,next) == OPENV2G_RESULT_BUSY);
+    TEST_ASSERT(recv(listener,request,sizeof(request),0) == 10);
+    next = job.retry_at; TEST_ASSERT(Ov2g_Sdp6Pump(&job,next) == OPENV2G_RESULT_BUSY && job.attempts == 3u);
+    TEST_ASSERT(recv(listener,request,sizeof(request),0) == 10);
+    next = job.retry_at; TEST_ASSERT(Ov2g_Sdp6Pump(&job,next) == OPENV2G_RESULT_BUSY && job.attempts == 3u);
+    TEST_ASSERT(recv(listener,request,sizeof(request),0) < 0);
+    TEST_ASSERT(Ov2g_Sdp6Pump(&job,job.deadline) == OPENV2G_RESULT_REJECTED);
+    Ov2g_TcpClose(&listener); return 0;
+}
 int main(void)
 {
     uint8_t response[29] = {1u,0xfeu,0x90u,1u,0u,0u,0u,20u};
@@ -74,6 +119,7 @@ int main(void)
     TEST_ASSERT(!Ov2g_Sdp6DecodeResponse(response, 28u, &server_endpoint, &output));
     response[0] = 1u; response[8] = 0xffu;
     TEST_ASSERT(!Ov2g_Sdp6DecodeResponse(response, 28u, &server_endpoint, &output));
+    TEST_ASSERT(scoped_and_retries() == 0);
     TEST_ASSERT(roundtrip(OPENV2G_SECURITY_NONE) == 0);
     TEST_ASSERT(roundtrip(OPENV2G_SECURITY_TLS12) == 0);
     TEST_ASSERT(roundtrip(OPENV2G_SECURITY_TLS13) == 0);
