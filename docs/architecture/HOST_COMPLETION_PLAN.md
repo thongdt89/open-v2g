@@ -15,7 +15,7 @@ missing supplier/OEM/vehicle artifacts do not block independent host work.
 - [x] ISO-2 three-phase AC, balanced phase limits and explicit invalid-phase rejection (asymmetric dispatch remains open).
 - [ ] ISO-2 charging profiles, richer schedule/tariff and completion/notification handling.
 - [ ] DIN metering branches where represented by the pinned model.
-- [ ] Host contract roles/eMAID and PaymentDetails/challenge signature path.
+- [x] Restricted host contract role/identity, PaymentDetails and signed challenge Authorization; pre-provisioned contract, explicit TLS, AC/DC/three-phase and signed receipts. See [PnC host scope](PNC_HOST.md).
 - [ ] Host certificate installation/update wire and encrypted key import transaction.
 - [ ] ISO-20 Common/AC/DC source hashes and separately selected bounded EXI backends.
 - [ ] ISO-20 scheduled/dynamic EIM socket sessions and negative coverage.

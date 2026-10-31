@@ -13,7 +13,7 @@ static uint32_t number_crc(uint32_t crc, uint32_t value)
 static uint32_t record_crc(const OpenV2g_CertificateRecord *record)
 {
     uint32_t crc = UINT32_MAX; unsigned i,j;
-    crc = number_crc(crc,record->version); crc = byte_crc(crc,record->present ? 1u : 0u);
+    crc = number_crc(crc,record->version); crc = number_crc(crc,(uint32_t)record->usage); crc = byte_crc(crc,record->present ? 1u : 0u);
     crc = number_crc(crc,record->key_handle); crc = number_crc(crc,record->key_version);
     crc = number_crc(crc,record->identity_length); crc = byte_crc(crc,record->chain_count);
     for (i = 0u; i < OPENV2G_CERT_IDENTITY_MAX; ++i) { crc = byte_crc(crc,(uint8_t)record->identity[i]); }

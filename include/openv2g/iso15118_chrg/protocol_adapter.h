@@ -6,6 +6,7 @@
 
 #include "openv2g/common/result.h"
 #include "openv2g/common/types.h"
+#include "openv2g/common/pnc_types.h"
 #include "openv2g/charging_coordinator/permission_manager.h"
 #include "openv2g/support/energy_data_provider.h"
 
@@ -30,7 +31,8 @@ typedef enum {
     OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION = 13,
     OPENV2G_PROTOCOL_MESSAGE_SESSION_STOP = 14,
     OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL = 15,
-    OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE = 16
+    OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE = 16,
+    OPENV2G_PROTOCOL_MESSAGE_PAYMENT_DETAILS = 17
 } OpenV2g_ProtocolMessageKind;
 
 typedef enum {
@@ -50,7 +52,8 @@ typedef enum {
     OPENV2G_PROTOCOL_STATE_WELDING_DETECTION = 13,
     OPENV2G_PROTOCOL_STATE_SESSION_STOP = 14,
     OPENV2G_PROTOCOL_STATE_TERMINATED = 15,
-    OPENV2G_PROTOCOL_STATE_FAILED = 16
+    OPENV2G_PROTOCOL_STATE_FAILED = 16,
+    OPENV2G_PROTOCOL_STATE_PAYMENT_DETAILS = 17
 } OpenV2g_ProtocolState;
 
 typedef enum {
@@ -96,6 +99,8 @@ typedef struct {
     OpenV2g_ProtocolMeteringEvidence metering_evidence;
     OpenV2g_AllowedAction requested_action;
     int32_t requested_power_w;
+    bool has_pnc_evidence;
+    OpenV2g_ProtocolPncEvidence pnc_evidence;
 } OpenV2g_ProtocolMessage;
 
 typedef struct {
@@ -145,6 +150,9 @@ typedef struct {
     OpenV2g_EvEnergySnapshot energy;
     OpenV2g_ChargePermission permission;
     OpenV2g_ProtocolMeteringEvidence metering_evidence;
+    bool use_pnc;
+    bool has_pnc_evidence;
+    OpenV2g_ProtocolPncEvidence pnc_evidence;
 } OpenV2g_ProtocolTxRequest;
 
 /* Required PAD-IF-009 C/S message channel. */

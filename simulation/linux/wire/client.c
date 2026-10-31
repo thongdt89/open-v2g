@@ -96,6 +96,7 @@ static bool supervise(void *context, OpenV2g_TimeUs now)
     ++client->ticks;
 #ifdef OPENV2G_HAVE_OPENSSL_HOST
     if (client->prepared_receipt.has_signature && !managed_receipt_current(client)) { return false; }
+    if (!OvWirePncClient_Supervise(client,now)) { return false; }
 #endif
     if (client->io.generation != sim->coordinator.generation ||
         (client->io.connection != 0u && client->io.connection != sim->hlc.tcp_tls_session.status.connection_id)) { return false; }
@@ -120,7 +121,7 @@ static bool supervise(void *context, OpenV2g_TimeUs now)
     }
     return true;
 }
-bool OvWireClient_InitMode(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol, bool freeze_energy, bool ac_mode)
+static bool init_mode(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol, bool freeze_energy, bool ac_mode, bool pnc_capable)
 {
     OpenV2g_HostSimulationConfig config = OpenV2g_HostSimulation_DefaultConfig();
     OpenV2g_TcpTxCsPort tx;
@@ -140,6 +141,7 @@ bool OvWireClient_InitMode(OvWireClient *client, int fd, OpenV2g_ProtocolId prot
     config.coordinator.permission.require_protocol_readiness = true;
     config.coordinator.permission.required_limit_sources = (1u << OPENV2G_LIMIT_SOURCE_COUNT) - 1u;
     config.coordinator.permission.limit_max_age_us = 2000000u;
+    config.features.iso_15118_2_pnc = pnc_capable;
     client->assessment_port = OvWireHostAssessmentPort();
     if (OpenV2g_HostSimulation_Init(&client->environment.rte, &config) != OPENV2G_RESULT_OK || !OvWireCodec_Init(&client->codec, 1u)) { return false; }
     {
@@ -162,6 +164,18 @@ bool OvWireClient_InitMode(OvWireClient *client, int fd, OpenV2g_ProtocolId prot
     tx = OvWireIo_TxPort(&client->io);
     return OpenV2g_TcpTlsSession_BindTcpTxPort(client->io.transport, &tx) == OPENV2G_RESULT_OK;
 }
+bool OvWireClient_InitMode(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol, bool freeze_energy, bool ac_mode)
+{
+    return init_mode(client,fd,protocol,freeze_energy,ac_mode,false);
+}
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+bool OvWireClient_InitPncMode(OvWireClient *client, int fd, uint16_t discovery_port, bool ac_mode)
+{
+    if ((discovery_port == 0u && fd < 0) || (discovery_port != 0u && fd != -1) ||
+        !init_mode(client,fd,OPENV2G_PROTOCOL_ISO_15118_2,false,ac_mode,true)) { return false; }
+    client->pnc_required = true; client->discovery_port = discovery_port; return true;
+}
+#endif
 bool OvWireClient_InitDiscoveryMode(OvWireClient *client, OpenV2g_ProtocolId protocol, uint16_t discovery_port, bool ac_mode)
 {
     if (discovery_port == 0u || !OvWireClient_InitMode(client, -1, protocol, false, ac_mode)) { return false; }
@@ -219,6 +233,10 @@ bool OvWireClient_SetSelectedServices(OvWireClient *client, const OpenV2g_ExiSel
     (void)memset(client->requested_extras,0,sizeof(client->requested_extras));
     if (count != 0u) { (void)memcpy(client->requested_extras,extras,count*sizeof(*extras)); }
     client->requested_extra_count = count; client->select_parameter_set = has_set; client->selected_parameter_set = set; return true;
+}
+static uint8_t payment_choice(const OvWireClient *client)
+{
+    return client->environment.rte.hlc.pnc_selected ? OPENV2G_PAYMENT_CONTRACT : OPENV2G_PAYMENT_EXTERNAL;
 }
 static bool offered_mode(const OvWireClient *client, const OpenV2g_ExiDcDocument *offer)
 {
@@ -374,8 +392,8 @@ static bool exchange_protocol(OvWireClient *client)
         unsigned i,j; bool found;
         if (client->offer_generation != client->io.generation || Ov2g_OsNow() >= client->offer_valid_until ||
             client->service_offer.service_id != request.service_id ||
-            (client->service_offer.payment_options & OPENV2G_PAYMENT_EXTERNAL) == 0u || !offered_mode(client,&client->service_offer)) { return false; }
-        request.selected_payment = OPENV2G_PAYMENT_EXTERNAL; request.selected_service_count = (uint8_t)(client->requested_extra_count+1u);
+            (client->service_offer.payment_options & payment_choice(client)) == 0u || !offered_mode(client,&client->service_offer)) { return false; }
+        request.selected_payment = payment_choice(client); request.selected_service_count = (uint8_t)(client->requested_extra_count+1u);
         request.selected_services[0].id = request.service_id; request.selected_services[0].has_parameter_set = client->select_parameter_set;
         request.selected_services[0].parameter_set = client->selected_parameter_set;
         if (client->select_parameter_set) {
@@ -390,6 +408,9 @@ static bool exchange_protocol(OvWireClient *client)
             request.selected_services[i+1u] = client->requested_extras[i];
         }
     }
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+    if (!OvWirePncClient_Request(client,pending,&request,Ov2g_OsNow())) { return false; }
+#endif
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT) {
         if (!pending->has_metering_evidence || client->meter_correlation == 0u ||
             pending->metering_evidence.generation != client->io.generation ||
@@ -435,7 +456,7 @@ static bool exchange_protocol(OvWireClient *client)
     if (!supervise(client, now)) { return false; }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY) {
         if (!offered_mode(client,&response) || (pending->protocol == OPENV2G_PROTOCOL_ISO_15118_2 &&
-            (response.payment_options & OPENV2G_PAYMENT_EXTERNAL) == 0u)) { return false; }
+            (response.payment_options & payment_choice(client)) == 0u)) { return false; }
         client->service_offer = response; client->offer_generation = client->io.generation; client->offer_valid_until = now > UINT64_MAX-2000000u ? UINT64_MAX : now+2000000u;
     }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL) {
@@ -557,6 +578,9 @@ static bool exchange_protocol(OvWireClient *client)
 #endif
 
     }
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+    if (!OvWirePncClient_Response(client,pending,&response,&message,Ov2g_OsNow())) { return false; }
+#endif
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT) {
         if (!response.ready || response.rcd_fault || response.ac_mode != client->ac_mode || (!client->ac_mode && !response.isolation_valid) || client->meter_correlation == 0u) { return false; }
         message.ongoing = client->loops < 3u; ++client->receipts;
@@ -565,6 +589,8 @@ static bool exchange_protocol(OvWireClient *client)
         release_prepared_receipt(client);
 #endif
     }
+    message.now = Ov2g_OsNow();
+    if (!supervise(client,message.now)) { return false; }
     ++client->messages;
     (void)printf("wire schema=%d message=%d loop=%u\n", (int)pending->schema, (int)pending->kind, client->loops);
     return ok(OpenV2g_Iso15118Chrg_OnProtocolMessage(&sim->hlc, message.now, &message)) && sync_hlc(client);
@@ -574,6 +600,9 @@ bool OvWireClient_Run(OvWireClient *client)
     bool success = false;
     OpenV2g_HostSimulation *sim = &client->environment.rte;
     unsigned guard = 0u;
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+    if (client->pnc_required && (!sim->hlc.pnc_selected || !client->tls_enabled)) { return false; }
+#endif
     if (!sap(client)) { goto stop; }
     while (++guard < 40u) {
         if (!exchange_protocol(client)) { goto stop; }
@@ -596,7 +625,7 @@ stop:
     (void)OpenV2g_ExiCodec_Stop(&client->codec.codec, client->io.generation);
     (void)memset(&client->meter_info, 0, sizeof(client->meter_info)); client->meter_correlation = 0u;
 #ifdef OPENV2G_HAVE_OPENSSL_HOST
-    release_prepared_receipt(client);
+    release_prepared_receipt(client); OvWirePncClient_Clear(client);
 #endif
     client->offer_generation = 0u; client->offer_valid_until = 0u; client->service_parameter_count = 0u;
     (void)memset(&client->service_offer,0,sizeof(client->service_offer));

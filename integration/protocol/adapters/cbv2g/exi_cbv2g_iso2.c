@@ -279,6 +279,42 @@ static bool service_in(const struct iso2_ServiceType *source, OpenV2g_ExiService
     if (target->has_scope) { target->scope_length = source->ServiceScope.charactersLen; (void)memcpy(target->scope,source->ServiceScope.characters,target->scope_length); }
     return true;
 }
+static bool contract_out(const OpenV2g_CertificateRecord *source, struct iso2_PaymentDetailsReqType *target)
+{
+    unsigned i;
+    if (!source->present || source->identity_length == 0u || source->identity_length > 15u || source->chain_count == 0u || source->chain_count > OPENV2G_CERT_CHAIN_MAX) { return false; }
+    target->eMAID.charactersLen = source->identity_length; (void)memcpy(target->eMAID.characters,source->identity,source->identity_length);
+    for (i = 0u; i < source->chain_count; ++i) {
+        if (source->chain[i].length == 0u || source->chain[i].length > iso2_certificateType_BYTES_SIZE) { return false; }
+    }
+    target->ContractSignatureCertChain.Certificate.bytesLen = source->chain[0].length;
+    (void)memcpy(target->ContractSignatureCertChain.Certificate.bytes,source->chain[0].bytes,source->chain[0].length);
+    target->ContractSignatureCertChain.SubCertificates_isUsed = source->chain_count > 1u;
+    target->ContractSignatureCertChain.SubCertificates.Certificate.arrayLen = (uint16_t)(source->chain_count-1u);
+    for (i = 1u; i < source->chain_count; ++i) {
+        target->ContractSignatureCertChain.SubCertificates.Certificate.array[i-1u].bytesLen = source->chain[i].length;
+        (void)memcpy(target->ContractSignatureCertChain.SubCertificates.Certificate.array[i-1u].bytes,source->chain[i].bytes,source->chain[i].length);
+    }
+    return true;
+}
+static bool contract_in(const struct iso2_PaymentDetailsReqType *source, OpenV2g_CertificateRecord *target)
+{
+    unsigned i, count = source->ContractSignatureCertChain.SubCertificates_isUsed ? source->ContractSignatureCertChain.SubCertificates.Certificate.arrayLen : 0u;
+    if (source->eMAID.charactersLen == 0u || source->eMAID.charactersLen > 15u || source->ContractSignatureCertChain.Id_isUsed ||
+        count >= OPENV2G_CERT_CHAIN_MAX || (source->ContractSignatureCertChain.SubCertificates_isUsed && count == 0u) ||
+        source->ContractSignatureCertChain.Certificate.bytesLen == 0u || source->ContractSignatureCertChain.Certificate.bytesLen > iso2_certificateType_BYTES_SIZE) { return false; }
+    target->present = true; target->usage = OPENV2G_CERT_USAGE_HOST_CONTRACT; target->identity_length = source->eMAID.charactersLen;
+    (void)memcpy(target->identity,source->eMAID.characters,target->identity_length); target->chain_count = (uint8_t)(count+1u);
+    target->chain[0].length = source->ContractSignatureCertChain.Certificate.bytesLen;
+    (void)memcpy(target->chain[0].bytes,source->ContractSignatureCertChain.Certificate.bytes,target->chain[0].length);
+    for (i = 0u; i < count; ++i) {
+        if (source->ContractSignatureCertChain.SubCertificates.Certificate.array[i].bytesLen == 0u ||
+            source->ContractSignatureCertChain.SubCertificates.Certificate.array[i].bytesLen > iso2_certificateType_BYTES_SIZE) { return false; }
+        target->chain[i+1u].length = source->ContractSignatureCertChain.SubCertificates.Certificate.array[i].bytesLen;
+        (void)memcpy(target->chain[i+1u].bytes,source->ContractSignatureCertChain.SubCertificates.Certificate.array[i].bytes,target->chain[i+1u].length);
+    }
+    return true;
+}
 static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocument *generated)
 {
     struct iso2_BodyType *body = &generated->V2G_Message.Body;
@@ -319,8 +355,18 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
             }
             break;
         }
+        case OPENV2G_PROTOCOL_MESSAGE_PAYMENT_DETAILS:
+            body->PaymentDetailsReq_isUsed = 1u; REQUIRE(contract_out(&value->contract,&body->PaymentDetailsReq)); break;
         case OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION:
-            body->AuthorizationReq_isUsed = 1u; break;
+            body->AuthorizationReq_isUsed = 1u;
+            if (value->has_challenge) {
+                REQUIRE(signature_id_valid(&value->signature));
+                body->AuthorizationReq.Id_isUsed = 1u; body->AuthorizationReq.Id.charactersLen = value->signature.body_id_length;
+                (void)memcpy(body->AuthorizationReq.Id.characters,value->signature.body_id,value->signature.body_id_length);
+                body->AuthorizationReq.GenChallenge_isUsed = 1u; body->AuthorizationReq.GenChallenge.bytesLen = 16u;
+                (void)memcpy(body->AuthorizationReq.GenChallenge.bytes,value->challenge,16u);
+            } else { REQUIRE(!value->has_signature && value->signature.body_id_length == 0u); }
+            break;
         case OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER: {
             struct iso2_DC_EVChargeParameterType *parameters = &body->ChargeParameterDiscoveryReq.DC_EVChargeParameter;
             body->ChargeParameterDiscoveryReq_isUsed = 1u;
@@ -464,6 +510,10 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
         }
         case OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION:
             body->PaymentServiceSelectionRes_isUsed = 1u; body->PaymentServiceSelectionRes.ResponseCode = code; break;
+        case OPENV2G_PROTOCOL_MESSAGE_PAYMENT_DETAILS:
+            REQUIRE(value->has_challenge); body->PaymentDetailsRes_isUsed = 1u; body->PaymentDetailsRes.ResponseCode = code;
+            body->PaymentDetailsRes.GenChallenge.bytesLen = 16u; (void)memcpy(body->PaymentDetailsRes.GenChallenge.bytes,value->challenge,16u);
+            body->PaymentDetailsRes.EVSETimeStamp = value->peer_time_s; break;
         case OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION:
             body->AuthorizationRes_isUsed = 1u; body->AuthorizationRes.ResponseCode = code;
             body->AuthorizationRes.EVSEProcessing = value->waiting_for_customer ? iso2_EVSEProcessingType_Ongoing_WaitingForCustomerInteraction : (value->ongoing ? iso2_EVSEProcessingType_Ongoing : iso2_EVSEProcessingType_Finished); break;
@@ -592,7 +642,8 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
         }
     }
     if (value->has_signature) {
-        REQUIRE(!value->response && value->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT);
+        REQUIRE(!value->response && (value->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT ||
+            (value->kind == OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION && value->has_challenge)));
         generated->V2G_Message.Header.Signature_isUsed = 1u;
         REQUIRE(signed_info_out(&value->signature, &generated->V2G_Message.Header.Signature.SignedInfo));
         generated->V2G_Message.Header.Signature.SignatureValue.CONTENT.bytesLen = 64u;
@@ -714,8 +765,22 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
     if (body->PaymentServiceSelectionRes_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION; value->response = true;
         value->accepted = body->PaymentServiceSelectionRes.ResponseCode == iso2_responseCodeType_OK;
     }
+    if (body->PaymentDetailsReq_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_PAYMENT_DETAILS; value->response = false;
+        REQUIRE(contract_in(&body->PaymentDetailsReq,&value->contract));
+    }
+    if (body->PaymentDetailsRes_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_PAYMENT_DETAILS; value->response = true;
+        value->accepted = body->PaymentDetailsRes.ResponseCode == iso2_responseCodeType_OK;
+        REQUIRE(body->PaymentDetailsRes.GenChallenge.bytesLen == 16u); value->has_challenge = true;
+        (void)memcpy(value->challenge,body->PaymentDetailsRes.GenChallenge.bytes,16u); value->peer_time_s = body->PaymentDetailsRes.EVSETimeStamp;
+    }
     if (body->AuthorizationReq_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION; value->response = false;
-        REQUIRE(!body->AuthorizationReq.Id_isUsed && !body->AuthorizationReq.GenChallenge_isUsed);
+        if (body->AuthorizationReq.GenChallenge_isUsed) {
+            REQUIRE(body->AuthorizationReq.GenChallenge.bytesLen == 16u && body->AuthorizationReq.Id_isUsed &&
+                body->AuthorizationReq.Id.charactersLen > 0u && body->AuthorizationReq.Id.charactersLen <= sizeof(value->signature.body_id));
+            value->has_challenge = true; (void)memcpy(value->challenge,body->AuthorizationReq.GenChallenge.bytes,16u);
+            value->signature.body_id_length = body->AuthorizationReq.Id.charactersLen;
+            (void)memcpy(value->signature.body_id,body->AuthorizationReq.Id.characters,value->signature.body_id_length); REQUIRE(signature_id_valid(&value->signature));
+        } else { REQUIRE(!body->AuthorizationReq.Id_isUsed); }
     }
     if (body->AuthorizationRes_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION; value->response = true;
         value->accepted = body->AuthorizationRes.ResponseCode == iso2_responseCodeType_OK;
@@ -922,7 +987,8 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
     }
     REQUIRE(selected == 1u);
     if (generated->V2G_Message.Header.Signature_isUsed) {
-        REQUIRE(value->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT && !value->response);
+        REQUIRE(!value->response && (value->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT ||
+            (value->kind == OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION && value->has_challenge)));
         REQUIRE(signature_in(&generated->V2G_Message.Header.Signature, &value->signature)); value->has_signature = true;
     }
     return true;
@@ -1021,6 +1087,19 @@ OpenV2g_Result OpenV2g_Cbv2gIso2_ReceiptFragment(const OpenV2g_ExiDcDocument *do
     (void)memset(&fragment, 0, sizeof(fragment)); fragment.MeteringReceiptReq_isUsed = 1u;
     fragment.MeteringReceiptReq = generated.V2G_Message.Body.MeteringReceiptReq;
     return encode_fragment(&fragment, output, capacity, length);
+}
+OpenV2g_Result OpenV2g_Cbv2gIso2_AuthorizationFragment(const OpenV2g_ExiDcDocument *document,
+    uint8_t *output, size_t capacity, size_t *length)
+{
+    OpenV2g_ExiDcDocument unsigned_document; struct iso2_exiDocument generated; struct iso2_exiFragment fragment;
+    if (length != NULL) { *length = 0u; }
+    if (document == NULL || document->kind != OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION || document->response || !document->has_challenge ||
+        !signature_id_valid(&document->signature)) { return OPENV2G_RESULT_REJECTED; }
+    unsigned_document = *document; unsigned_document.has_signature = false;
+    (void)memset(&generated,0,sizeof(generated)); init_iso2_exiDocument(&generated);
+    if (!to_generated(&unsigned_document,&generated)) { return OPENV2G_RESULT_REJECTED; }
+    (void)memset(&fragment,0,sizeof(fragment)); fragment.AuthorizationReq_isUsed = 1u; fragment.AuthorizationReq = generated.V2G_Message.Body.AuthorizationReq;
+    return encode_fragment(&fragment,output,capacity,length);
 }
 OpenV2g_Result OpenV2g_Cbv2gIso2_SignedInfoFragment(const OpenV2g_ExiSignature *signature,
     uint8_t *output, size_t capacity, size_t *length)

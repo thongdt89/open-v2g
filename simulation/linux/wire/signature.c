@@ -11,12 +11,21 @@ static bool perform(Ov2g_Crypto *crypto, uint32_t generation, uint32_t job,
         Ov2g_OsNow(), deadline) != OPENV2G_RESULT_ACCEPTED) { return false; }
     for (i = 0u; i < OV2G_CRYPTO_JOBS; ++i) {
         (void)Ov2g_CryptoPump(crypto, generation, Ov2g_OsNow());
-        if (Ov2g_CryptoTakeResult(crypto, generation, job, result) == OPENV2G_RESULT_OK) { return result->result == OPENV2G_RESULT_OK; }
+        if (Ov2g_CryptoTakeResult(crypto,generation,job,result) == OPENV2G_RESULT_OK) {
+            return result->result == OPENV2G_RESULT_OK && result->generation == generation && result->job_id == job &&
+                result->operation == operation && result->key_handle == key && Ov2g_OsNow() < deadline &&
+                (key == 0u || (key <= OV2G_CRYPTO_KEYS && result->key_version == crypto->versions[key-1u]));
+        }
     }
     (void)Ov2g_CryptoCancel(crypto, generation, job);
     (void)Ov2g_CryptoTakeResult(crypto, generation, job, result); return false;
 }
-bool OvWireSignReceipt(Ov2g_Crypto *crypto, uint32_t generation, uint32_t key,
+static OpenV2g_Result body_fragment(const OpenV2g_ExiDcDocument *document, uint8_t *output, size_t capacity, size_t *length)
+{
+    if (document->kind == OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION) { return OpenV2g_Cbv2gIso2_AuthorizationFragment(document,output,capacity,length); }
+    return OpenV2g_Cbv2gIso2_ReceiptFragment(document,output,capacity,length);
+}
+static bool sign_document(Ov2g_Crypto *crypto, uint32_t generation, uint32_t key,
     uint32_t job, OpenV2g_ExiDcDocument *document, OpenV2g_TimeUs deadline, uint32_t *key_version)
 {
     OpenV2g_ExiDcDocument candidate;
@@ -27,7 +36,7 @@ bool OvWireSignReceipt(Ov2g_Crypto *crypto, uint32_t generation, uint32_t key,
     if (crypto == NULL || document == NULL || key_version == NULL || job == 0u || job == UINT32_MAX ||
         crypto->generation != generation || document->has_signature) { return false; }
     candidate = *document;
-    if (OpenV2g_Cbv2gIso2_ReceiptFragment(&candidate, fragment, sizeof(fragment), &length) != OPENV2G_RESULT_OK ||
+    if (body_fragment(&candidate, fragment, sizeof(fragment), &length) != OPENV2G_RESULT_OK ||
         !perform(crypto, generation, job, OV2G_CRYPTO_SHA256, 0u, fragment, length, NULL, 0u, deadline, &result) || result.output_length != 32u) { return false; }
     (void)memcpy(candidate.signature.digest, result.output, 32u);
     if (OpenV2g_Cbv2gIso2_SignedInfoFragment(&candidate.signature, fragment, sizeof(fragment), &length) != OPENV2G_RESULT_OK ||
@@ -35,17 +44,36 @@ bool OvWireSignReceipt(Ov2g_Crypto *crypto, uint32_t generation, uint32_t key,
     (void)memcpy(candidate.signature.value, result.output, 64u); candidate.has_signature = true;
     *key_version = result.key_version; *document = candidate; return true;
 }
-bool OvWireVerifyReceipt(Ov2g_Crypto *crypto, uint32_t generation, uint32_t key,
+static bool verify_document(Ov2g_Crypto *crypto, uint32_t generation, uint32_t key,
     uint32_t job, const OpenV2g_ExiDcDocument *document, OpenV2g_TimeUs deadline)
 {
     uint8_t fragment[OPENV2G_EXI_DC_PAYLOAD_MAX];
     size_t length;
     Ov2g_CryptoResult result;
     if (crypto == NULL || document == NULL || !document->has_signature || job == 0u || job == UINT32_MAX || crypto->generation != generation) { return false; }
-    if (OpenV2g_Cbv2gIso2_ReceiptFragment(document, fragment, sizeof(fragment), &length) != OPENV2G_RESULT_OK ||
+    if (body_fragment(document, fragment, sizeof(fragment), &length) != OPENV2G_RESULT_OK ||
         !perform(crypto, generation, job, OV2G_CRYPTO_SHA256, 0u, fragment, length, NULL, 0u, deadline, &result) ||
         result.output_length != 32u || memcmp(result.output, document->signature.digest, 32u) != 0) { return false; }
     if (OpenV2g_Cbv2gIso2_SignedInfoFragment(&document->signature, fragment, sizeof(fragment), &length) != OPENV2G_RESULT_OK) { return false; }
     return perform(crypto, generation, job + 1u, OV2G_CRYPTO_VERIFY_P256_SHA256, key,
         fragment, length, document->signature.value, sizeof(document->signature.value), deadline, &result);
+}
+
+bool OvWireSignReceipt(Ov2g_Crypto *crypto, uint32_t generation, uint32_t key, uint32_t job, OpenV2g_ExiDcDocument *document, OpenV2g_TimeUs deadline, uint32_t *version)
+{
+    if (version != NULL) { *version = 0u; }
+    return document != NULL && document->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT && sign_document(crypto,generation,key,job,document,deadline,version);
+}
+bool OvWireVerifyReceipt(Ov2g_Crypto *crypto, uint32_t generation, uint32_t key, uint32_t job, const OpenV2g_ExiDcDocument *document, OpenV2g_TimeUs deadline)
+{
+    return document != NULL && document->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT && verify_document(crypto,generation,key,job,document,deadline);
+}
+bool OvWireSignAuthorization(Ov2g_Crypto *crypto, uint32_t generation, uint32_t key, uint32_t job, OpenV2g_ExiDcDocument *document, OpenV2g_TimeUs deadline, uint32_t *version)
+{
+    if (version != NULL) { *version = 0u; }
+    return document != NULL && document->kind == OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION && sign_document(crypto,generation,key,job,document,deadline,version);
+}
+bool OvWireVerifyAuthorization(Ov2g_Crypto *crypto, uint32_t generation, uint32_t key, uint32_t job, const OpenV2g_ExiDcDocument *document, OpenV2g_TimeUs deadline)
+{
+    return document != NULL && document->kind == OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION && verify_document(crypto,generation,key,job,document,deadline);
 }

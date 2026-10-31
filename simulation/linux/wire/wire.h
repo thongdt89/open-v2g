@@ -10,6 +10,8 @@
 #define OV_WIRE_REFRESH_US 10000u
 #define OV_WIRE_TIMEOUT_US 500000u
 
+typedef struct OvWirePncStationConfig OvWirePncStationConfig;
+
 typedef struct {
     int fd;
 #ifdef OPENV2G_HAVE_OPENSSL_HOST
@@ -70,6 +72,9 @@ typedef struct {
     uint32_t receipt_certificate_version;
     uint8_t receipt_certificate_fingerprint[32];
     OpenV2g_ExiDcDocument prepared_receipt;
+    bool pnc_required;
+    uint32_t authorization_key_lease;
+    OpenV2g_ExiDcDocument prepared_authorization;
 #endif
     OpenV2g_SapTxRequest pending_sap;
     OpenV2g_ProtocolTxRequest pending_protocol;
@@ -109,6 +114,37 @@ typedef struct {
 } OvWireClient;
 
 #ifdef OPENV2G_HAVE_OPENSSL_HOST
+#include "openv2g/linux/pki.h"
+struct OvWirePncStationConfig {
+    Ov2g_Pki *pki;
+    Ov2g_Crypto *crypto;
+    uint32_t key;
+    void *time_context;
+    bool (*trusted_time)(void *, uint32_t, OpenV2g_TimeUs, OpenV2g_TrustedTime *);
+    uint8_t ac_phases; /* 0 DC, 1 or 3 balanced AC. */
+    bool receipts;
+    bool authorization_ongoing_once;
+    bool mismatch_challenge; /* Explicit negative fixture; never a production policy. */
+};
+typedef struct {
+    OpenV2g_CertificateRecord contract;
+    OpenV2g_CertificateProof proof;
+    uint32_t lease, key_version, next_job;
+    OpenV2g_TimeUs deadline;
+    uint8_t session[8], challenge[16];
+    bool details, authorized, ongoing_sent;
+} OvWirePncStation;
+bool OvWireStation_RunPnc(int listener, int udp, uint16_t tcp_port, const Ov2g_TlsConfig *, const OvWirePncStationConfig *);
+bool OvWirePncStation_Process(OvWirePncStation *, const OvWirePncStationConfig *, const OpenV2g_ExiDcDocument *, OpenV2g_ExiDcDocument *);
+bool OvWirePncStation_VerifyReceipt(OvWirePncStation *, const OvWirePncStationConfig *, const OpenV2g_ExiDcDocument *);
+void OvWirePncStation_Clear(OvWirePncStation *, const OvWirePncStationConfig *);
+bool OvWireClient_InitPncMode(OvWireClient *, int fd, uint16_t discovery_port, bool ac_mode);
+bool OvWireClient_SetPncSigner(OvWireClient *, Ov2g_Crypto *, const OpenV2g_CertificatePorts *,
+    bool (*trusted_time)(void *, uint32_t, OpenV2g_TimeUs, OpenV2g_TrustedTime *), void *time_context);
+bool OvWirePncClient_Request(OvWireClient *, const OpenV2g_ProtocolTxRequest *, OpenV2g_ExiDcDocument *, OpenV2g_TimeUs now);
+bool OvWirePncClient_Response(OvWireClient *, const OpenV2g_ProtocolTxRequest *, const OpenV2g_ExiDcDocument *, OpenV2g_ProtocolMessage *, OpenV2g_TimeUs now);
+bool OvWirePncClient_Supervise(OvWireClient *, OpenV2g_TimeUs now);
+void OvWirePncClient_Clear(OvWireClient *);
 bool OvWireClient_SetManagedReceiptSigner(OvWireClient *, Ov2g_Crypto *, const OpenV2g_CertificatePorts *,
     bool (*trusted_time)(void *, uint32_t, OpenV2g_TimeUs, OpenV2g_TrustedTime *), void *time_context);
 bool OvWireClient_SetReceiptSigner(OvWireClient *client, Ov2g_Crypto *crypto, uint32_t key);
@@ -116,6 +152,10 @@ bool OvWireStation_RunSigned(int listener, bool ac_mode, const Ov2g_TlsConfig *t
     Ov2g_Crypto *verification_crypto, uint32_t key);
 bool OvWireStation_RunDiscoveredSigned(int listener, int udp, uint16_t tcp_port, bool ac_mode,
     const Ov2g_TlsConfig *tls_config, Ov2g_Crypto *verification_crypto, uint32_t key);
+bool OvWireSignAuthorization(Ov2g_Crypto *, uint32_t generation, uint32_t key, uint32_t job,
+    OpenV2g_ExiDcDocument *, OpenV2g_TimeUs deadline, uint32_t *key_version);
+bool OvWireVerifyAuthorization(Ov2g_Crypto *, uint32_t generation, uint32_t key, uint32_t job,
+    const OpenV2g_ExiDcDocument *, OpenV2g_TimeUs deadline);
 bool OvWireSignReceipt(Ov2g_Crypto *crypto, uint32_t generation, uint32_t key,
     uint32_t job, OpenV2g_ExiDcDocument *document, OpenV2g_TimeUs deadline, uint32_t *key_version);
 bool OvWireVerifyReceipt(Ov2g_Crypto *crypto, uint32_t generation, uint32_t key,

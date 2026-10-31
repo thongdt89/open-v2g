@@ -64,3 +64,5 @@ endif()
 if(TARGET openv2g_host_sim)
     add_openv2g_simulation_test(openv2g_test_pev_slac unit/test_pev_slac.c)
 endif()
+
+add_openv2g_test(openv2g_test_pnc_context unit/test_pnc_context.c)

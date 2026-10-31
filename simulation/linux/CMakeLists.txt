@@ -73,3 +73,13 @@ if(OPENV2G_ENABLE_OPENSSL_HOST AND OPENV2G_BUILD_TESTS)
         ${PROJECT_SOURCE_DIR}/tests/security/fixture.py $<TARGET_FILE:openv2g_test_linux_pki>)
     set_tests_properties(openv2g_test_linux_pki PROPERTIES TIMEOUT 30)
 endif()
+
+if(OPENV2G_ENABLE_OPENSSL_HOST AND OPENV2G_BUILD_TESTS)
+    add_executable(openv2g_test_pki_roles tests/test_pki_roles.c)
+    target_link_libraries(openv2g_test_pki_roles PRIVATE openv2g_openssl_host)
+    target_include_directories(openv2g_test_pki_roles PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+    openv2g_enable_strict_warnings(openv2g_test_pki_roles)
+    add_test(NAME openv2g_test_pki_roles COMMAND ${Python3_EXECUTABLE}
+        ${PROJECT_SOURCE_DIR}/tests/security/fixture.py $<TARGET_FILE:openv2g_test_pki_roles>)
+    set_tests_properties(openv2g_test_pki_roles PROPERTIES TIMEOUT 30)
+endif()

@@ -2,6 +2,15 @@
 
 #include <string.h>
 
+bool OpenV2g_HostEmaidIsValid(const char *identity, size_t length)
+{
+    size_t i; if (identity == NULL || length != 15u) { return false; }
+    for (i = 0u; i < length; ++i) {
+        if (!((identity[i] >= 'A' && identity[i] <= 'Z') || (i >= 2u && identity[i] >= '0' && identity[i] <= '9'))) { return false; }
+    }
+    return true;
+}
+
 bool OpenV2g_EndpointIsValid(const OpenV2g_Endpoint *endpoint)
 {
     size_t index;

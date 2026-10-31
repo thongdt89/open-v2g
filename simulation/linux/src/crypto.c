@@ -6,6 +6,7 @@
 #include <openssl/err.h>
 #include <openssl/core_names.h>
 #include <openssl/ec.h>
+#include <openssl/rand.h>
 
 void Ov2g_CryptoInit(Ov2g_Crypto *crypto)
 {
@@ -107,6 +108,44 @@ static OpenV2g_Result load(Ov2g_Crypto *crypto, uint32_t handle, const char *pat
 }
 OpenV2g_Result Ov2g_CryptoLoadPrivateKey(Ov2g_Crypto *crypto, uint32_t handle, const char *path) { return load(crypto, handle, path, true); }
 OpenV2g_Result Ov2g_CryptoLoadPublicCertificate(Ov2g_Crypto *crypto, uint32_t handle, const char *path) { return load(crypto, handle, path, false); }
+OpenV2g_Result Ov2g_CryptoLoadPublicDer(Ov2g_Crypto *crypto, uint32_t generation, uint32_t handle, const uint8_t *der, size_t size)
+{
+    const unsigned char *cursor = der; X509 *certificate; EVP_PKEY *key; EVP_PKEY_CTX *context;
+    unsigned i; char group[32]; size_t length; bool valid;
+    if (crypto == NULL || generation == 0u || generation != crypto->generation || handle == 0u || handle > OV2G_CRYPTO_KEYS ||
+        der == NULL || size == 0u || size > OV2G_CRYPTO_CERTIFICATE_MAX) { return OPENV2G_RESULT_REJECTED; }
+    for (i = 0u; i < OV2G_CRYPTO_JOBS; ++i) {
+        if (crypto->jobs[i].used && !crypto->jobs[i].done && crypto->jobs[i].result.key_handle == handle) { return OPENV2G_RESULT_BUSY; }
+    }
+    for (i = 0u; i < OV2G_CRYPTO_LEASES; ++i) {
+        if (crypto->leases[i].id != 0u && crypto->leases[i].key_handle == handle) { return OPENV2G_RESULT_BUSY; }
+    }
+    if (crypto->versions[handle-1u] == UINT32_MAX) { return OPENV2G_RESULT_OVERFLOW; }
+    certificate = d2i_X509(NULL,&cursor,(long)size);
+    if (certificate == NULL || cursor != der+size) { X509_free(certificate); return OPENV2G_RESULT_REJECTED; }
+    key = X509_get_pubkey(certificate); X509_free(certificate);
+    if (key == NULL) { return OPENV2G_RESULT_REJECTED; }
+    valid = EVP_PKEY_is_a(key,"EC") == 1 && EVP_PKEY_get_utf8_string_param(key,OSSL_PKEY_PARAM_GROUP_NAME,group,sizeof(group),&length) == 1 &&
+        (strcmp(group,"prime256v1") == 0 || strcmp(group,"P-256") == 0);
+    context = EVP_PKEY_CTX_new_from_pkey(NULL,key,NULL);
+    valid = valid && context != NULL && EVP_PKEY_public_check(context) == 1; EVP_PKEY_CTX_free(context);
+    if (!valid) { EVP_PKEY_free(key); return OPENV2G_RESULT_REJECTED; }
+    EVP_PKEY_free(crypto->keys[handle-1u]); crypto->keys[handle-1u] = key;
+    ++crypto->versions[handle-1u]; crypto->can_sign[handle-1u] = false; return OPENV2G_RESULT_OK;
+}
+bool Ov2g_CryptoPrivateKeyMatchesCertificate(const Ov2g_Crypto *crypto, uint32_t generation, uint32_t handle, uint32_t version,
+    const uint8_t *der, size_t length)
+{
+    const unsigned char *cursor = der; X509 *certificate; EVP_PKEY *public_key; bool matches;
+    if (crypto == NULL || generation == 0u || crypto->generation != generation || handle == 0u || handle > OV2G_CRYPTO_KEYS ||
+        version == 0u || crypto->versions[handle-1u] != version || !crypto->can_sign[handle-1u] || der == NULL ||
+        length == 0u || length > OV2G_CRYPTO_CERTIFICATE_MAX) { return false; }
+    certificate = d2i_X509(NULL,&cursor,(long)length);
+    if (certificate == NULL || cursor != der+length) { X509_free(certificate); return false; }
+    public_key = X509_get_pubkey(certificate); X509_free(certificate);
+    matches = public_key != NULL && EVP_PKEY_eq(public_key,crypto->keys[handle-1u]) == 1;
+    EVP_PKEY_free(public_key); return matches;
+}
 OpenV2g_Result Ov2g_CryptoSubmit(Ov2g_Crypto *crypto, uint32_t generation, uint32_t job_id,
     Ov2g_CryptoOperation operation, uint32_t key_handle, const uint8_t *input, size_t input_length,
     const uint8_t *signature, size_t signature_length, OpenV2g_TimeUs now, OpenV2g_TimeUs deadline)
@@ -214,4 +253,12 @@ OpenV2g_Result Ov2g_CryptoCancel(Ov2g_Crypto *crypto, uint32_t generation, uint3
         }
     }
     return OPENV2G_RESULT_OK;
+}
+
+OpenV2g_Result Ov2g_CryptoRandom(Ov2g_Crypto *crypto, uint32_t generation, uint8_t *output, size_t length)
+{
+    uint8_t candidate[64];
+    if (crypto == NULL || generation == 0u || crypto->generation != generation || output == NULL || length == 0u || length > sizeof(candidate)) { return OPENV2G_RESULT_REJECTED; }
+    if (RAND_bytes(candidate,(int)length) != 1) { OPENSSL_cleanse(candidate,sizeof(candidate)); return OPENV2G_RESULT_REJECTED; }
+    (void)memcpy(output,candidate,length); OPENSSL_cleanse(candidate,sizeof(candidate)); return OPENV2G_RESULT_OK;
 }

@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include "openv2g/iso15118_chrg/session_context.h"
 #include "openv2g/iso15118_chrg/certificate_manager.h"
+#include "openv2g/iso15118_chrg/pnc_context.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -126,6 +127,8 @@ typedef struct {
     OpenV2g_Subsystem iso_15118_20_adapter;
     OpenV2g_Subsystem pki_security_adapter;
     OpenV2g_CertificateManager certificate_manager;
+    OpenV2g_PncContext pnc_context;
+    bool pnc_selected;
 } OpenV2g_Iso15118Chrg;
 
 /* PROJECT policy. Supervisor owns one cumulative stage timer; values are not normative defaults. */
@@ -146,6 +149,7 @@ void OpenV2g_Iso15118Chrg_Init(
     const OpenV2g_HlcFeatureConfig *features);
 
 /* Optional owner-bound PROJECT ports. Does not enable PnC protocol support. */
+OpenV2g_Result OpenV2g_Iso15118Chrg_ConfigurePnc(OpenV2g_Iso15118Chrg *);
 OpenV2g_Result OpenV2g_Iso15118Chrg_BindCertificateManager(
     OpenV2g_Iso15118Chrg *, const OpenV2g_CertificatePorts *, bool allow_delete);
 

@@ -21,6 +21,7 @@ static void update_status(
     hlc->status.state = state;
     if (state == OPENV2G_HLC_ERROR || state == OPENV2G_HLC_IDLE || state == OPENV2G_HLC_CLOSING) {
         OpenV2g_CertificateManager_Invalidate(&hlc->certificate_manager,hlc->generation);
+        (void)OpenV2g_PncContext_Cancel(&hlc->pnc_context,hlc->generation);
     }
     if (state == OPENV2G_HLC_ERROR) { hlc->retained_session.valid = false; hlc->resume_requested = false; }
     if (state == OPENV2G_HLC_PROTOCOL_SESSION) { hlc->setup_deadline = 0u; }
@@ -67,6 +68,11 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_TickCommunication(OpenV2g_Iso15118Chrg *hlc,
 {
     if (hlc == NULL || generation == 0u || generation != hlc->generation || now == 0u || hlc->status.state == OPENV2G_HLC_ERROR) { return OPENV2G_RESULT_REJECTED; }
     OpenV2g_CertificateManager_Tick(&hlc->certificate_manager,generation,now);
+    if (hlc->pnc_selected && hlc->pnc_context.generation == generation &&
+        (hlc->pnc_context.state == OPENV2G_PNC_WAIT_DETAILS || hlc->pnc_context.state == OPENV2G_PNC_CHALLENGE_READY || hlc->pnc_context.state == OPENV2G_PNC_SIGNATURE_READY) &&
+        (now < hlc->pnc_context.owner_time || now >= hlc->pnc_context.deadline)) {
+        update_status(hlc,now,OPENV2G_HLC_ERROR,OPENV2G_REASON_TIMEOUT); return OPENV2G_RESULT_REJECTED;
+    }
     if (hlc->setup_deadline != 0u && now >= hlc->setup_deadline) {
         update_status(hlc, now, OPENV2G_HLC_ERROR, OPENV2G_REASON_TIMEOUT); return OPENV2G_RESULT_REJECTED;
     }
@@ -176,6 +182,7 @@ static OpenV2g_Result protocol_channel_send(
         (request->generation != hlc->generation)) {
         return OPENV2G_RESULT_REJECTED;
     }
+    if (request->protocol == OPENV2G_PROTOCOL_ISO_15118_2 && request->use_pnc != hlc->pnc_selected) { return OPENV2G_RESULT_REJECTED; }
     if (hlc->protocol_request_pending) {
         return OPENV2G_RESULT_BUSY;
     }
@@ -192,6 +199,9 @@ static OpenV2g_Result protocol_channel_send(
         if (request->timestamp == 0u || hlc->response_budget_us > UINT64_MAX - request->timestamp) { return OPENV2G_RESULT_REJECTED; }
         hlc->response_deadline = request->timestamp + hlc->response_budget_us;
     }
+    if (request->use_pnc && request->kind == OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION &&
+        (!request->has_pnc_evidence || OpenV2g_PncContext_BindAuthorization(&hlc->pnc_context,request->generation,
+            request->correlation_id,&request->pnc_evidence,request->timestamp) != OPENV2G_RESULT_OK)) { return OPENV2G_RESULT_REJECTED; }
     hlc->pending_protocol_request = *request;
     hlc->protocol_request_pending = true;
     return OPENV2G_RESULT_ACCEPTED;
@@ -513,6 +523,13 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_BindEvContextPorts(
     return result;
 }
 
+OpenV2g_Result OpenV2g_Iso15118Chrg_ConfigurePnc(OpenV2g_Iso15118Chrg *hlc)
+{
+    if (hlc == NULL || hlc->generation != 0u || hlc->status.state != OPENV2G_HLC_IDLE || !hlc->require_wire_validation ||
+        !hlc->features.iso_15118_2_pnc || hlc->certificate_manager.state != OPENV2G_CERT_READY ||
+        !hlc->certificate_manager.active.present || hlc->certificate_manager.active.usage != OPENV2G_CERT_USAGE_HOST_CONTRACT) { return OPENV2G_RESULT_REJECTED; }
+    hlc->pnc_selected = true; hlc->iso_15118_2_adapter.pnc_selected = true; return OPENV2G_RESULT_OK;
+}
 OpenV2g_Result OpenV2g_Iso15118Chrg_BindCertificateManager(
     OpenV2g_Iso15118Chrg *hlc, const OpenV2g_CertificatePorts *ports, bool allow_delete)
 {
@@ -960,6 +977,9 @@ OpenV2g_Result OpenV2g_Iso15118Chrg_OnProtocolMessage(
         message->kind != hlc->session_context.pending_kind || message->correlation_id != hlc->session_context.pending_correlation || !message->accepted ||
         ((message->kind == OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION || message->kind == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER ||
           message->kind == OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK) && message->ongoing != hlc->session_context.validated_ongoing))) { return OPENV2G_RESULT_REJECTED; }
+    if (hlc->pnc_selected && message->accepted &&
+        ((message->kind == OPENV2G_PROTOCOL_MESSAGE_PAYMENT_DETAILS && hlc->pnc_context.state != OPENV2G_PNC_SIGNATURE_READY) ||
+         (message->kind == OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION && !message->ongoing && hlc->pnc_context.state != OPENV2G_PNC_AUTHORIZED))) { return OPENV2G_RESULT_REJECTED; }
     if (hlc->require_wire_validation && OpenV2g_SessionContext_Consume(&hlc->session_context, message->kind, message->correlation_id) != OPENV2G_RESULT_OK) { return OPENV2G_RESULT_REJECTED; }
     (void)memset(&adapter_status, 0, sizeof(adapter_status));
     completed_request = hlc->dispatched_protocol_request;

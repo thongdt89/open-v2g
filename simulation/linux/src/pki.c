@@ -12,12 +12,14 @@ void Ov2g_PkiClose(Ov2g_Pki *pki)
     if (pki == NULL) { return; }
     X509_STORE_free(pki->store); (void)memset(pki,0,sizeof(*pki));
 }
-OpenV2g_Result Ov2g_PkiInit(Ov2g_Pki *pki, Ov2g_Crypto *crypto, const char *ca_file,
-    const char *crl_file, const char *identity, OpenV2g_TimeUs max_age, OpenV2g_TimeUs ttl)
+OpenV2g_Result Ov2g_PkiInitRole(Ov2g_Pki *pki, Ov2g_Crypto *crypto, const char *ca_file,
+    const char *crl_file, OpenV2g_CertificateUsage usage, const char *identity, OpenV2g_TimeUs max_age, OpenV2g_TimeUs ttl)
 {
     X509_STORE *store; size_t length;
     if (pki == NULL || crypto == NULL || ca_file == NULL || identity == NULL ||
-        (length = strlen(identity)) == 0u || length >= OPENV2G_CERT_IDENTITY_MAX || max_age == 0u || ttl == 0u) { return OPENV2G_RESULT_REJECTED; }
+        (length = strlen(identity)) == 0u || length >= OPENV2G_CERT_IDENTITY_MAX ||
+        (usage != OPENV2G_CERT_USAGE_HOST_DNS_CLIENT && usage != OPENV2G_CERT_USAGE_HOST_CONTRACT) || max_age == 0u || ttl == 0u) { return OPENV2G_RESULT_REJECTED; }
+    if (usage == OPENV2G_CERT_USAGE_HOST_CONTRACT && !OpenV2g_HostEmaidIsValid(identity,length)) { return OPENV2G_RESULT_REJECTED; }
     (void)memset(pki,0,sizeof(*pki)); store = X509_STORE_new();
     if (store == NULL || X509_STORE_load_locations(store,ca_file,NULL) != 1) { X509_STORE_free(store); return OPENV2G_RESULT_NOT_OK; }
     if (crl_file != NULL) {
@@ -29,11 +31,28 @@ OpenV2g_Result Ov2g_PkiInit(Ov2g_Pki *pki, Ov2g_Crypto *crypto, const char *ca_f
         }
         X509_CRL_free(crl);
     }
-    pki->store = store; pki->crypto = crypto; (void)memcpy(pki->identity,identity,length+1u);
+    pki->store = store; pki->crypto = crypto; pki->usage = usage; (void)memcpy(pki->identity,identity,length+1u);
     pki->time_max_age = max_age; pki->proof_ttl = ttl; return OPENV2G_RESULT_OK;
 }
-static OpenV2g_Result validate(void *context, uint32_t generation, const OpenV2g_CertificateRecord *record,
-    const OpenV2g_TrustedTime *time, OpenV2g_TimeUs now, OpenV2g_TimeUs deadline, OpenV2g_CertificateProof *output)
+OpenV2g_Result Ov2g_PkiInit(Ov2g_Pki *pki, Ov2g_Crypto *crypto, const char *ca_file,
+    const char *crl_file, const char *identity, OpenV2g_TimeUs max_age, OpenV2g_TimeUs ttl)
+{
+    return Ov2g_PkiInitRole(pki,crypto,ca_file,crl_file,OPENV2G_CERT_USAGE_HOST_DNS_CLIENT,identity,max_age,ttl);
+}
+static bool identity_matches(const Ov2g_Pki *pki, X509 *leaf)
+{
+    X509_NAME *subject; int index, length; unsigned char *value = NULL; bool matches;
+    if (pki->usage == OPENV2G_CERT_USAGE_HOST_DNS_CLIENT) {
+        return X509_check_host(leaf,pki->identity,0u,X509_CHECK_FLAG_NEVER_CHECK_SUBJECT,NULL) == 1;
+    }
+    subject = X509_get_subject_name(leaf); index = X509_NAME_get_index_by_NID(subject,NID_commonName,-1);
+    if (index < 0 || X509_NAME_get_index_by_NID(subject,NID_commonName,index) >= 0) { return false; }
+    length = ASN1_STRING_to_UTF8(&value,X509_NAME_ENTRY_get_data(X509_NAME_get_entry(subject,index)));
+    matches = length > 0 && (size_t)length == strlen(pki->identity) && memcmp(value,pki->identity,(size_t)length) == 0;
+    OPENSSL_free(value); return matches;
+}
+static OpenV2g_Result validate_record(void *context, uint32_t generation, const OpenV2g_CertificateRecord *record,
+    const OpenV2g_TrustedTime *time, OpenV2g_TimeUs now, OpenV2g_TimeUs deadline, OpenV2g_CertificateProof *output, bool local_key)
 {
     Ov2g_Pki *pki = context; X509 *leaf = NULL; X509_STORE_CTX *verify = NULL;
     STACK_OF(X509) *chain = NULL; EVP_PKEY *public_key = NULL;
@@ -43,9 +62,10 @@ static OpenV2g_Result validate(void *context, uint32_t generation, const OpenV2g
     OpenV2g_TimeUs after, expiry, age_remaining;
     if (pki == NULL || pki->store == NULL || record == NULL || time == NULL || output == NULL ||
         !record->present || record->chain_count == 0u || record->chain_count > OPENV2G_CERT_CHAIN_MAX ||
-        record->key_handle == 0u || record->key_handle > OV2G_CRYPTO_KEYS || record->key_version == 0u ||
-        pki->crypto->generation != generation || !pki->crypto->can_sign[record->key_handle-1u] ||
-        pki->crypto->versions[record->key_handle-1u] != record->key_version ||
+        pki->crypto->generation != generation || (record->usage != OPENV2G_CERT_USAGE_UNSPECIFIED && record->usage != pki->usage) ||
+        (pki->usage == OPENV2G_CERT_USAGE_HOST_CONTRACT && record->usage != OPENV2G_CERT_USAGE_HOST_CONTRACT) ||
+        (local_key && (record->key_handle == 0u || record->key_handle > OV2G_CRYPTO_KEYS || record->key_version == 0u ||
+            !pki->crypto->can_sign[record->key_handle-1u] || pki->crypto->versions[record->key_handle-1u] != record->key_version)) ||
         record->identity_length != strlen(pki->identity) || memcmp(record->identity,pki->identity,record->identity_length) != 0 ||
         !OpenV2g_EnvelopeIsCurrent(&time->env,generation,now,pki->time_max_age) || time->env.quality != OPENV2G_QUALITY_VALID ||
         time->epoch_seconds == 0u || deadline <= now || now > UINT64_MAX-pki->proof_ttl) { return result; }
@@ -65,7 +85,7 @@ static OpenV2g_Result validate(void *context, uint32_t generation, const OpenV2g
         if (i == 0u) { leaf = certificate; }
         else if (sk_X509_push(chain,certificate) == 0) { X509_free(certificate); goto cleanup; }
     }
-    if (X509_check_ca(leaf) != 0 || X509_check_host(leaf,pki->identity,0u,X509_CHECK_FLAG_NEVER_CHECK_SUBJECT,NULL) != 1 ||
+    if (X509_check_ca(leaf) != 0 || !identity_matches(pki,leaf) ||
         (X509_get_extension_flags(leaf) & EXFLAG_KUSAGE) == 0u || (X509_get_key_usage(leaf) & KU_DIGITAL_SIGNATURE) == 0u ||
         (X509_get_extension_flags(leaf) & EXFLAG_XKUSAGE) == 0u || (X509_get_extended_key_usage(leaf) & XKU_SSL_CLIENT) == 0u ||
         X509_STORE_CTX_init(verify,pki->store,leaf,chain) != 1 || X509_STORE_CTX_set_purpose(verify,X509_PURPOSE_SSL_CLIENT) != 1) { goto cleanup; }
@@ -76,7 +96,7 @@ static OpenV2g_Result validate(void *context, uint32_t generation, const OpenV2g
     public_key = X509_get_pubkey(leaf);
     if (public_key == NULL || !EVP_PKEY_is_a(public_key,"EC") ||
         EVP_PKEY_get_utf8_string_param(public_key,OSSL_PKEY_PARAM_GROUP_NAME,group,sizeof(group),&group_length) != 1 ||
-        strcmp(group,"prime256v1") != 0 || EVP_PKEY_eq(public_key,pki->crypto->keys[record->key_handle-1u]) != 1) { goto cleanup; }
+        (strcmp(group,"prime256v1") != 0 && strcmp(group,"P-256") != 0) || (local_key && EVP_PKEY_eq(public_key,pki->crypto->keys[record->key_handle-1u]) != 1)) { goto cleanup; }
     {
         ASN1_TIME *trusted = ASN1_TIME_set(NULL,epoch);
         int ok = trusted == NULL ? 0 : ASN1_TIME_diff(&days,&seconds,trusted,X509_get0_notAfter(leaf));
@@ -108,11 +128,21 @@ static OpenV2g_Result validate(void *context, uint32_t generation, const OpenV2g
     }
     after = Ov2g_OsNow();
     if (after < now || after >= expiry || X509_digest(leaf,EVP_sha256(),proof.fingerprint,&digest_length) != 1 || digest_length != 32u) { goto cleanup; }
-    proof.generation = generation; proof.key_version = record->key_version; proof.valid_until = expiry;
+    proof.generation = generation; proof.key_version = local_key ? record->key_version : 0u; proof.usage = pki->usage; proof.valid_until = expiry;
     *output = proof; result = OPENV2G_RESULT_OK;
 cleanup:
     EVP_PKEY_free(public_key); X509_STORE_CTX_free(verify); X509_free(leaf); sk_X509_pop_free(chain,X509_free);
     return result;
+}
+static OpenV2g_Result validate(void *context, uint32_t generation, const OpenV2g_CertificateRecord *record,
+    const OpenV2g_TrustedTime *time, OpenV2g_TimeUs now, OpenV2g_TimeUs deadline, OpenV2g_CertificateProof *output)
+{
+    return validate_record(context,generation,record,time,now,deadline,output,true);
+}
+OpenV2g_Result Ov2g_PkiValidatePeer(Ov2g_Pki *pki, uint32_t generation, const OpenV2g_CertificateRecord *record,
+    const OpenV2g_TrustedTime *time, OpenV2g_TimeUs now, OpenV2g_TimeUs deadline, OpenV2g_CertificateProof *output)
+{
+    return validate_record(pki,generation,record,time,now,deadline,output,false);
 }
 static OpenV2g_Result acquire(void *context, uint32_t generation, uint32_t handle, uint32_t version, uint32_t *lease)
 { return Ov2g_CryptoAcquireKeyLease(((Ov2g_Pki *)context)->crypto,generation,handle,version,lease); }

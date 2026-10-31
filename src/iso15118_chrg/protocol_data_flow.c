@@ -36,7 +36,7 @@ static bool kind_is_valid_for_mode(
     OpenV2g_ProtocolMessageKind kind)
 {
     if (protocol == OPENV2G_PROTOCOL_DIN_70121) {
-        return (kind != OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE) && (mode == OPENV2G_MODE_DC) &&
+        return (kind != OPENV2G_PROTOCOL_MESSAGE_PAYMENT_DETAILS) && (kind != OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE) && (mode == OPENV2G_MODE_DC) &&
                (kind != OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS) &&
                (kind != OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT);
     }
@@ -119,6 +119,9 @@ OpenV2g_Result OpenV2g_ProtocolDataFlow_GetRule(
             (kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION)
                 ? OPENV2G_HLC_EVENT_PARAMETERS_ACCEPTED
                 : OPENV2G_HLC_EVENT_STATE_CHANGED);
+        break;
+    case OPENV2G_PROTOCOL_MESSAGE_PAYMENT_DETAILS:
+        set_rule(rule,OPENV2G_PROTOCOL_FLOW_AUTHORIZATION,0u,0u,false,false,OPENV2G_ACTION_NONE,OPENV2G_HLC_EVENT_STATE_CHANGED);
         break;
     case OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION:
         set_rule(

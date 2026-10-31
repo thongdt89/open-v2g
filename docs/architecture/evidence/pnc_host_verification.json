@@ -1,0 +1,81 @@
+{
+  "status": "verified host increment; overall remaining work is still in progress",
+  "baseline": "f1cc21b",
+  "date": "2026-10-31",
+  "scope": "Pre-provisioned ISO-2 host PnC; production integration excluded",
+  "tests": {
+    "tls_oracle": {
+      "passed": 50,
+      "total": 50,
+      "log": "/tmp/openv2g-pnc-tls-tests.log"
+    },
+    "asan_ubsan": {
+      "passed": 48,
+      "total": 48,
+      "log": "/tmp/openv2g-pnc-sanitize-tests.log"
+    },
+    "generated_without_openssl": {
+      "passed": 39,
+      "total": 39
+    },
+    "default": {
+      "passed": 28,
+      "total": 28
+    }
+  },
+  "last_change_validation": "After full suites, test-only PaymentDetails artifacts and independent oracle checks were added; authorization_signature rerun passed in normal and sanitizer builds. No implementation changed after those full suites.",
+  "socket_cases": 13,
+  "independent_checks": [
+    "PaymentDetails request/response plus Authorization document and both EXI fragments: pinned independent codec byte round-trip",
+    "Python cryptography verifies P-256 signature and fragment SHA-256 digest"
+  ],
+  "limitations": [
+    "Restricted host CN/identity profile, not full normative eMAID/OEM policy",
+    "Pre-provisioned contract only; certificate installation/update/encrypted key import remain open",
+    "Pinned separate codec is a differential oracle, not standards certification",
+    "CRLs enforced when configured; no online revocation fetch",
+    "No production integration, safety allocation or physical interoperability proof"
+  ],
+  "sha256": {
+    "CMakeLists.txt": "9e9e07a16e882ac6d0f1708edde446a924e3bb2baf0abff185c2acec5ad24087",
+    "docs/architecture/HOST_COMPLETION_PLAN.md": "38491e58ad9844ff938f6da051875320c989b79f4dda1d6de0597cdf6b5d2e71",
+    "docs/architecture/INCOMPLETE_ITEMS.md": "b6abf0b4bc5e6099c45bcd44a162808bc37e34ab318d5db91e3ddbc433962fe0",
+    "include/openv2g/common/validation.h": "4bee269e01e211eb431bf52561539a0fc40fbed5a7a41d0df80a446c4f99861a",
+    "include/openv2g/iso15118_chrg/certificate_manager.h": "2cec1d626eba0683f14430463362baa8b8ff6e849cbb2d71965c6b351b26c903",
+    "include/openv2g/iso15118_chrg/iso15118_2_adapter.h": "bee07bbf68118b6b922e42d121f9731c380ad01b7ba256904790fb023a4818b3",
+    "include/openv2g/iso15118_chrg/iso15118_chrg.h": "5f5abe46277e4f2b563a246b53f10ff4590a8d30e9c3f6ec06c859a730a5b075",
+    "include/openv2g/iso15118_chrg/protocol_adapter.h": "c8fa1e1807a0b952f3a755726c6dfacbc3d61c330499241893c2b4a851ad74c2",
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_din.c": "027b1f89b873cdd9aca76a845171681ce9024e2b37601ad2ea7b065e989fe4e9",
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_iso2.c": "2584f23095fa42c19904ba6c99eca67ba5b1009a2193cedd6f4a1256e83bdc5f",
+    "integration/protocol/adapters/cbv2g/include/openv2g/exi_cbv2g_dc.h": "89380d13c85fccd992f88c05208d1ddf28c789d8a4d9420683fc1a7094eb3b19",
+    "simulation/linux/CMakeLists.txt": "2dbfe465a6a54ac8e1ad13aa977001ca95415b8e2d93cd1529fba317d35bb2de",
+    "simulation/linux/include/openv2g/linux/crypto.h": "447879bac94f2389b13c47137f7575ae35367a342645fb1abc0637dbfda37622",
+    "simulation/linux/include/openv2g/linux/pki.h": "c49b927de7645851c83f844c26ce453fee98d640a8a91b6289ebd4365514f0b7",
+    "simulation/linux/src/crypto.c": "8bde570323362aa42783951c8a78a3f4c26378542022c379a76fa9fb58c5e3de",
+    "simulation/linux/src/pki.c": "0456327d308358db9707795fd693165f81ae667cf89d2cba632609dd3d8a2242",
+    "simulation/linux/wire/CMakeLists.txt": "033b969adbd5c37bb884aafc774b565313315d81793f94611082c8f9397801d5",
+    "simulation/linux/wire/client.c": "f0ff0ade7bcaf0483745272f2772af530ee095e5b62c9694c7555cadbc1dfaba",
+    "simulation/linux/wire/signature.c": "c19b11b176826445ddeee472c163e674f1350bad17758be4bd397eb83878a6e5",
+    "simulation/linux/wire/station.c": "8320dd8b817e27c1e207c2e5db62433bdbff5ce8a3f1e2fbc3a74a3f01b505f0",
+    "simulation/linux/wire/wire.h": "85e067a48527371a0241f32cc4c950e7bfe2a384af6eafc32bddff649d65f687",
+    "simulation/src/certificate_storage.c": "7853f82f39aad94292cc033964faa17cfbabfeeb48ad747e3ec2d344f043eefd",
+    "src/common/validation.c": "c0e4857179bce268178c9eadae47ca5620916de6912c6e6c180ad855da70f77b",
+    "src/iso15118_chrg/certificate_manager.c": "d2d884758c1a96a557e150287b48e2e8dbedcbcdaeab4b058c08844698531f45",
+    "src/iso15118_chrg/iso15118_2_adapter.c": "db2887ae54ed4c0aa6d6bc64ce9ef8b0e167204943f62ab64383df658288c3c7",
+    "src/iso15118_chrg/iso15118_chrg.c": "bbc88da3cb0da69da4bb341fd093bf31a5dc3aae64a469549c8893a5a934ec9c",
+    "src/iso15118_chrg/protocol_data_flow.c": "e74ab605cf373c4e6cc579dc156bd539807a9dfde2d39d705157f3ef70685584",
+    "tests/CMakeLists.txt": "a12aabe9fe48927b80646a2fc6397f9952c0bdfdd033110064eed6776d810501",
+    "tests/security/fixture.py": "05014db994953ab0af6d7991688487159bf87711a998abf39a4849a33593f48b",
+    "docs/architecture/PNC_HOST.md": "1c2ee0c6c57ddc6f015d7d8ee7f41bc06aa159425a30904682f8b49f8ad0aa62",
+    "include/openv2g/common/pnc_types.h": "0e56831316b95bc2c333df1e86668a0854939df412369613a34813bde3e43c8e",
+    "include/openv2g/iso15118_chrg/pnc_context.h": "a83f22fcee2f649263d9100d63773267c871dbb5a909d281f17e55b48808c621",
+    "simulation/linux/tests/test_pki_roles.c": "362e7f16c94777bc332ce511a831eb4a4a9a5364d1138ef3d5622935ac62babb",
+    "simulation/linux/wire/pnc_client.c": "81240ed2b481e92afedf881c82b74077781edcc2f55e9c176152a48e77ee4f79",
+    "simulation/linux/wire/pnc_station.c": "621eb378d8f65dbc95b70cd789542212471d3a02659b9e13aec3774c562d5d6f",
+    "simulation/linux/wire/test_authorization_signature.c": "b3232b2739f1a7384720655cfae64872041e5aa82ee22b223ee3fa8a0f02cb0f",
+    "simulation/linux/wire/test_pnc_station.c": "fe03b6e8ee469868f7c00023db483763206d91d4d1b3403bd19a80813ecc1152",
+    "simulation/linux/wire/test_wire_pnc.c": "a7c526ec84fe0968fa6e0398f8683c554efdadfa8e73f6607548698ff72c6b67",
+    "src/iso15118_chrg/pnc_context.c": "672cdb3d34c4a0a0272be5018f405ba9eba3fdda6b57aa2a5dd1a5084764fe51",
+    "tests/unit/test_pnc_context.c": "09353a0fd4244d70ccec5c5db0e488af010823964839570d68aa4dc5a9c8f482"
+  }
+}

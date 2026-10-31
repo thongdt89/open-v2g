@@ -5,10 +5,13 @@
 #define OPENV2G_CERT_CHAIN_MAX 3u
 #define OPENV2G_CERT_DER_MAX 2048u
 #define OPENV2G_CERT_IDENTITY_MAX 64u
+typedef enum { OPENV2G_CERT_USAGE_UNSPECIFIED = 0, OPENV2G_CERT_USAGE_HOST_DNS_CLIENT = 1,
+    OPENV2G_CERT_USAGE_HOST_CONTRACT = 2 } OpenV2g_CertificateUsage;
 /* PROJECT owned public data and opaque key references. Never private key bytes. */
 typedef struct { uint16_t length; uint8_t bytes[OPENV2G_CERT_DER_MAX]; } OpenV2g_PublicCertificate;
 typedef struct {
     uint32_t version;
+    OpenV2g_CertificateUsage usage;
     bool present;
     uint32_t key_handle;
     uint32_t key_version;
@@ -23,6 +26,7 @@ typedef struct {
     uint32_t key_version;
     OpenV2g_TimeUs valid_until;
     uint8_t fingerprint[32];
+    OpenV2g_CertificateUsage usage;
 } OpenV2g_CertificateProof;
 typedef struct {
     void *storage_context;

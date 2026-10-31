@@ -8,6 +8,7 @@
 #define OV2G_CRYPTO_LEASES 4u
 #define OV2G_CRYPTO_INPUT_MAX 4096u
 #define OV2G_CRYPTO_SIGNATURE_SIZE 64u
+#define OV2G_CRYPTO_CERTIFICATE_MAX 2048u
 /* PROJECT typed host seam; not a supplier Csm ABI or XMLDSIG canonicalizer. */
 typedef enum { OV2G_CRYPTO_SHA256 = 1, OV2G_CRYPTO_SIGN_P256_SHA256 = 2, OV2G_CRYPTO_VERIFY_P256_SHA256 = 3 } Ov2g_CryptoOperation;
 typedef struct {
@@ -51,6 +52,10 @@ OpenV2g_Result Ov2g_CryptoBeginGeneration(Ov2g_Crypto *crypto, uint32_t generati
 OpenV2g_Result Ov2g_CryptoLoadPrivateKey(Ov2g_Crypto *crypto, uint32_t handle, const char *path);
 /* Imports a public key, not a certificate trust decision. */
 OpenV2g_Result Ov2g_CryptoLoadPublicCertificate(Ov2g_Crypto *crypto, uint32_t handle, const char *path);
+/* Public-key import only: the caller must separately validate certificate trust/role. */
+OpenV2g_Result Ov2g_CryptoLoadPublicDer(Ov2g_Crypto *, uint32_t generation, uint32_t handle, const uint8_t *der, size_t length);
+bool Ov2g_CryptoPrivateKeyMatchesCertificate(const Ov2g_Crypto *, uint32_t generation, uint32_t handle, uint32_t version,
+    const uint8_t *der, size_t length);
 /* Freeze a prepared signature's key version until TX/ack/cancel cleanup. */
 OpenV2g_Result Ov2g_CryptoAcquireKeyLease(Ov2g_Crypto *crypto, uint32_t generation,
     uint32_t key_handle, uint32_t key_version, uint32_t *lease_id);
@@ -64,4 +69,5 @@ OpenV2g_Result Ov2g_CryptoSubmit(Ov2g_Crypto *crypto, uint32_t generation, uint3
 OpenV2g_Result Ov2g_CryptoPump(Ov2g_Crypto *crypto, uint32_t generation, OpenV2g_TimeUs now);
 OpenV2g_Result Ov2g_CryptoTakeResult(Ov2g_Crypto *crypto, uint32_t generation, uint32_t job_id, Ov2g_CryptoResult *result);
 OpenV2g_Result Ov2g_CryptoCancel(Ov2g_Crypto *crypto, uint32_t generation, uint32_t job_id);
+OpenV2g_Result Ov2g_CryptoRandom(Ov2g_Crypto *, uint32_t generation, uint8_t *output, size_t length);
 #endif

@@ -12,8 +12,8 @@ static void set_state(
     adapter->status.state = state;
     adapter->status.reason = reason;
     adapter->status.active =
-        (state >= OPENV2G_PROTOCOL_STATE_SESSION_SETUP) &&
-        (state < OPENV2G_PROTOCOL_STATE_TERMINATED);
+        ((state >= OPENV2G_PROTOCOL_STATE_SESSION_SETUP) && (state < OPENV2G_PROTOCOL_STATE_TERMINATED)) ||
+        state == OPENV2G_PROTOCOL_STATE_PAYMENT_DETAILS;
 }
 
 static void fail_adapter(
@@ -64,6 +64,14 @@ static OpenV2g_Result send_request(
         fail_adapter(adapter, kind, correlation_id, reason);
         return result;
     }
+    request.use_pnc = adapter->pnc_selected;
+    if (adapter->pnc_selected && kind == OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION) {
+        if (adapter->pnc_evidence.generation != adapter->status.generation || adapter->pnc_evidence.source_correlation_id == 0u ||
+            adapter->pnc_evidence.signing_job_id == 0u || adapter->pnc_evidence.signing_key_handle == 0u || adapter->pnc_evidence.signing_key_version == 0u) {
+            fail_adapter(adapter,kind,correlation_id,OPENV2G_REASON_PRECONDITION); return OPENV2G_RESULT_REJECTED;
+        }
+        request.has_pnc_evidence = true; request.pnc_evidence = adapter->pnc_evidence;
+    }
     result = adapter->message_required_port.send(
         adapter->message_required_port.context, &request);
     if ((result != OPENV2G_RESULT_OK) &&
@@ -100,6 +108,7 @@ static OpenV2g_Result iso2_start(
         (request->security != OPENV2G_SECURITY_TLS13)) {
         return OPENV2G_RESULT_REJECTED;
     }
+    if (adapter->pnc_selected && (!adapter->pnc_enabled || request->security == OPENV2G_SECURITY_NONE)) { return OPENV2G_RESULT_REJECTED; }
     mode_enabled = ((request->mode == OPENV2G_MODE_DC) &&
                     adapter->dc_eim_enabled) ||
                    ((request->mode == OPENV2G_MODE_AC) &&
@@ -117,6 +126,7 @@ static OpenV2g_Result iso2_start(
     adapter->status.pending_kind = OPENV2G_PROTOCOL_MESSAGE_NONE;
     adapter->next_correlation_id = 0u;
     (void)memset(&adapter->metering_evidence, 0, sizeof(adapter->metering_evidence));
+    (void)memset(&adapter->pnc_evidence,0,sizeof(adapter->pnc_evidence));
     (void)memset(&adapter->diagnostic, 0, sizeof(adapter->diagnostic));
     set_state(
         adapter, OPENV2G_PROTOCOL_STATE_SESSION_SETUP, OPENV2G_REASON_NONE);
@@ -144,6 +154,7 @@ static OpenV2g_Result iso2_stop(
     adapter->status.pending_correlation_id = 0u;
     adapter->status.pending_kind = OPENV2G_PROTOCOL_MESSAGE_NONE;
     (void)memset(&adapter->metering_evidence, 0, sizeof(adapter->metering_evidence));
+    (void)memset(&adapter->pnc_evidence,0,sizeof(adapter->pnc_evidence));
     if (adapter->status.state != OPENV2G_PROTOCOL_STATE_TERMINATED) {
         set_state(adapter, OPENV2G_PROTOCOL_STATE_TERMINATED, reason);
     }
@@ -169,9 +180,11 @@ static OpenV2g_Result advance_common(
         next_kind = OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION;
         break;
     case OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION:
-        next_state = OPENV2G_PROTOCOL_STATE_AUTHORIZATION;
-        next_kind = OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION;
+        next_state = adapter->pnc_selected ? OPENV2G_PROTOCOL_STATE_PAYMENT_DETAILS : OPENV2G_PROTOCOL_STATE_AUTHORIZATION;
+        next_kind = adapter->pnc_selected ? OPENV2G_PROTOCOL_MESSAGE_PAYMENT_DETAILS : OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION;
         break;
+    case OPENV2G_PROTOCOL_MESSAGE_PAYMENT_DETAILS:
+        next_state = OPENV2G_PROTOCOL_STATE_AUTHORIZATION; next_kind = OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION; break;
     case OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION:
         next_state = OPENV2G_PROTOCOL_STATE_CHARGE_PARAMETER;
         next_kind = OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER;
@@ -337,6 +350,13 @@ static OpenV2g_Result iso2_message(
             message->correlation_id,
             OPENV2G_REASON_PEER_REJECT);
         return OPENV2G_RESULT_REJECTED;
+    }
+    if (completed_kind == OPENV2G_PROTOCOL_MESSAGE_PAYMENT_DETAILS) {
+        if (!adapter->pnc_selected || !message->has_pnc_evidence || message->pnc_evidence.generation != adapter->status.generation ||
+            message->pnc_evidence.source_correlation_id != message->correlation_id || message->pnc_evidence.signing_job_id == 0u || message->ongoing) {
+            fail_adapter(adapter,message->kind,message->correlation_id,OPENV2G_REASON_PRECONDITION); return OPENV2G_RESULT_REJECTED;
+        }
+        adapter->pnc_evidence = message->pnc_evidence;
     }
     if (completed_kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY && message->request_service_detail) {
         return send_request(adapter, OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL, message->now);

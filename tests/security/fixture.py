@@ -34,12 +34,12 @@ def credentials(folder):
     write("ca.pem", root.public_bytes(serialization.Encoding.PEM))
     write("other-ca.pem", other.public_bytes(serialization.Encoding.PEM))
     serials = {}
-    def leaf(name, issuer, issuer_key, hostname="localhost", start=-1, end=1, client=False):
+    def leaf(name, issuer, issuer_key, hostname="localhost", start=-1, end=1, client=False, subject=None):
         key = ec.generate_private_key(ec.SECP256R1())
         alternatives = [x509.DNSName(hostname)]
         if not client:
             alternatives += [x509.IPAddress(ipaddress.ip_address("::1")), x509.IPAddress(ipaddress.ip_address("127.0.0.1"))]
-        cert = (x509.CertificateBuilder().subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, hostname)]))
+        cert = (x509.CertificateBuilder().subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, subject or hostname)]))
                 .issuer_name(issuer.subject).public_key(key.public_key()).serial_number(x509.random_serial_number())
                 .not_valid_before(now + dt.timedelta(days=start)).not_valid_after(now + dt.timedelta(days=end))
                 .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
@@ -56,6 +56,8 @@ def credentials(folder):
     r, s = utils.decode_dss_signature(server_key.sign(b"abc", ec.ECDSA(hashes.SHA256())))
     write("external.sig", r.to_bytes(32, "big") + s.to_bytes(32, "big"))
     leaf("client", root, root_key, "evcc.test", client=True)
+    leaf("contract", root, root_key, "evcc.test", client=True, subject="DEABC1234567890")
+    leaf("contract-wrong-id", root, root_key, "evcc.test", client=True, subject="DEABC1234567891")
     leaf("client-expired", root, root_key, "evcc.test", start=-3, end=-2, client=True)
     leaf("client-future", root, root_key, "evcc.test", start=1, end=2, client=True)
     leaf("client-untrusted", other, other_key, "evcc.test", client=True)
@@ -64,7 +66,7 @@ def credentials(folder):
     leaf("expired", root, root_key, start=-3, end=-2)
     leaf("future", root, root_key, start=1, end=2)
     revoked = x509.RevokedCertificateBuilder().serial_number(serials["server"]).revocation_date(now - dt.timedelta(minutes=1)).build()
-    for name, entries in [("revoked.crl", [revoked]), ("clean.crl", []), ("client-revoked.crl", [x509.RevokedCertificateBuilder().serial_number(serials["client"]).revocation_date(now - dt.timedelta(minutes=1)).build()])]:
+    for name, entries in [("revoked.crl", [revoked]), ("clean.crl", []), ("contract-revoked.crl", [x509.RevokedCertificateBuilder().serial_number(serials["contract"]).revocation_date(now - dt.timedelta(minutes=1)).build()]), ("client-revoked.crl", [x509.RevokedCertificateBuilder().serial_number(serials["client"]).revocation_date(now - dt.timedelta(minutes=1)).build()])]:
         crl = x509.CertificateRevocationListBuilder().issuer_name(root.subject).last_update(now - dt.timedelta(minutes=2)).next_update(now + dt.timedelta(days=1))
         for entry in entries:
             crl = crl.add_revoked_certificate(entry)
@@ -97,6 +99,21 @@ if __name__ == "__main__":
             oracle = os.environ.get("OPENV2G_EXI_ORACLE")
             if oracle:
                 for name, schema in [("receipt.exi", "iso2"), ("receipt-body.exi", "iso2-fragment"), ("receipt-info.exi", "iso2-fragment")]:
+                    data = (folder / name).read_bytes()
+                    result = subprocess.run([oracle, schema], input=data, capture_output=True, check=True, timeout=5)
+                    assert result.stdout == data, name
+
+        auth_signature = folder / "auth.sig"
+        if auth_signature.exists():
+            signature = auth_signature.read_bytes()
+            assert len(signature) == 64
+            public = x509.load_pem_x509_certificate((folder / "contract.pem").read_bytes()).public_key()
+            public.verify(utils.encode_dss_signature(int.from_bytes(signature[:32], "big"), int.from_bytes(signature[32:], "big")),
+                          (folder / "auth-info.exi").read_bytes(), ec.ECDSA(hashes.SHA256()))
+            assert hashlib.sha256((folder / "auth-body.exi").read_bytes()).digest() == (folder / "auth-digest.bin").read_bytes()
+            oracle = os.environ.get("OPENV2G_EXI_ORACLE")
+            if oracle:
+                for name, schema in [("payment-details.exi", "iso2"), ("payment-details-response.exi", "iso2"), ("auth.exi", "iso2"), ("auth-body.exi", "iso2-fragment"), ("auth-info.exi", "iso2-fragment")]:
                     data = (folder / name).read_bytes()
                     result = subprocess.run([oracle, schema], input=data, capture_output=True, check=True, timeout=5)
                     assert result.stdout == data, name

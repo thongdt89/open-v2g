@@ -2,6 +2,7 @@
 #define OPENV2G_EXI_CBV2G_DC_H
 #include "openv2g/iso15118_chrg/exi_codec.h"
 #include "openv2g/iso15118_chrg/protocol_adapter.h"
+#include "openv2g/iso15118_chrg/certificate_manager.h"
 #define OPENV2G_EXI_DC_PAYLOAD_MAX 4096u
 #define OPENV2G_EXI_DC_WORKSPACE_SIZE (OPENV2G_EXI_DC_PAYLOAD_MAX + 1u)
 /* Project DTO IDs: request kind, or kind + response offset. Not wire tags. */
@@ -69,6 +70,10 @@ typedef struct {
     OpenV2g_ProtocolMessageKind kind;
     bool response;
     bool has_signature;
+    bool has_challenge;
+    uint8_t challenge[16];
+    int64_t peer_time_s; /* Received telemetry, never an implicit trusted clock. */
+    OpenV2g_CertificateRecord contract; /* Only public identity/chain are serialized. */
     OpenV2g_ExiSignature signature;
     bool accepted;
     bool new_session;
@@ -126,6 +131,7 @@ typedef struct {
     uint32_t schedule_duration_s;
 } OpenV2g_ExiDcDocument;
 /* Strict one-local-reference ISO-2 receipt profile. Serialization is not trust verification. */
+OpenV2g_Result OpenV2g_Cbv2gIso2_AuthorizationFragment(const OpenV2g_ExiDcDocument *, uint8_t *, size_t capacity, size_t *length);
 OpenV2g_Result OpenV2g_Cbv2gIso2_ReceiptFragment(const OpenV2g_ExiDcDocument *document,
     uint8_t *output, size_t capacity, size_t *length);
 OpenV2g_Result OpenV2g_Cbv2gIso2_SignedInfoFragment(const OpenV2g_ExiSignature *signature,

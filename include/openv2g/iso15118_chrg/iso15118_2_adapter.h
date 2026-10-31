@@ -9,6 +9,8 @@ typedef struct {
     bool dc_eim_enabled;
     bool ac_eim_enabled;
     bool pnc_enabled;
+    bool pnc_selected;
+    OpenV2g_ProtocolPncEvidence pnc_evidence;
     OpenV2g_ProtocolAdapterStatus status;
     OpenV2g_ProtocolMessageChannelCsPort message_required_port;
     OpenV2g_EnergySnapshotSrPort energy_required_port;

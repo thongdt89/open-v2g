@@ -16,11 +16,11 @@ static bool record_valid(const OpenV2g_CertificateRecord *record)
     if (record == NULL) { return false; }
     if (!record->present) {
         OpenV2g_CertificateRecord empty = {0}; empty.version = record->version;
-        return record->key_handle == 0u && record->key_version == 0u && record->identity_length == 0u &&
+        return record->usage == OPENV2G_CERT_USAGE_UNSPECIFIED && record->key_handle == 0u && record->key_version == 0u && record->identity_length == 0u &&
             record->chain_count == 0u && memcmp(record->identity,empty.identity,sizeof(empty.identity)) == 0 &&
             memcmp(record->chain,empty.chain,sizeof(empty.chain)) == 0;
     }
-    if (record->key_handle == 0u || record->key_version == 0u ||
+    if (record->usage < OPENV2G_CERT_USAGE_UNSPECIFIED || record->usage > OPENV2G_CERT_USAGE_HOST_CONTRACT || record->key_handle == 0u || record->key_version == 0u ||
         record->identity_length == 0u || record->identity_length >= OPENV2G_CERT_IDENTITY_MAX ||
         record->chain_count == 0u || record->chain_count > OPENV2G_CERT_CHAIN_MAX) { return false; }
     for (i = 0u; i < record->chain_count; ++i) {
@@ -88,7 +88,7 @@ static OpenV2g_Result validate(OpenV2g_CertificateManager *manager, uint32_t gen
     if (manager->ports.validate(manager->ports.security_context,generation,record,time,now,deadline,proof) != OPENV2G_RESULT_OK) { return OPENV2G_RESULT_REJECTED; }
     after = manager->ports.now(manager->ports.clock_context);
     if (after < now || after >= deadline || proof->generation != generation || proof->key_version != record->key_version ||
-        proof->valid_until <= after || manager->generation != generation) { return OPENV2G_RESULT_REJECTED; }
+        (record->usage != OPENV2G_CERT_USAGE_UNSPECIFIED && proof->usage != record->usage) || proof->valid_until <= after || manager->generation != generation) { return OPENV2G_RESULT_REJECTED; }
     manager->owner_time = after;
     return OPENV2G_RESULT_OK;
 }

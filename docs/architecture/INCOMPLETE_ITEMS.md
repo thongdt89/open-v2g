@@ -1,9 +1,23 @@
 # Current feature completion status
 
-Revision: Draft 0.11 — 31/10/2026. **Overall implementation remains in progress.**
+Revision: Draft 0.12 — 31/10/2026. **Overall implementation remains in progress.**
 This is the current inventory; older audits/work-log entries describe their own
 snapshots. Implemented means host code, not selected supplier, frozen design,
 vehicle safety allocation or protocol conformance.
+
+## PnC host authorization increment — 31/10/2026
+
+Explicit PnC runners now select Contract over TLS, validate a persisted contract
+role/identity and public chain, exchange PaymentDetails with a fresh station
+nonce, sign/verify Authorization and complete existing AC/DC charging with signed
+receipts. Ongoing preserves the original challenge and deadline. Certificate
+version/fingerprint, key version/lease, generation, session, job and correlation
+remain bound through the portable PncContext. Ordinary EIM defaults remain off
+for PnC. Exact-CN whitelist and 15-character identity are a restricted host policy,
+not full normative/OEM eMAID policy. See [contracts and limits](PNC_HOST.md).
+Certificate installation/update and encrypted-key import remain unimplemented;
+ISO-20, broader schedules/profile/notification handling and secondary detail
+negotiation remain on the [execution list](HOST_COMPLETION_PLAN.md).
 
 ## PEV-SLAC typed host increment — 31/10/2026
 
