@@ -110,6 +110,8 @@ static bool evidence_is_complete(
     if ((evidence->energy->availability_mask & (OPENV2G_ENERGY_FIELD_INTERLOCK | OPENV2G_ENERGY_FIELD_LIMITS)) !=
         (OPENV2G_ENERGY_FIELD_INTERLOCK | OPENV2G_ENERGY_FIELD_LIMITS)) { return false; }
 
+    if ((evidence->energy->ac_phases != 0u && evidence->energy->ac_phases != 1u && evidence->energy->ac_phases != 3u) ||
+        (evidence->hlc->selected_mode != OPENV2G_MODE_AC && evidence->energy->ac_phases > 1u)) { return false; }
     if ((evidence->energy->snapshot_id == 0u) || !evidence->energy->interlock_closed ||
         (evidence->energy->limits.max_import_power_w < 0) ||
         (evidence->energy->limits.max_charge_current_ma < 0)) {
@@ -218,6 +220,17 @@ OpenV2g_Result OpenV2g_PermissionManager_Evaluate(
     manager->current.mode = evidence->hlc->selected_mode;
     manager->current.direction = OPENV2G_DIRECTION_IMPORT_TO_EV;
     manager->current.limits = allowed_limits;
+    manager->current.ac_phases = evidence->energy->ac_phases;
+    if (evidence->hlc->selected_mode == OPENV2G_MODE_AC && evidence->energy->ac_phases == 3u) {
+        int64_t current;
+        if (evidence->energy->target_voltage_mv == 0u ||
+            (evidence->energy->availability_mask & OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE) == 0u) {
+            OpenV2g_PermissionSetDeny(&manager->current,evidence->generation,now,OPENV2G_REASON_PRECONDITION);
+            manager->current.env.sequence_counter = publication_sequence; return OPENV2G_RESULT_REJECTED;
+        }
+        current = (int64_t)allowed_limits.max_import_power_w*1000000 / ((int64_t)evidence->energy->target_voltage_mv*3);
+        if (current < manager->current.limits.max_charge_current_ma) { manager->current.limits.max_charge_current_ma = (int32_t)current; }
+    }
     manager->current.valid_until = now + config->permission_validity_us;
     cap_validity(evidence->cp_pp->env.timestamp, config->cp_pp_max_age_us, &manager->current.valid_until);
     cap_validity(evidence->energy->env.timestamp, config->energy_max_age_us, &manager->current.valid_until);

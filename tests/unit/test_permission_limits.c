@@ -76,5 +76,17 @@ int main(void)
     TEST_ASSERT(OpenV2g_PermissionManager_Evaluate(&manager, &config, &evidence, 170u) == OPENV2G_RESULT_REJECTED);
     hlc.service_selected = true;
     TEST_ASSERT(OpenV2g_PermissionManager_Evaluate(&manager, &config, &evidence, 170u) == OPENV2G_RESULT_OK);
+    config.allow_ac_eim = true; hlc.selected_mode = OPENV2G_MODE_AC;
+    energy.ac_phases = 3u; energy.target_voltage_mv = 230000u;
+    energy.availability_mask |= OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE;
+    energy.limits.max_charge_current_ma = 32000; energy.limits.max_import_power_w = 30000;
+    for (i = 0u; i < OPENV2G_LIMIT_SOURCE_COUNT; ++i) { limits[i].mode = OPENV2G_MODE_AC; limits[i].limits.max_charge_current_ma = 32000; }
+    TEST_ASSERT(OpenV2g_PermissionManager_Evaluate(&manager,&config,&evidence,170u) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(manager.current.ac_phases == 3u && manager.current.limits.max_import_power_w == 10000 && manager.current.limits.max_charge_current_ma == 14492);
+    TEST_ASSERT((int64_t)manager.current.limits.max_charge_current_ma*230000*3/1000000 <= 10000);
+    energy.ac_phases = 2u;
+    TEST_ASSERT(OpenV2g_PermissionManager_Evaluate(&manager,&config,&evidence,170u) == OPENV2G_RESULT_REJECTED && manager.current.decision == OPENV2G_PERMISSION_DENY);
+    energy.ac_phases = 3u; energy.availability_mask &= ~OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE;
+    TEST_ASSERT(OpenV2g_PermissionManager_Evaluate(&manager,&config,&evidence,170u) == OPENV2G_RESULT_REJECTED && manager.current.decision == OPENV2G_PERMISSION_DENY);
     return 0;
 }

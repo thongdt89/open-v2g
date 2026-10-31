@@ -49,7 +49,8 @@ typedef struct {
     bool isolation_valid;
     bool resumed_session;
     bool pause_session;
-    bool ac_mode; /* Bounded single-phase AC EIM host profile. */
+    bool ac_mode; /* Explicit AC/DC branch. */
+    uint8_t ac_phases; /* 0/1 single or 3 balanced, only serialized where the schema carries a mode. */
     bool rcd_fault;
     uint32_t ac_energy_wh;
     bool charging_complete;

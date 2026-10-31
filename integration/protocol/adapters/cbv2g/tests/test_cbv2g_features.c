@@ -107,6 +107,15 @@ int main(void)
     TEST_ASSERT(metering() == 0);
     TEST_ASSERT(ac_profile() == 0);
     {
+        OpenV2g_ExiDcDocument value = OpenV2g_ExiDc_Default(OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER,false), output;
+        value.ac_mode = true; value.ac_phases = 3u; value.max_voltage_mv = 250000u; value.max_current_ma = 32000;
+        TEST_ASSERT(roundtrip(&value,&output) == 0 && output.ac_phases == 3u);
+        value.kind = OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY; value.response = true;
+        TEST_ASSERT(roundtrip(&value,&output) == 0 && output.ac_phases == 3u);
+        value.kind = OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER; value.response = false; value.ac_phases = 2u;
+        TEST_ASSERT(rejected(&value) == 0);
+    }
+    {
         OpenV2g_ExiDcDocument document = OpenV2g_ExiDc_Default(OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE, false), output;
         TEST_ASSERT(roundtrip(&document, &output) == 0 && output.kind == OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE);
         document.ac_mode = true;

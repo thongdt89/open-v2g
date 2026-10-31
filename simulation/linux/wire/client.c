@@ -68,7 +68,13 @@ static bool refresh(OvWireClient *client, OpenV2g_TimeUs now)
     energy.env.sequence_counter = sim->coordinator.energy.env.sequence_counter + 1u;
     if (client->ac_mode) {
         energy.limits.max_voltage_mv = 250000u; energy.limits.max_charge_current_ma = 32000;
-        energy.limits.max_import_power_w = 7360; energy.target_voltage_mv = 230000u; energy.target_current_ma = 16000;
+        int32_t current = client->phase_current_limits_ma[0]; unsigned phase;
+        for (phase = 1u; phase < client->ac_phases; ++phase) {
+            if (client->phase_current_limits_ma[phase] < current) { current = client->phase_current_limits_ma[phase]; }
+        }
+        energy.ac_phases = client->ac_phases; energy.limits.max_charge_current_ma = current;
+        energy.limits.max_import_power_w = (int32_t)((int64_t)230000u*current*client->ac_phases/1000000);
+        energy.target_voltage_mv = 230000u; energy.target_current_ma = current < 16000 ? current : 16000;
     }
     if (!ok(OpenV2g_HostSimulation_InjectCpPp(sim, &cp, now))) { return false; }
     /* Explicit surrounding-component sample, not freshness restamping of a
@@ -112,6 +118,7 @@ bool OvWireClient_InitMode(OvWireClient *client, int fd, OpenV2g_ProtocolId prot
     OpenV2g_HostSimulationConfig config = OpenV2g_HostSimulation_DefaultConfig();
     OpenV2g_TcpTxCsPort tx;
     (void)memset(client, 0, sizeof(*client));
+    client->ac_phases = 1u; client->phase_current_limits_ma[0] = 32000;
     if (protocol != OPENV2G_PROTOCOL_DIN_70121 && protocol != OPENV2G_PROTOCOL_ISO_15118_2) { return false; }
     if (ac_mode && protocol != OPENV2G_PROTOCOL_ISO_15118_2) { return false; }
     client->ac_mode = ac_mode;
@@ -190,6 +197,16 @@ static OpenV2g_Result discovered(void *context, uint32_t generation, const OpenV
 {
     OvWireClient *client = context;
     return OpenV2g_Iso15118Chrg_OnSdpComplete(&client->environment.rte.hlc, generation, Ov2g_OsNow(), endpoint);
+}
+bool OvWireClient_SetAcPhaseLimits(OvWireClient *client, uint8_t phases, const int32_t limits[3])
+{
+    unsigned i;
+    if (client == NULL || limits == NULL || !client->ac_mode || client->environment.rte.coordinator.generation != 0u ||
+        (phases != 1u && phases != 3u)) { return false; }
+    for (i = 0u; i < 3u; ++i) {
+        if ((i < phases && (limits[i] < 6000 || limits[i] > 32000)) || (i >= phases && limits[i] != 0)) { return false; }
+    }
+    client->ac_phases = phases; (void)memcpy(client->phase_current_limits_ma,limits,sizeof(client->phase_current_limits_ma)); return true;
 }
 bool OvWireClient_SetDiscoveryEndpoint(OvWireClient *client, const OpenV2g_Endpoint *destination, uint8_t attempts, OpenV2g_TimeUs interval)
 {
@@ -312,7 +329,7 @@ static bool exchange_protocol(OvWireClient *client)
     }
     request = OpenV2g_ExiDc_Default(pending->kind, false);
     request.pause_session = pending->kind == OPENV2G_PROTOCOL_MESSAGE_SESSION_STOP && sim->hlc.pause_on_stop;
-    request.ac_mode = client->ac_mode; request.ac_energy_wh = client->ac_mode ? 1000u : 0u;
+    request.ac_mode = client->ac_mode; request.ac_phases = client->ac_phases; request.ac_energy_wh = client->ac_mode ? 1000u : 0u;
     (void)memcpy(request.session_id, client->environment.rte.hlc.session_context.session_id, 8u);
     request.service_id = client->environment.rte.hlc.session_context.service_id != 0u ? client->environment.rte.hlc.session_context.service_id : 1u;
     request.schedule_id = client->environment.rte.hlc.session_context.schedule_id != 0u ? client->environment.rte.hlc.session_context.schedule_id : 1u;
@@ -367,8 +384,12 @@ static bool exchange_protocol(OvWireClient *client)
     now = Ov2g_OsNow();
     if (!supervise(client, now)) { return false; }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY) {
-        if (response.ac_mode != client->ac_mode) { return false; }
+        if (response.ac_mode != client->ac_mode || (client->ac_mode && response.ac_phases != client->ac_phases)) { return false; }
 
+    }
+    if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER && response.ac_mode && client->ac_phases == 3u) {
+        if (response.max_power_w > INT32_MAX/3) { return false; }
+        response.max_power_w *= 3; /* ISO-2 response contains a per-phase current, no phase count. */
     }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER && !response.ongoing) {
         if (response.ac_mode != client->ac_mode || !response.ready || (!client->ac_mode && !response.isolation_valid) || response.max_voltage_mv == 0u || response.max_current_ma <= 0 ||

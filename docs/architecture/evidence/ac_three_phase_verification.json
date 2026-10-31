@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-31",
+  "base_commit": "2d82257",
+  "scope": "Balanced ISO-2 three-phase host EIM with explicit simulated phase caps. Not asymmetric dispatch, actual OBC integration or conformance. System OpenSSL shared libraries are not sanitizer-instrumented.",
+  "builds": {
+    "normal_generated_openssl_oracle": {
+      "passed": 42,
+      "failed": 0,
+      "ctest_log_sha256": "ac456855d0d1c9baf3ba93c07cf9730617b14c45bd7d141ed04b6315812724bd"
+    },
+    "asan_ubsan_generated_openssl": {
+      "passed": 40,
+      "failed": 0,
+      "ctest_log_sha256": "839f840535eeb2946b7e8ebfbeb4ea757c1bf3d5f235c3cd5fabb18030ea0a67"
+    },
+    "generated_oracle_openssl_off": {
+      "passed": 35,
+      "failed": 0,
+      "ctest_log_sha256": "9bc7ea414a17159b1dc63a2f1ace9461972e5a48a832c921837f320b369d1596"
+    },
+    "default_codecs_openssl_off": {
+      "passed": 26,
+      "failed": 0,
+      "ctest_log_sha256": "1141521e2b97e76053662a53a1e24dd0a5602bc3995ccfbf1acb897135921e4b"
+    }
+  },
+  "source_sha256": {
+    "include/openv2g/common/types.h": "d8a2bc988d156840ad1165148f6f3794bdcadc23fcff283830b0a3cd87a60d95",
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_iso2.c": "d8a4bdd28ab8fb3d7d694735b320de91a92ddf65537059a211a6bf1d87a31a3b",
+    "integration/protocol/adapters/cbv2g/include/openv2g/exi_cbv2g_dc.h": "33704714c34c8bceac9b420fbff4588957dc5f14481e061e6e9d02056c7508ed",
+    "integration/protocol/adapters/cbv2g/tests/feature_vector_dump.c": "1fb610c9c89b58ff6ce039f04d58e9f70e52415d0c85cd4a1196873494a173a3",
+    "integration/protocol/adapters/cbv2g/tests/test_cbv2g_features.c": "1069e111f2fbc5b1e074d2cae0f13d2ae85faa2966de8464107dad08ec193862",
+    "simulation/linux/wire/client.c": "106975f00a52f49189c163429b45dac0c98c749162f2b76b53b19891d3c0ed70",
+    "simulation/linux/wire/main.c": "253aabdae580eeffc10c7f4c27e1c3c4abf6737eee11adbfc595a63ead391732",
+    "simulation/linux/wire/station.c": "6355e7d0b5f10e38b802e427b358b581a2305f1b14c78e1564d7d14253ae14cd",
+    "simulation/linux/wire/test_wire.c": "aecf63aaa8160cba27fc5f117e00ee3e5063082966c5db238ebf3a2bc5e394a8",
+    "simulation/linux/wire/wire.h": "3ddec65c05ea793bd1ce8786742d9345b3ae22dbfcf71073df03f89d44e3a8b1",
+    "src/charging_coordinator/permission_manager.c": "b284c717b8185e898cfd3c9752256c24af41354698915070b14724686931a1d8",
+    "src/iso15118_chrg/protocol_data_flow.c": "f18aadb0110eb495743999a39f40c2750c330409ab02b913c255342a3693b282",
+    "tests/oracle/differential.py": "3cfa9ef433d1e83c159be32c2c2c6b71c3925cec758788c31eff18d98949226c",
+    "tests/oracle/feature_vectors.json": "2818d7ed80a7931f92b211548fb400f63409539a0d4c92e1ca910a0f7fc19b7d",
+    "tests/security/tls_cli.py": "3d1a63b1436123b1777a68f4ea7c1ae95863447e43785a51aa1462860e24ca42",
+    "tests/unit/test_permission_limits.c": "79ab94057583c7305d6041461f8e26e5fd6e3a40192c737da260d305839f8b2a",
+    "tests/unit/test_protocol_data_flow.c": "b65f1398035cbb2cc40a18cb69cea56e8bc226d022d2178f928f1ece6c8d7429"
+  },
+  "baseline_vectors_unchanged": 50,
+  "earlier_feature_vectors_unchanged": 25,
+  "new_independent_feature_vectors": 2,
+  "wire_sessions": 45,
+  "tls_cli_pairs": 4
+}

@@ -3,6 +3,12 @@
 #include <limits.h>
 #include <string.h>
 
+static int64_t balanced_power(uint32_t voltage_mv, int32_t current_ma, uint8_t phases)
+{
+    const int64_t product = (int64_t)voltage_mv*current_ma;
+    const int64_t count = phases == 3u ? 3 : 1;
+    return (product/1000000)*count+(product%1000000)*count/1000000;
+}
 static void set_rule(
     OpenV2g_ProtocolDataFlowRule *rule,
     OpenV2g_ProtocolFlowCase flow_case,
@@ -268,6 +274,7 @@ static bool energy_is_usable(
          rule->required_energy_fields)) {
         return false;
     }
+    if (energy->ac_phases != 0u && energy->ac_phases != 1u && energy->ac_phases != 3u) { return false; }
     if (((energy->availability_mask & OPENV2G_ENERGY_FIELD_SOC) != 0u) &&
         (energy->soc_permille > 1000u)) {
         return false;
@@ -336,6 +343,7 @@ static bool targets_fit_limits(
         ((energy->availability_mask & target_fields) == target_fields);
     int64_t requested_power_w;
 
+    if (permission != NULL && (energy->ac_phases == 3u) != (permission->ac_phases == 3u)) { return false; }
     if (!has_targets) {
         return true;
     }
@@ -353,9 +361,7 @@ static bool targets_fit_limits(
             return false;
         }
     }
-    requested_power_w =
-        ((int64_t)energy->target_voltage_mv * energy->target_current_ma) /
-        1000000;
+    requested_power_w = balanced_power(energy->target_voltage_mv,energy->target_current_ma,energy->ac_phases);
     if ((((energy->availability_mask & OPENV2G_ENERGY_FIELD_LIMITS) != 0u) &&
          (requested_power_w > energy->limits.max_import_power_w)) ||
         ((permission != NULL) &&
@@ -411,7 +417,8 @@ OpenV2g_Result OpenV2g_ProtocolDataFlow_PrepareRequest(
         if ((energy_port == NULL) || (energy_port->read == NULL) ||
             (energy_port->read(energy_port->context, &request->energy) !=
              OPENV2G_RESULT_OK) ||
-            !energy_is_usable(&request->energy, &rule, generation, now)) {
+            !energy_is_usable(&request->energy, &rule, generation, now) ||
+            (mode != OPENV2G_MODE_AC && request->energy.ac_phases > 1u)) {
             *reason = OPENV2G_REASON_STALE_DATA;
             return OPENV2G_RESULT_REJECTED;
         }
@@ -453,7 +460,7 @@ OpenV2g_Result OpenV2g_ProtocolDataFlow_PrepareRequest(
             if (projected.target_voltage_mv > limits->max_voltage_mv) { projected.target_voltage_mv = limits->max_voltage_mv; }
             if (projected.target_current_ma > limits->max_charge_current_ma) { projected.target_current_ma = limits->max_charge_current_ma; }
             if (projected.target_voltage_mv != 0u) {
-                int64_t current = (int64_t)limits->max_import_power_w * 1000000 / projected.target_voltage_mv;
+                int64_t current = (int64_t)limits->max_import_power_w * 1000000 / ((int64_t)projected.target_voltage_mv * (projected.ac_phases == 3u ? 3 : 1));
                 if (current < projected.target_current_ma) { projected.target_current_ma = (int32_t)current; }
             }
         }
@@ -466,7 +473,7 @@ OpenV2g_Result OpenV2g_ProtocolDataFlow_PrepareRequest(
             (OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE | OPENV2G_ENERGY_FIELD_TARGET_CURRENT) &&
             (projected.availability_mask & (OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE | OPENV2G_ENERGY_FIELD_TARGET_CURRENT)) ==
             (OPENV2G_ENERGY_FIELD_TARGET_VOLTAGE | OPENV2G_ENERGY_FIELD_TARGET_CURRENT)) {
-            requested_power_w = (int64_t)projected.target_voltage_mv * projected.target_current_ma / 1000000;
+            requested_power_w = balanced_power(projected.target_voltage_mv,projected.target_current_ma,projected.ac_phases);
             request->requested_power_w = (int32_t)requested_power_w;
         }
     }

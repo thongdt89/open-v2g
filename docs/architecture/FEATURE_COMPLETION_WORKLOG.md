@@ -253,3 +253,13 @@ kernel ingress, join all-nodes membership and retry within one aggregate budget.
 Loopback interface/retry behavior is exercised; real physical multicast/link-local
 connectivity remains unverified. Production integration is excluded by user scope;
 remaining host features continue in HOST_COMPLETION_PLAN.md.
+
+## Balanced three-phase AC — 31/10/2026
+
+Added explicit mode/CPD mapping and `iso2-ac3` IPv4/IPv6/TLS CLI profile.
+Surrounding phase caps are copied and balanced to their minimum; PermissionManager
+and HLC projection distinguish per-phase current from total power, with phase
+mismatch and overflow guards. Added two independent EXI cases and retained the
+old 25 feature/50 baseline references. Broader services/profiles and asymmetric
+phase control are still open. See simulation/linux/AC_THREE_PHASE.md and
+[evidence](evidence/ac_three_phase_verification.json).

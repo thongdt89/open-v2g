@@ -151,7 +151,7 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
     struct iso2_BodyType *body = &generated->V2G_Message.Body;
     iso2_responseCodeType code = value->accepted ?
         (value->new_session ? iso2_responseCodeType_OK_NewSessionEstablished : (value->resumed_session ? iso2_responseCodeType_OK_OldSessionJoined : iso2_responseCodeType_OK)) : iso2_responseCodeType_FAILED;
-    if (value->soc_permille > 1000u || value->voltage_mv > INT32_MAX || value->max_voltage_mv > INT32_MAX ||
+    if ((value->ac_mode && value->ac_phases != 0u && value->ac_phases != 1u && value->ac_phases != 3u) || value->soc_permille > 1000u || value->voltage_mv > INT32_MAX || value->max_voltage_mv > INT32_MAX ||
         value->min_voltage_mv > INT32_MAX || value->min_current_ma < 0 ||
         value->current_ma < 0 || value->max_current_ma < 0 || value->max_power_w < 0 || value->schedule_power_w < 0) { return false; }
     generated->V2G_Message.Header.SessionID.bytesLen = 8u;
@@ -179,7 +179,8 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
             if (value->ac_mode) {
                 struct iso2_AC_EVChargeParameterType *ac = &body->ChargeParameterDiscoveryReq.AC_EVChargeParameter;
                 body->ChargeParameterDiscoveryReq.AC_EVChargeParameter_isUsed = 1u;
-                body->ChargeParameterDiscoveryReq.RequestedEnergyTransferMode = iso2_EnergyTransferModeType_AC_single_phase_core;
+                REQUIRE(value->ac_phases == 0u || value->ac_phases == 1u || value->ac_phases == 3u);
+                body->ChargeParameterDiscoveryReq.RequestedEnergyTransferMode = value->ac_phases == 3u ? iso2_EnergyTransferModeType_AC_three_phase_core : iso2_EnergyTransferModeType_AC_single_phase_core;
                 OUT_PHYS(ac->EAmount, (int64_t)value->ac_energy_wh * 1000, Wh);
                 OUT_PHYS(ac->EVMaxVoltage, value->max_voltage_mv, V);
                 OUT_PHYS(ac->EVMaxCurrent, value->max_current_ma, A);
@@ -278,7 +279,7 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
             body->ServiceDiscoveryRes.ChargeService.ServiceID = value->service_id;
             body->ServiceDiscoveryRes.ChargeService.ServiceCategory = iso2_serviceCategoryType_EVCharging;
             body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.arrayLen = 1u;
-            body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.array[0] = (value->ac_mode ? iso2_EnergyTransferModeType_AC_single_phase_core : iso2_EnergyTransferModeType_DC_core);
+            body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.array[0] = (value->ac_mode ? (value->ac_phases == 3u ? iso2_EnergyTransferModeType_AC_three_phase_core : iso2_EnergyTransferModeType_AC_single_phase_core) : iso2_EnergyTransferModeType_DC_core);
             body->ServiceDiscoveryRes.ChargeService.FreeService = 1; break;
         case OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION:
             body->PaymentServiceSelectionRes_isUsed = 1u; body->PaymentServiceSelectionRes.ResponseCode = code; break;
@@ -475,7 +476,8 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
         value->accepted = body->ServiceDiscoveryRes.ResponseCode == iso2_responseCodeType_OK;
         REQUIRE(body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.arrayLen == 1u && body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.array[0] == iso2_paymentOptionType_ExternalPayment);
         REQUIRE(body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.arrayLen == 1u);
-        value->ac_mode = body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.array[0] == iso2_EnergyTransferModeType_AC_single_phase_core;
+        value->ac_phases = body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.array[0] == iso2_EnergyTransferModeType_AC_three_phase_core ? 3u : 1u;
+        value->ac_mode = value->ac_phases == 3u || body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.array[0] == iso2_EnergyTransferModeType_AC_single_phase_core;
         REQUIRE(value->ac_mode || body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.array[0] == iso2_EnergyTransferModeType_DC_core);
         REQUIRE(body->ServiceDiscoveryRes.ChargeService.ServiceCategory == iso2_serviceCategoryType_EVCharging && !body->ServiceDiscoveryRes.ServiceList_isUsed);
         value->service_id = body->ServiceDiscoveryRes.ChargeService.ServiceID;
@@ -503,7 +505,8 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
         REQUIRE((unsigned)body->ChargeParameterDiscoveryReq.DC_EVChargeParameter_isUsed + (unsigned)value->ac_mode == 1u);
         if (value->ac_mode) {
             const struct iso2_AC_EVChargeParameterType *ac = &body->ChargeParameterDiscoveryReq.AC_EVChargeParameter;
-            REQUIRE(body->ChargeParameterDiscoveryReq.RequestedEnergyTransferMode == iso2_EnergyTransferModeType_AC_single_phase_core);
+            value->ac_phases = body->ChargeParameterDiscoveryReq.RequestedEnergyTransferMode == iso2_EnergyTransferModeType_AC_three_phase_core ? 3u : 1u;
+            REQUIRE(body->ChargeParameterDiscoveryReq.RequestedEnergyTransferMode == iso2_EnergyTransferModeType_AC_single_phase_core || value->ac_phases == 3u);
             IN_PHYS(ac->EAmount, Wh, physical); REQUIRE(physical % 1000 == 0); value->ac_energy_wh = (uint32_t)(physical / 1000);
             IN_PHYS(ac->EVMaxVoltage, V, physical); value->max_voltage_mv = (uint32_t)physical;
             IN_PHYS(ac->EVMaxCurrent, A, value->max_current_ma); IN_PHYS(ac->EVMinCurrent, A, value->min_current_ma);
@@ -532,7 +535,7 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
             int64_t power;
             REQUIRE(ac_status_in(&ac->AC_EVSEStatus, value));
             IN_PHYS(ac->EVSENominalVoltage, V, physical); value->voltage_mv = (uint32_t)physical;
-            value->max_voltage_mv = value->voltage_mv; /* Host single-phase limit projection. */
+            value->max_voltage_mv = value->voltage_mv; /* Per-phase projection; active session supplies the phase count. */
             IN_PHYS(ac->EVSEMaxCurrent, A, value->max_current_ma);
             power = (int64_t)value->voltage_mv * value->max_current_ma / 1000000;
             REQUIRE(power <= INT32_MAX); value->max_power_w = (int32_t)power;

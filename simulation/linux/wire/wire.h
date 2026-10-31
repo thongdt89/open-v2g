@@ -48,7 +48,7 @@ typedef enum {
     OV_WIRE_REPLAY_SAP = 9, OV_WIRE_WRONG_SCHEDULE = 10,
     OV_WIRE_WRONG_EVSE = 11, OV_WIRE_WRONG_SCHEMA = 12,
     OV_WIRE_ZERO_PRECHARGE = 13, OV_WIRE_WELDED = 14, OV_WIRE_MINOR_DEVIATION = 15, OV_WIRE_PENDING = 16, OV_WIRE_DYNAMIC_LIMIT = 17, OV_WIRE_METERING = 18, OV_WIRE_SIGNED_METER = 19,
-    OV_WIRE_AC = 20, OV_WIRE_AC_METERING = 21, OV_WIRE_AC_RCD = 22, OV_WIRE_AC_WRONG_MODE = 23, OV_WIRE_RECEIPT_POLICY = 24, OV_WIRE_PAUSE = 25, OV_WIRE_RESUME = 26, OV_WIRE_PAUSE_AC = 27, OV_WIRE_RESUME_AC = 28, OV_WIRE_RENEGOTIATE = 29, OV_WIRE_RENEGOTIATE_AC = 30, OV_WIRE_SIGNED_RECEIPT = 31, OV_WIRE_SIGNED_RECEIPT_AC = 32
+    OV_WIRE_AC = 20, OV_WIRE_AC_METERING = 21, OV_WIRE_AC_RCD = 22, OV_WIRE_AC_WRONG_MODE = 23, OV_WIRE_RECEIPT_POLICY = 24, OV_WIRE_PAUSE = 25, OV_WIRE_RESUME = 26, OV_WIRE_PAUSE_AC = 27, OV_WIRE_RESUME_AC = 28, OV_WIRE_RENEGOTIATE = 29, OV_WIRE_RENEGOTIATE_AC = 30, OV_WIRE_SIGNED_RECEIPT = 31, OV_WIRE_SIGNED_RECEIPT_AC = 32, OV_WIRE_AC3 = 33, OV_WIRE_AC3_WRONG_PHASE = 34
 } OvWireScenario;
 
 typedef struct {
@@ -89,6 +89,8 @@ typedef struct {
     unsigned messages;
     unsigned ticks;
     bool ac_mode;
+    uint8_t ac_phases;
+    int32_t phase_current_limits_ma[3];
     bool energy_started;
     bool freeze_energy;
     bool allow_sap_minor_deviation;
@@ -130,6 +132,7 @@ bool OvWireClient_Init(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol
 bool OvWireClient_InitMode(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol, bool freeze_energy, bool ac_mode);
 bool OvWireClient_InitDiscoveryMode(OvWireClient *client, OpenV2g_ProtocolId protocol, uint16_t discovery_port, bool ac_mode);
 bool OvWireClient_InitDiscovery(OvWireClient *client, OpenV2g_ProtocolId protocol, uint16_t discovery_port);
+bool OvWireClient_SetAcPhaseLimits(OvWireClient *, uint8_t phases, const int32_t limits_ma[3]);
 bool OvWireClient_SetDiscoveryEndpoint(OvWireClient *, const OpenV2g_Endpoint *, uint8_t attempts, OpenV2g_TimeUs retry_interval);
 bool OvWireClient_Run(OvWireClient *client);
 /* Prepare a new generation after measured connected-safe stop; real SDP endpoint required. */

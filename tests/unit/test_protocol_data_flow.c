@@ -1,4 +1,5 @@
 #include <string.h>
+#include <limits.h>
 
 #include "openv2g/iso15118_chrg/protocol_data_flow.h"
 #include "test.h"
@@ -69,6 +70,28 @@ static void init_context(TestContext *test)
     test->permission.valid_until = 1000u;
 }
 
+static int three_phase_projection(void)
+{
+    TestContext test; OpenV2g_ProtocolTxRequest request; OpenV2g_ReasonCode reason;
+    OpenV2g_EnergySnapshotSrPort energy_port = {&test,read_energy};
+    OpenV2g_ChargePermissionSrPort permission_port = {&test,read_permission};
+    init_context(&test); test.energy.ac_phases = test.permission.ac_phases = 3u;
+    test.energy.target_voltage_mv = 230000u; test.energy.target_current_ma = 32000;
+    test.energy.limits.max_import_power_w = 22080; test.energy.limits.max_charge_current_ma = 32000;
+    test.permission.mode = OPENV2G_MODE_AC; test.permission.limits = test.energy.limits;
+    test.permission.limits.max_import_power_w = 10000;
+    TEST_ASSERT(OpenV2g_ProtocolDataFlow_PrepareRequest(OPENV2G_PROTOCOL_ISO_15118_2,OPENV2G_SCHEMA_ISO_15118_2,
+        OPENV2G_MODE_AC,OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START,31u,1u,200u,&energy_port,&permission_port,NULL,&request,&reason) == OPENV2G_RESULT_OK);
+    TEST_ASSERT(request.target_current_ma == 14492 && request.requested_power_w == 9999 && test.energy.target_current_ma == 32000);
+    test.permission.ac_phases = 1u;
+    TEST_ASSERT(OpenV2g_ProtocolDataFlow_PrepareRequest(OPENV2G_PROTOCOL_ISO_15118_2,OPENV2G_SCHEMA_ISO_15118_2,
+        OPENV2G_MODE_AC,OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START,31u,2u,200u,&energy_port,&permission_port,NULL,&request,&reason) == OPENV2G_RESULT_REJECTED);
+    test.permission.ac_phases = 3u; test.energy.target_voltage_mv = UINT32_MAX; test.energy.target_current_ma = INT32_MAX;
+    test.energy.limits.max_voltage_mv = UINT32_MAX; test.energy.limits.max_charge_current_ma = INT32_MAX; test.energy.limits.max_import_power_w = INT32_MAX;
+    TEST_ASSERT(OpenV2g_ProtocolDataFlow_PrepareRequest(OPENV2G_PROTOCOL_ISO_15118_2,OPENV2G_SCHEMA_ISO_15118_2,
+        OPENV2G_MODE_AC,OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START,31u,3u,200u,&energy_port,&permission_port,NULL,&request,&reason) == OPENV2G_RESULT_REJECTED);
+    return 0;
+}
 int main(void)
 {
     TestContext test;
@@ -79,6 +102,7 @@ int main(void)
     OpenV2g_ProtocolMeteringEvidence metering;
     OpenV2g_ReasonCode reason;
 
+    TEST_ASSERT(three_phase_projection() == 0);
     init_context(&test);
     energy_port.context = &test;
     energy_port.read = read_energy;

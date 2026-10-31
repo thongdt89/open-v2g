@@ -75,5 +75,14 @@ int main(void)
             if (emit(profile, &document) != 0) { return 1; }
         }
     }
+    {
+        OpenV2g_ExiDcDocument document = OpenV2g_ExiDc_Default(OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY,true);
+        document.ac_mode = true; document.ac_phases = 3u;
+        if (emit("iso2-ac3",&document) != 0) { return 1; }
+        document = OpenV2g_ExiDc_Default(OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER,false);
+        document.ac_mode = true; document.ac_phases = 3u; document.ac_energy_wh = 1000u;
+        document.max_voltage_mv = 250000u; document.max_current_ma = 32000; document.min_current_ma = 6000;
+        if (emit("iso2-ac3",&document) != 0) { return 1; }
+    }
     return 0;
 }

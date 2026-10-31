@@ -1,9 +1,20 @@
 # Current feature completion status
 
-Revision: Draft 0.7 — 31/10/2026. **Overall implementation remains in progress.**
+Revision: Draft 0.8 — 31/10/2026. **Overall implementation remains in progress.**
 This is the current inventory; older audits/work-log entries describe their own
 snapshots. Implemented means host code, not selected supplier, frozen design,
 vehicle safety allocation or protocol conformance.
+
+## Balanced three-phase AC increment — 31/10/2026
+
+Explicit `iso2-ac3` now supports balanced AC over IPv4/IPv6 with optional TLS.
+Phase-to-neutral voltage/per-phase current and total-power conventions are
+explicit project metadata, checked in PermissionManager and HLC projection.
+Unequal host phase caps select the lowest cap; invalid/mismatched phase offers
+fail before energy. Two additional independent EXI comparisons preserve the
+previous 25 feature and 50 baseline cases. See [host contracts](../../simulation/linux/AC_THREE_PHASE.md).
+Asymmetric dispatch, richer charging profiles and production OBC acquisition
+remain distinct; this increment does not close them.
 
 ## Managed consumer and scoped network increment — 31/10/2026
 

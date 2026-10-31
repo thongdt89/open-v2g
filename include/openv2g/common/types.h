@@ -257,6 +257,7 @@ typedef struct {
     uint32_t target_voltage_mv;
     int32_t target_current_ma;
     uint32_t availability_mask;
+    uint8_t ac_phases; /* PROJECT: 0 legacy/one phase, 1 or 3 balanced phases; AC current is per phase. */
 } OpenV2g_EvEnergySnapshot;
 
 typedef struct {
@@ -313,6 +314,7 @@ typedef struct {
     OpenV2g_PowerDirection direction;
     OpenV2g_PowerLimits limits;
     OpenV2g_TimeUs valid_until;
+    uint8_t ac_phases; /* Same phase convention as the qualified energy snapshot. */
 } OpenV2g_ChargePermission;
 
 typedef struct {
