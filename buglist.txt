@@ -4,7 +4,7 @@ Review baseline: 4f4df51184d2c279c86e791681201f601fc3c759
 Source: docs/architecture/reviews/ARCHITECTURE_REVIEW_2026-10-31.md
 Task labels below are local tracking labels, not requirement IDs.
 
-[x] TASK-1 | P1 | Stop active charging when HLC event overflow revokes permission
+[x] TASK-1 | P1 | Stop active charging when HLC event overflow revokes permission | done
 Status: FIXED — implementation 91cd37030d2af3c1c0a28616561ad34415e24704
 Review finding: 1
 Primary file: src/charging_coordinator/charging_coordinator.c
@@ -43,7 +43,7 @@ Acceptance criteria:
     current measured-safe evidence and the existing teardown conditions.
   - Add desired-behavior regressions for these cases and pass the portable suite.
 
-[x] TASK-2 | P1 | Use trusted owner time for fault-triggered stop supervision
+[x] TASK-2 | P1 | Use trusted owner time for fault-triggered stop supervision | done
 Status: FIXED — implementation 91cd37030d2af3c1c0a28616561ad34415e24704
 Review finding: 2
 Primary file: src/charging_coordinator/charging_coordinator.c
@@ -107,3 +107,92 @@ Closure — 2026-10-31
     docs/architecture/BUGLIST_FIX_DISPOSITION_2026-10-31.md
     docs/architecture/evidence/coordinator_bugfix_verification.json
   Historical review report/probes are preserved. No target safety/freeze claim.
+
+Re-review — 2026-10-31
+  Reviewed revision: c1c6b21dbc0d98f3a30b7856c9916fc8e9576999
+  TASK-1 and TASK-2 remain fixed within their listed scopes; task title lines
+  now end in "done". The portable suite passed again: 27/27.
+  The following are distinct additional findings; they do not restore the
+  original overflow-routing or HLC/link/hardware producer-clock defects.
+  Reproduction source and observations:
+    docs/architecture/evidence/coordinator_rereview_2026-10-31.c
+    docs/architecture/evidence/coordinator_rereview_2026-10-31.json
+  Review-only probe assertions describe observed defects, not desired behavior.
+
+[ ] TASK-3 | P1 | Escalate an incomplete stop when measured-safe evidence expires
+Status: OPEN
+Primary file: src/charging_coordinator/charging_coordinator.c
+Operations: Tick, OnHardwareStatus
+Reviewed lines: 791-814 at c1c6b21
+
+Problem:
+  Tick's missing-measurement timeout checks the retained stop_measured_safe flag
+  without rechecking hardware freshness. Once that flag is true, stale hardware
+  evidence prevents the completion guard from passing but also bypasses timeout
+  escalation when HLC/PLC teardown already completed. STOPPING can persist past
+  its configured deadline without completion or a latched timeout fault.
+
+Reproduction:
+  Establish energy transfer at 160 using the review fixture. Select a synthetic
+  hardware_max_age_us of 20 before Stop(170), with stop_timeout_us=100.
+  Let the safe-state port return OK and both teardown ports complete.
+  Supply newer measured SAFE/open/zero-current hardware at source/receipt 180.
+  Call Tick(270): state=STOPPING (6), stop_measured_safe=true,
+  stop_completed=false, stop_deadline=270, owner_time=270, fault.latched=false.
+  The 180 sample is no longer current at 270. Repeated later Tick calls cannot
+  complete or escalate this stop without additional external input.
+
+Implementation task:
+  Make completion and timeout supervision use current required measured evidence,
+  rather than treating a retained boolean as indefinitely valid proof. At the
+  existing deadline, an incomplete stop must reach the existing fault/escalation
+  path if required completion evidence is missing or stale. Preserve the original
+  deadline/result and command idempotence. Do not add actuator retries, assume
+  measured safety from command acceptance, or invent a new physical deadline.
+
+Acceptance criteria:
+  - Fresh measured confirmation plus teardown still permits normal completion.
+  - Expired measured-safe evidence cannot suppress timeout escalation or complete
+    a stop; test a configured evidence age shorter than the stop budget.
+  - Missing/invalid other required completion evidence cannot leave STOPPING
+    indefinitely after its existing deadline without a defined terminal outcome.
+  - No late evidence resurrects a fault-latched stop; commands remain idempotent.
+  - Add desired-behavior tests separate from the dated review probe.
+
+[ ] TASK-4 | P2 | Do not retain rejected CP/PP timestamps as ordering watermarks
+Status: OPEN
+Primary file: src/charging_coordinator/charging_coordinator.c
+Operation: OnQualifiedCpPp
+Reviewed lines: 95-101 at c1c6b21
+
+Problem:
+  The invalid CP/PP branch copies a future-dated envelope into cp_pp before
+  rejecting it and clearing has_cp_pp. The next valid sample is rejected by
+  obsolete() because its source timestamp is earlier than the rejected future
+  timestamp, even when its sequence is higher. This blocks legitimate CP/PP
+  recovery, including detection of a subsequent unplug, until that artificial
+  future timestamp is reached or the context is otherwise reset.
+
+Reproduction:
+  Establish energy transfer at 160. Inject a current-generation, higher-sequence
+  CP/PP sample with source timestamp 1000000 at trusted receipt time 170.
+  It is rejected and starts stopping, but the cached timestamp becomes 1000000.
+  Inject a valid same-generation UNPLUGGED sample with source/receipt time 180
+  and a still higher sequence. It is rejected; cached timestamp remains 1000000,
+  has_cp_pp=false and the retained plug state still indicates connected.
+  The rejection is fail-closed for energy, but the valid unplug cannot progress
+  the stop/recovery path. This is separate from TASK-2's three status APIs.
+
+Implementation task:
+  Keep current-generation invalid CP/PP evidence fail-closed without adopting its
+  invalid timestamp/sequence as the accepted-sample watermark. Preserve unrelated
+  generation rejection and trusted owner receipt-time semantics. A subsequent
+  genuinely current, ordered sample must be able to restore source evidence or
+  report unplug without reviving transfer in the stopping generation.
+
+Acceptance criteria:
+  - Rejected future/invalid CP/PP cannot poison the accepted ordering watermark.
+  - Subsequent valid higher-sequence current CP/PP, including unplug, is handled.
+  - Invalid evidence still revokes before coordinated stop during active charging.
+  - Unrelated generations and genuinely reordered accepted evidence remain rejected.
+  - Add desired-behavior recovery tests separate from the dated review probe.

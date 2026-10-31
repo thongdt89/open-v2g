@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-31",
+  "reviewed_commit": "c1c6b21dbc0d98f3a30b7856c9916fc8e9576999",
+  "scope": "Re-review of coordinator fixes and adjacent stop/evidence paths; host only",
+  "resolved": [
+    "TASK-1",
+    "TASK-2"
+  ],
+  "new_open_findings": {
+    "TASK-3": "P1: stale measured-safe proof can suppress timeout while preventing completion",
+    "TASK-4": "P2: rejected future CP/PP envelope poisons ordering watermark"
+  },
+  "portable_regression": {
+    "passed": 27,
+    "failed": 0,
+    "command": "ctest --test-dir /tmp/openv2g-bugfix-final-8fun3jdb --output-on-failure",
+    "log_sha256": "31ebb68eb1f9755e759974fe0c44e91923371e16f89af0d2e4ba700a80fd4ad3"
+  },
+  "review_probe": {
+    "source": "docs/architecture/evidence/coordinator_rereview_2026-10-31.c",
+    "sha256": "764e028dcec23548b5ee9c026a02e6aa7a108d9c410cf237240bb0d10bb1fa90",
+    "compile_command": "cc -std=c11 -Wall -Wextra -Werror -Iinclude -Isimulation/include -Itests docs/architecture/evidence/coordinator_rereview_2026-10-31.c /tmp/openv2g-bugfix-final-8fun3jdb/simulation/libopenv2g_host_sim.a /tmp/openv2g-bugfix-final-8fun3jdb/libopenv2g_core.a -o /tmp/evcc_rereview_probe",
+    "run_command": "/tmp/evcc_rereview_probe",
+    "exit_code": 0,
+    "observed_output": "expired measured proof: state=6 measured=1 completed=0 deadline=270 owner=270 fault=0\nCP future watermark: result=3 timestamp=1000000 has_cp=0 plug=2\n",
+    "interpretation": "Assertions reproduce current defects; not desired-behavior acceptance tests."
+  },
+  "source_sha256": "148dd396943ffbf08c97f678a15178cd0fb3ec7ad4c6c2a27419367f5ca0f3aa",
+  "limitations": "No production qualification, vehicle safety allocation or full-project defect-free claim; implementation unchanged during this review."
+}
