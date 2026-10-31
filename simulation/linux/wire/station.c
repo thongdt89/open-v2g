@@ -52,6 +52,13 @@ static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenari
     size_t step_count = sizeof(sequence) / sizeof(sequence[0]);
     OpenV2g_ProtocolMessageKind steps[24];
     (void)memcpy(steps, sequence, sizeof(sequence));
+    if (scenario == OV_WIRE_ALL_DETAILS) {
+        (void)memmove(&steps[6],&steps[3],(step_count-3u)*sizeof(steps[0]));
+        steps[3] = steps[4] = steps[5] = OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL; step_count += 3u;
+    }
+    if (scenario >= OV_WIRE_SECONDARY_DETAIL && scenario <= OV_WIRE_SECONDARY_WRONG_ID) {
+        (void)memmove(&steps[4],&steps[3],(step_count-3u)*sizeof(steps[0])); steps[3] = OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL; ++step_count;
+    }
     if (scenario == OV_WIRE_RENEGOTIATE || scenario == OV_WIRE_RENEGOTIATE_AC) {
         size_t after_loop = 10u;
         (void)memmove(&steps[after_loop + 5u], &steps[after_loop], (step_count - after_loop) * sizeof(steps[0]));
@@ -114,13 +121,14 @@ static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenari
             if (scenario == OV_WIRE_AC_WRONG_MODE && steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER) { response.ac_mode = false; }
             if (scenario == OV_WIRE_AC_RCD && steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS) { response.rcd_fault = true; }
         }
-        if (scenario == OV_WIRE_MULTI_OFFER || scenario == OV_WIRE_CONTRACT_ONLY || scenario == OV_WIRE_UNSUPPORTED_MODE || scenario == OV_WIRE_BAD_SERVICE || scenario == OV_WIRE_MULTI_AC) {
+        if (scenario == OV_WIRE_ALL_DETAILS || (scenario >= OV_WIRE_SECONDARY_DETAIL && scenario <= OV_WIRE_SECONDARY_WRONG_ID) || scenario == OV_WIRE_MULTI_OFFER || scenario == OV_WIRE_CONTRACT_ONLY || scenario == OV_WIRE_UNSUPPORTED_MODE || scenario == OV_WIRE_BAD_SERVICE || scenario == OV_WIRE_MULTI_AC) {
             if (steps[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY) {
                 response.payment_options = scenario == OV_WIRE_CONTRACT_ONLY ? OPENV2G_PAYMENT_CONTRACT : OPENV2G_PAYMENT_EXTERNAL|OPENV2G_PAYMENT_CONTRACT;
                 response.transfer_mode_count = scenario == OV_WIRE_UNSUPPORTED_MODE ? 1u : 3u;
                 response.transfer_modes[0] = OPENV2G_TRANSFER_AC_SINGLE; response.transfer_modes[1] = OPENV2G_TRANSFER_DC_CORE;
                 response.transfer_modes[2] = OPENV2G_TRANSFER_AC_THREE;
-                response.extra_service_count = 2u;
+                response.extra_service_count = scenario == OV_WIRE_ALL_DETAILS ? 3u : 2u;
+                response.extra_services[2].id = 4u; response.extra_services[2].category = OPENV2G_SERVICE_CUSTOM;
                 response.extra_services[0].id = 2u; response.extra_services[0].category = OPENV2G_SERVICE_INTERNET;
                 response.extra_services[0].free_service = true; response.extra_services[0].has_name = true;
                 response.extra_services[0].name_length = 4u; (void)memcpy(response.extra_services[0].name,"host",4u);
@@ -132,7 +140,7 @@ static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenari
 
         if (!OvWireIo_Receive(&io, &received, Ov2g_OsNow() + OV_WIRE_TIMEOUT_US) ||
             !OvWireDecode(&codec, 1u, schema, (uint16_t)steps[index], &received, &request, sizeof(request))) {
-            if ((scenario == OV_WIRE_BAD_SERVICE || scenario == OV_WIRE_BAD_PARAMETER_SET) && steps[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION) { success = true; }
+            if ((scenario == OV_WIRE_BAD_SERVICE || scenario == OV_WIRE_BAD_PARAMETER_SET || scenario == OV_WIRE_SECONDARY_BAD_SET) && steps[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION) { success = true; }
             if (scenario == OV_WIRE_SLAC_KEY_LOSS && (steps[index] == OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START || steps[index] == OPENV2G_PROTOCOL_MESSAGE_CURRENT_DEMAND)) { success = true; }
             goto stop;
         }
@@ -140,10 +148,10 @@ static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenari
         if (steps[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION && protocol == OPENV2G_PROTOCOL_ISO_15118_2) {
             unsigned selected;
             if (request.selected_payment != (pnc_config != NULL ? OPENV2G_PAYMENT_CONTRACT : OPENV2G_PAYMENT_EXTERNAL) || request.service_id != 1u ||
-                request.selected_service_count != ((scenario == OV_WIRE_MULTI_OFFER || scenario == OV_WIRE_MULTI_AC) ? 2u : 1u)) { goto stop; }
+                request.selected_service_count != (scenario == OV_WIRE_ALL_DETAILS ? 4u : (scenario == OV_WIRE_MULTI_OFFER || scenario == OV_WIRE_MULTI_AC || (scenario >= OV_WIRE_SECONDARY_DETAIL && scenario <= OV_WIRE_SECONDARY_WRONG_ID)) ? 2u : 1u)) { goto stop; }
             for (selected = 0u; selected < request.selected_service_count; ++selected) {
                 if (request.selected_services[selected].id != selected+1u ||
-                    (request.selected_services[selected].has_parameter_set && (selected != 0u || request.selected_services[selected].parameter_set != 1))) { goto stop; }
+                    (request.selected_services[selected].has_parameter_set && ((selected != 0u && scenario != OV_WIRE_SECONDARY_DETAIL && scenario != OV_WIRE_ALL_DETAILS) || request.selected_services[selected].parameter_set != 1))) { goto stop; }
             }
         }
         if (index != 0u && memcmp(request.session_id, session_id, 8u) != 0) { goto stop; }
@@ -157,6 +165,8 @@ static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenari
             success = send_fragmented(&io, sap_frame, sap_length); goto stop;
         }
         if (steps[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL) {
+            response.service_id = request.service_id;
+            if (scenario == OV_WIRE_SECONDARY_WRONG_ID && request.service_id == 2u) { response.service_id = 3u; }
             response.parameter_count = 1u;
             response.parameters[0].set_id = 1; response.parameters[0].name_length = 4u;
             (void)memcpy(response.parameters[0].name, "host", 4u); response.parameters[0].integer_value = 1;
@@ -214,6 +224,7 @@ static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenari
             (void)send_fragmented(&io, bytes, length); success = true; goto stop;
         }
         if (!send_fragmented(&io, bytes, length)) { goto stop; }
+        if (scenario == OV_WIRE_SECONDARY_WRONG_ID && steps[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL && request.service_id == 2u) { success = true; goto stop; }
         if ((scenario == OV_WIRE_CONTRACT_ONLY || scenario == OV_WIRE_UNSUPPORTED_MODE) && steps[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY) { success = true; goto stop; }
         if (scenario == OV_WIRE_AC3_WRONG_PHASE && steps[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY) { success = true; goto stop; }
         if ((scenario == OV_WIRE_AC_RCD && steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS) ||

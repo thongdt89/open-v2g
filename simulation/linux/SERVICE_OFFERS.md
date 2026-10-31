@@ -1,6 +1,6 @@
 # Multiple ISO-2 service and payment offers
 
-Draft 0.1 — 31/10/2026. Bounded host behavior, not PnC authorization or standards
+Draft 0.2 — 31/10/2026. Bounded host behavior, not PnC authorization or standards
 conformance. Existing DIN wire remains its explicitly closed DC EIM profile.
 
 The ISO-2 codec now retains both payment options, all six energy-transfer-mode
@@ -25,12 +25,17 @@ retains the correlated offer and ServiceDetail parameter entries in owned
 storage, binds them to the generation and a provisional two-second host validity
 budget, and checks them immediately before transmitting its selection. Requested
 ancillary IDs must have been offered, and a primary parameter set must have been
-returned in its correlated ServiceDetail response. Unrequested secondary service
-parameter sets are rejected by configuration; their ServiceDetail loop remains
-future work. Ancillary service selection does not itself implement an Internet
+returned in its correlated ServiceDetail response. Up to three selected ancillary
+services with a requested ParameterSetID each receive a separate ServiceDetail
+transaction. The portable adapter owns this bounded loop; each request carries
+its service ID and fresh correlation. SessionContext validates the exact pending
+service ID without overwriting the primary charging-service identity. The runner
+copies each service's parameters into separate owned storage and checks a selected
+set against that service only. The generation and offer expiry also apply to all
+secondary details. Ancillary service selection does not itself implement an Internet
 service, certificate provisioning or billing application.
 
-Stop clears offer and parameter evidence; resume obtains new offers/details.
+Stop clears primary and secondary offer/parameter evidence; resume obtains new offers/details.
 The station fixture validates selected external payment, service IDs and its
 known primary parameter set. Socket tests cover mixed offers for DC and AC3,
 valid ancillary/parameter selection, and rejection before energy of contract-only,
@@ -60,3 +65,12 @@ Verification includes the dedicated offer codec tests and truncations, all prior
 50 baseline/29 feature references, two new independent offer/selection vectors,
 and 51 existing-plus-expanded socket scenarios. See
 [executed evidence](../../docs/architecture/evidence/service_offer_verification.json).
+
+## Secondary detail increment
+
+The socket fixture now exercises one and three ancillary detail transactions,
+then selects the verified ParameterSetIDs. Negative cases include an unknown
+secondary set and a response for a different service; both stop before energy.
+Context tests verify that a correct secondary response preserves the primary ID
+and that a wrong-service response leaves the context unchanged. No parameter
+name or value is treated as permission or as an implemented ancillary application.

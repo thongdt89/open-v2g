@@ -18,7 +18,11 @@ typedef struct {
     OpenV2g_ProtocolMeteringEvidence metering_evidence;
     OpenV2g_ProtocolDiagnostic diagnostic;
     uint32_t next_correlation_id;
+    uint16_t detail_service_ids[3];
+    uint8_t detail_service_count, detail_index;
 } OpenV2g_Iso15118_2Adapter;
+
+OpenV2g_Result OpenV2g_Iso15118_2Adapter_ConfigureServiceDetails(OpenV2g_Iso15118_2Adapter *, const uint16_t *ids, uint8_t count);
 
 void OpenV2g_Iso15118_2Adapter_Init(
     OpenV2g_Iso15118_2Adapter *adapter,

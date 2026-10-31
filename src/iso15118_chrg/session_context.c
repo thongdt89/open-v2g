@@ -21,6 +21,7 @@ OpenV2g_Result OpenV2g_SessionContext_Expect(OpenV2g_SessionContext *context, co
         request->timestamp == 0u || request->timestamp < context->last_response_time ||
         OpenV2g_ProtocolDataFlow_GetRule(request->protocol, request->mode, request->kind, &rule) != OPENV2G_RESULT_OK) { return OPENV2G_RESULT_REJECTED; }
     context->pending_timestamp = request->timestamp; context->pending_correlation = request->correlation_id; context->pending_kind = request->kind;
+    context->pending_service_id = request->service_id != 0u ? request->service_id : context->service_id;
     context->response_validated = false; return OPENV2G_RESULT_OK;
 }
 OpenV2g_Result OpenV2g_SessionContext_Validate(OpenV2g_SessionContext *context,
@@ -49,7 +50,7 @@ OpenV2g_Result OpenV2g_SessionContext_Validate(OpenV2g_SessionContext *context,
         if (response->kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY) {
             if (response->service_id == 0u || (context->resumed && response->service_id != context->service_id)) { return OPENV2G_RESULT_REJECTED; }
             candidate.service_id = response->service_id;
-        } else if (response->kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL && response->service_id != context->service_id) { return OPENV2G_RESULT_REJECTED; }
+        } else if (response->kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL && response->service_id != context->pending_service_id) { return OPENV2G_RESULT_REJECTED; }
         if (response->kind == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER && !response->ongoing) {
             uint64_t duration = (uint64_t)response->schedule_duration_s * 1000000u;
             if (duration == 0u || duration > UINT64_MAX - now || response->schedule_power_w <= 0 ||

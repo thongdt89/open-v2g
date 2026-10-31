@@ -36,6 +36,7 @@ typedef struct {
     uint32_t pending_correlation;
     OpenV2g_TimeUs pending_timestamp;
     OpenV2g_ProtocolMessageKind pending_kind;
+    uint16_t pending_service_id;
     uint8_t session_id[OPENV2G_SESSION_ID_SIZE];
     uint8_t peer_id[OPENV2G_SESSION_PEER_ID_MAX];
     uint16_t peer_id_length;

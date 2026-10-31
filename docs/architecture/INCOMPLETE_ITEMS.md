@@ -1,9 +1,19 @@
 # Current feature completion status
 
-Revision: Draft 0.12 — 31/10/2026. **Overall implementation remains in progress.**
+Revision: Draft 0.13 — 31/10/2026. **Overall implementation remains in progress.**
 This is the current inventory; older audits/work-log entries describe their own
 snapshots. Implemented means host code, not selected supplier, frozen design,
 vehicle safety allocation or protocol conformance.
+
+## Secondary service detail increment — 31/10/2026
+
+The portable ISO-2 adapter owns up to three additional ServiceDetail transactions.
+Each request binds the target service ID into SessionContext alongside generation,
+schema, session and correlation. A secondary response cannot replace the primary
+charging-service identity. The runner separately copies each service's parameter
+sets, validates the selected set against that service and clears evidence on stop.
+Wrong-service responses and unavailable secondary sets stop before energy.
+See [service contracts](../../simulation/linux/SERVICE_OFFERS.md).
 
 ## PnC host authorization increment — 31/10/2026
 
@@ -16,8 +26,7 @@ remain bound through the portable PncContext. Ordinary EIM defaults remain off
 for PnC. Exact-CN whitelist and 15-character identity are a restricted host policy,
 not full normative/OEM eMAID policy. See [contracts and limits](PNC_HOST.md).
 Certificate installation/update and encrypted-key import remain unimplemented;
-ISO-20, broader schedules/profile/notification handling and secondary detail
-negotiation remain on the [execution list](HOST_COMPLETION_PLAN.md).
+ISO-20 and broader schedules/profile/notification handling remain on the [execution list](HOST_COMPLETION_PLAN.md).
 
 ## PEV-SLAC typed host increment — 31/10/2026
 

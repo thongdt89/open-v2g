@@ -37,6 +37,18 @@ int main(void)
     response.session_id[7] = 7u;
     TEST_ASSERT(OpenV2g_SessionContext_Validate(&context, &response, 102u) == OPENV2G_RESULT_OK && context.service_id == 1u);
     TEST_ASSERT(OpenV2g_SessionContext_Consume(&context, response.kind, 2u) == OPENV2G_RESULT_OK);
+    {
+        OpenV2g_SessionContext detail = context, unchanged; OpenV2g_SessionResponse reply = response;
+        OpenV2g_ProtocolTxRequest request = {0};
+        request.generation = 7u; request.protocol = context.protocol; request.schema = context.schema; request.mode = context.mode;
+        request.kind = OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL; request.correlation_id = 3u; request.timestamp = 103u; request.service_id = 2u;
+        TEST_ASSERT(OpenV2g_SessionContext_Expect(&detail,&request) == OPENV2G_RESULT_OK);
+        reply.kind = request.kind; reply.correlation_id = 3u; reply.service_id = 1u; unchanged = detail;
+        TEST_ASSERT(OpenV2g_SessionContext_Validate(&detail,&reply,104u) == OPENV2G_RESULT_REJECTED && memcmp(&detail,&unchanged,sizeof(detail)) == 0);
+        reply.service_id = 2u;
+        TEST_ASSERT(OpenV2g_SessionContext_Validate(&detail,&reply,104u) == OPENV2G_RESULT_OK && detail.service_id == 1u);
+        TEST_ASSERT(OpenV2g_SessionContext_Consume(&detail,reply.kind,3u) == OPENV2G_RESULT_OK);
+    }
     TEST_ASSERT(expect(&context, OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER, 3u) == 0);
     response.kind = OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER; response.correlation_id = 3u;
     response.schedule_id = 2u; response.schedule_duration_s = 1u; response.schedule_power_w = 10000;

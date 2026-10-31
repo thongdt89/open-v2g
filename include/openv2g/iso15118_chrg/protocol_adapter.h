@@ -150,6 +150,7 @@ typedef struct {
     OpenV2g_EvEnergySnapshot energy;
     OpenV2g_ChargePermission permission;
     OpenV2g_ProtocolMeteringEvidence metering_evidence;
+    uint16_t service_id; /* ServiceDetail target; zero selects the established primary service. */
     bool use_pnc;
     bool has_pnc_evidence;
     OpenV2g_ProtocolPncEvidence pnc_evidence;

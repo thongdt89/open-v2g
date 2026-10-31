@@ -1,0 +1,56 @@
+{
+  "date": "2026-10-31",
+  "base_commit": "6ab232d",
+  "scope": "ISO-2 bounded primary plus three ancillary ServiceDetail transactions; no ancillary application implementation or production integration",
+  "builds": {
+    "normal": {
+      "passed": 50,
+      "failed": 0,
+      "log_sha256": "fa8a9a1108e32547652b6d00b80a11eec0b9816d48a154606aa17eb138740db9"
+    },
+    "asan_ubsan": {
+      "passed": 48,
+      "failed": 0,
+      "log_sha256": "5617396b1a385dc0493601cfd30a63d1d82f09c41bc04633299aa106f6424714"
+    },
+    "openssl_off": {
+      "passed": 39,
+      "failed": 0,
+      "log_sha256": "ad70d0af8036f5c430f8c5d30505582b0a1d7b72639809a88819ebf866e05bc8"
+    },
+    "default": {
+      "passed": 28,
+      "failed": 0,
+      "log_sha256": "c110cdab9136f1f4fcafca6d06e939423e30fbd584018ba063a08f6105121ff1"
+    }
+  },
+  "wire_scenarios": 56,
+  "checks": [
+    "Fresh correlation and target service per detail request",
+    "Secondary response retains primary charging identity",
+    "Separate bounded per-service parameter storage and set selection",
+    "Unknown secondary parameter set and wrong-service response stop before energy",
+    "All primary/secondary evidence cleared on stop; resume fetches new evidence"
+  ],
+  "sha256": {
+    "docs/architecture/HOST_COMPLETION_PLAN.md": "a8aaa50ffc61bc69c04cefdfaccf544c7b107e4c94fa3d3c69cdd7fbeb1ff9de",
+    "docs/architecture/INCOMPLETE_ITEMS.md": "42483224d3cd8c447e54de25fb8f748c119f65469c1d240b254791acc08151a1",
+    "include/openv2g/iso15118_chrg/iso15118_2_adapter.h": "bd36354e232f8af40f9b0b9aa4344b1da34f220c394d3bc8edc0fa7003320418",
+    "include/openv2g/iso15118_chrg/protocol_adapter.h": "8f6caed82e405eee42243516de4197764b8609e17beef0b3b597dbe35370c049",
+    "include/openv2g/iso15118_chrg/session_context.h": "79abc9598e6259459bff30678c254a9df5a7460feea622f466985f2290fa1c08",
+    "simulation/linux/SERVICE_OFFERS.md": "6039a29784c85aa5221041eb67f9a790827b2983f1abba1b18a5a12ea9ba1e39",
+    "simulation/linux/wire/client.c": "21988a27361e8870d5abeedc3e87055ef743a89b7dea3471b135b5384037248d",
+    "simulation/linux/wire/station.c": "dc1f5b3d3c0387c5fc5bf1c9340b58946075d7f528a4f69fab06c07ab462ab00",
+    "simulation/linux/wire/test_wire.c": "7a464091bc0f9e41d4126bd2983aab0a10b3fa8666816a479c9c88b9737ad496",
+    "simulation/linux/wire/wire.h": "bfd97fe27881acdf401c5476ebaa4a19c2e64ea730e48cf005c6eb1bc2be31ec",
+    "src/iso15118_chrg/iso15118_2_adapter.c": "0c1b2e1a60b7d928997c368fdb522cdc94ea874d546e585ab94a58160df9c99d",
+    "src/iso15118_chrg/session_context.c": "f58bc50f48899d83d6b9a92c91f9bf7a1f5395972b5b6784177ed7cf14af8619",
+    "tests/unit/test_session_context.c": "e87358dca4a9e6665a563aeeebff16834c2771156bb59cbc46e17d874034905d",
+    "docs/architecture/evidence/din_metering_model_assessment.json": "1f95c911a7c3cf5124f7052bcfff5977e07ea84b131d5785b4b4408eeb6cd71e"
+  },
+  "limitations": [
+    "No billing/Internet/certificate service implementation implied",
+    "System OpenSSL libraries are not sanitizer-instrumented",
+    "DIN DC schema metering assessment is inspection, not newly implemented DIN AC runtime"
+  ]
+}

@@ -72,6 +72,10 @@ static OpenV2g_Result send_request(
         }
         request.has_pnc_evidence = true; request.pnc_evidence = adapter->pnc_evidence;
     }
+    if (kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL && adapter->detail_index != 0u) {
+        if (adapter->detail_index > adapter->detail_service_count) { return OPENV2G_RESULT_REJECTED; }
+        request.service_id = adapter->detail_service_ids[adapter->detail_index-1u];
+    }
     result = adapter->message_required_port.send(
         adapter->message_required_port.context, &request);
     if ((result != OPENV2G_RESULT_OK) &&
@@ -124,7 +128,7 @@ static OpenV2g_Result iso2_start(
     adapter->status.last_correlation_id = 0u;
     adapter->status.pending_correlation_id = 0u;
     adapter->status.pending_kind = OPENV2G_PROTOCOL_MESSAGE_NONE;
-    adapter->next_correlation_id = 0u;
+    adapter->next_correlation_id = 0u; adapter->detail_index = 0u;
     (void)memset(&adapter->metering_evidence, 0, sizeof(adapter->metering_evidence));
     (void)memset(&adapter->pnc_evidence,0,sizeof(adapter->pnc_evidence));
     (void)memset(&adapter->diagnostic, 0, sizeof(adapter->diagnostic));
@@ -369,6 +373,9 @@ static OpenV2g_Result iso2_message(
     if (message->ongoing) {
         return send_request(adapter, completed_kind, message->now);
     }
+    if (completed_kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL && adapter->detail_index < adapter->detail_service_count) {
+        ++adapter->detail_index; return send_request(adapter,completed_kind,message->now);
+    }
     return advance_common(adapter, completed_kind, message->now);
 }
 
@@ -500,4 +507,17 @@ OpenV2g_Result OpenV2g_Iso15118_2Adapter_CreateDiagnosticSenderReceiverPort(
     port->context = adapter;
     port->read = iso2_read_diagnostic;
     return OPENV2G_RESULT_OK;
+}
+
+OpenV2g_Result OpenV2g_Iso15118_2Adapter_ConfigureServiceDetails(OpenV2g_Iso15118_2Adapter *adapter, const uint16_t *ids, uint8_t count)
+{
+    unsigned i,j;
+    if (adapter == NULL || adapter->status.active || adapter->status.generation != 0u || count > 3u || (count != 0u && ids == NULL)) { return OPENV2G_RESULT_REJECTED; }
+    for (i = 0u; i < count; ++i) {
+        if (ids[i] == 0u) { return OPENV2G_RESULT_REJECTED; }
+        for (j = 0u; j < i; ++j) { if (ids[i] == ids[j]) { return OPENV2G_RESULT_REJECTED; } }
+    }
+    (void)memset(adapter->detail_service_ids,0,sizeof(adapter->detail_service_ids));
+    if (count != 0u) { (void)memcpy(adapter->detail_service_ids,ids,count*sizeof(*ids)); }
+    adapter->detail_service_count = count; adapter->detail_index = 0u; return OPENV2G_RESULT_OK;
 }
