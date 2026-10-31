@@ -22,7 +22,7 @@ for line in subprocess.check_output([args.candidate], text=True, timeout=10).spl
 assert actual == expected, "Candidate differs from saved differential references"
 if args.oracle:
     for (schema, message), payload in actual.items():
-        oracle_schema = {"din-parameters": "din", "iso2-parameters": "iso2", "iso2-ac3": "iso2", "iso2-ac": "iso2", "iso2-meter": "iso2", "iso2-lifecycle": "iso2", "iso2-lifecycle-ac": "iso2"}.get(schema, schema)
+        oracle_schema = {"iso2-offers": "iso2", "din-parameters": "din", "iso2-parameters": "iso2", "iso2-ac3": "iso2", "iso2-ac": "iso2", "iso2-meter": "iso2", "iso2-lifecycle": "iso2", "iso2-lifecycle-ac": "iso2"}.get(schema, schema)
         result = subprocess.run([args.oracle, oracle_schema], input=payload, capture_output=True,
                                 timeout=5, check=True)
         assert result.stdout == payload, f"Differential mismatch: {schema}/{message}"

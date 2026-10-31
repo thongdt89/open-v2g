@@ -198,6 +198,28 @@ static OpenV2g_Result discovered(void *context, uint32_t generation, const OpenV
     OvWireClient *client = context;
     return OpenV2g_Iso15118Chrg_OnSdpComplete(&client->environment.rte.hlc, generation, Ov2g_OsNow(), endpoint);
 }
+bool OvWireClient_SetSelectedServices(OvWireClient *client, const OpenV2g_ExiSelectedService *extras, uint8_t count,
+    bool has_set, int16_t set)
+{
+    unsigned i,j;
+    if (client == NULL || client->environment.rte.coordinator.generation != 0u || client->environment.rte.config.features.din_70121_dc_eim ||
+        count >= OPENV2G_EXI_SERVICES_MAX || (count != 0u && extras == NULL)) { return false; }
+    for (i = 0u; i < count; ++i) {
+        if (extras[i].id == 0u || extras[i].has_parameter_set) { return false; } /* No unrequested secondary ServiceDetail proof. */
+        for (j = 0u; j < i; ++j) { if (extras[i].id == extras[j].id) { return false; } }
+    }
+    (void)memset(client->requested_extras,0,sizeof(client->requested_extras));
+    if (count != 0u) { (void)memcpy(client->requested_extras,extras,count*sizeof(*extras)); }
+    client->requested_extra_count = count; client->select_parameter_set = has_set; client->selected_parameter_set = set; return true;
+}
+static bool offered_mode(const OvWireClient *client, const OpenV2g_ExiDcDocument *offer)
+{
+    unsigned i; OpenV2g_ExiTransferMode wanted = client->ac_mode ?
+        (client->ac_phases == 3u ? OPENV2G_TRANSFER_AC_THREE : OPENV2G_TRANSFER_AC_SINGLE) : OPENV2G_TRANSFER_DC_CORE;
+    if (offer->transfer_mode_count == 0u) { return offer->ac_mode == client->ac_mode && (!client->ac_mode || offer->ac_phases == client->ac_phases); }
+    for (i = 0u; i < offer->transfer_mode_count; ++i) { if (offer->transfer_modes[i] == wanted) { return true; } }
+    return false;
+}
 bool OvWireClient_SetAcPhaseLimits(OvWireClient *client, uint8_t phases, const int32_t limits[3])
 {
     unsigned i;
@@ -340,6 +362,26 @@ static bool exchange_protocol(OvWireClient *client)
         request.max_power_w = pending->energy.limits.max_import_power_w;
         request.voltage_mv = pending->target_voltage_mv; request.current_ma = pending->target_current_ma;
     }
+    if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION && pending->protocol == OPENV2G_PROTOCOL_ISO_15118_2) {
+        unsigned i,j; bool found;
+        if (client->offer_generation != client->io.generation || Ov2g_OsNow() >= client->offer_valid_until ||
+            client->service_offer.service_id != request.service_id ||
+            (client->service_offer.payment_options & OPENV2G_PAYMENT_EXTERNAL) == 0u || !offered_mode(client,&client->service_offer)) { return false; }
+        request.selected_payment = OPENV2G_PAYMENT_EXTERNAL; request.selected_service_count = (uint8_t)(client->requested_extra_count+1u);
+        request.selected_services[0].id = request.service_id; request.selected_services[0].has_parameter_set = client->select_parameter_set;
+        request.selected_services[0].parameter_set = client->selected_parameter_set;
+        if (client->select_parameter_set) {
+            found = false;
+            for (i = 0u; i < client->service_parameter_count; ++i) { if (client->service_parameters[i].set_id == client->selected_parameter_set) { found = true; } }
+            if (!found) { return false; }
+        }
+        for (i = 0u; i < client->requested_extra_count; ++i) {
+            found = false;
+            for (j = 0u; j < client->service_offer.extra_service_count; ++j) { if (client->requested_extras[i].id == client->service_offer.extra_services[j].id) { found = true; } }
+            if (!found || client->requested_extras[i].id == request.service_id) { return false; }
+            request.selected_services[i+1u] = client->requested_extras[i];
+        }
+    }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT) {
         if (!pending->has_metering_evidence || client->meter_correlation == 0u ||
             pending->metering_evidence.generation != client->io.generation ||
@@ -384,8 +426,13 @@ static bool exchange_protocol(OvWireClient *client)
     now = Ov2g_OsNow();
     if (!supervise(client, now)) { return false; }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY) {
-        if (response.ac_mode != client->ac_mode || (client->ac_mode && response.ac_phases != client->ac_phases)) { return false; }
-
+        if (!offered_mode(client,&response) || (pending->protocol == OPENV2G_PROTOCOL_ISO_15118_2 &&
+            (response.payment_options & OPENV2G_PAYMENT_EXTERNAL) == 0u)) { return false; }
+        client->service_offer = response; client->offer_generation = client->io.generation; client->offer_valid_until = now > UINT64_MAX-2000000u ? UINT64_MAX : now+2000000u;
+    }
+    if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DETAIL) {
+        client->service_parameter_count = response.parameter_count;
+        (void)memcpy(client->service_parameters,response.parameters,sizeof(client->service_parameters));
     }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER && response.ac_mode && client->ac_phases == 3u) {
         if (response.max_power_w > INT32_MAX/3) { return false; }
@@ -543,6 +590,9 @@ stop:
 #ifdef OPENV2G_HAVE_OPENSSL_HOST
     release_prepared_receipt(client);
 #endif
+    client->offer_generation = 0u; client->offer_valid_until = 0u; client->service_parameter_count = 0u;
+    (void)memset(&client->service_offer,0,sizeof(client->service_offer));
+    (void)memset(client->service_parameters,0,sizeof(client->service_parameters));
     client->io.queued = false; client->io.pending.data = NULL;
     return success;
 }

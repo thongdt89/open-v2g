@@ -48,7 +48,7 @@ typedef enum {
     OV_WIRE_REPLAY_SAP = 9, OV_WIRE_WRONG_SCHEDULE = 10,
     OV_WIRE_WRONG_EVSE = 11, OV_WIRE_WRONG_SCHEMA = 12,
     OV_WIRE_ZERO_PRECHARGE = 13, OV_WIRE_WELDED = 14, OV_WIRE_MINOR_DEVIATION = 15, OV_WIRE_PENDING = 16, OV_WIRE_DYNAMIC_LIMIT = 17, OV_WIRE_METERING = 18, OV_WIRE_SIGNED_METER = 19,
-    OV_WIRE_AC = 20, OV_WIRE_AC_METERING = 21, OV_WIRE_AC_RCD = 22, OV_WIRE_AC_WRONG_MODE = 23, OV_WIRE_RECEIPT_POLICY = 24, OV_WIRE_PAUSE = 25, OV_WIRE_RESUME = 26, OV_WIRE_PAUSE_AC = 27, OV_WIRE_RESUME_AC = 28, OV_WIRE_RENEGOTIATE = 29, OV_WIRE_RENEGOTIATE_AC = 30, OV_WIRE_SIGNED_RECEIPT = 31, OV_WIRE_SIGNED_RECEIPT_AC = 32, OV_WIRE_AC3 = 33, OV_WIRE_AC3_WRONG_PHASE = 34
+    OV_WIRE_AC = 20, OV_WIRE_AC_METERING = 21, OV_WIRE_AC_RCD = 22, OV_WIRE_AC_WRONG_MODE = 23, OV_WIRE_RECEIPT_POLICY = 24, OV_WIRE_PAUSE = 25, OV_WIRE_RESUME = 26, OV_WIRE_PAUSE_AC = 27, OV_WIRE_RESUME_AC = 28, OV_WIRE_RENEGOTIATE = 29, OV_WIRE_RENEGOTIATE_AC = 30, OV_WIRE_SIGNED_RECEIPT = 31, OV_WIRE_SIGNED_RECEIPT_AC = 32, OV_WIRE_AC3 = 33, OV_WIRE_AC3_WRONG_PHASE = 34, OV_WIRE_MULTI_OFFER = 35, OV_WIRE_CONTRACT_ONLY = 36, OV_WIRE_UNSUPPORTED_MODE = 37, OV_WIRE_BAD_SERVICE = 38, OV_WIRE_BAD_PARAMETER_SET = 39, OV_WIRE_MULTI_AC = 40
 } OvWireScenario;
 
 typedef struct {
@@ -75,6 +75,15 @@ typedef struct {
     OpenV2g_ProtocolTxRequest pending_protocol;
     OpenV2g_TimeUs refresh_at;
     uint8_t wire_ids[OPENV2G_EXI_SAP_OFFERS_MAX];
+    OpenV2g_ExiDcDocument service_offer;
+    uint32_t offer_generation;
+    OpenV2g_TimeUs offer_valid_until;
+    uint8_t service_parameter_count;
+    OpenV2g_ExiParameter service_parameters[OPENV2G_EXI_PARAMETER_MAX];
+    uint8_t requested_extra_count;
+    OpenV2g_ExiSelectedService requested_extras[OPENV2G_EXI_SERVICES_MAX-1u];
+    bool select_parameter_set;
+    int16_t selected_parameter_set;
     uint16_t discovery_port;
     OpenV2g_Endpoint discovery_destination;
     uint8_t discovery_attempts;
@@ -132,6 +141,8 @@ bool OvWireClient_Init(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol
 bool OvWireClient_InitMode(OvWireClient *client, int fd, OpenV2g_ProtocolId protocol, bool freeze_energy, bool ac_mode);
 bool OvWireClient_InitDiscoveryMode(OvWireClient *client, OpenV2g_ProtocolId protocol, uint16_t discovery_port, bool ac_mode);
 bool OvWireClient_InitDiscovery(OvWireClient *client, OpenV2g_ProtocolId protocol, uint16_t discovery_port);
+bool OvWireClient_SetSelectedServices(OvWireClient *, const OpenV2g_ExiSelectedService *extras, uint8_t count,
+    bool has_primary_parameter_set, int16_t primary_parameter_set);
 bool OvWireClient_SetAcPhaseLimits(OvWireClient *, uint8_t phases, const int32_t limits_ma[3]);
 bool OvWireClient_SetDiscoveryEndpoint(OvWireClient *, const OpenV2g_Endpoint *, uint8_t attempts, OpenV2g_TimeUs retry_interval);
 bool OvWireClient_Run(OvWireClient *client);

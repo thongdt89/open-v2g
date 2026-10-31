@@ -10,7 +10,8 @@ missing supplier/OEM/vehicle artifacts do not block independent host work.
 - [x] Scoped multicast/link-local IPv6 discovery/TCP, bounded retry and runner configuration (real physical-interface multicast/link-local execution remains unverified).
 - [ ] PEV-SLAC bounded host peer simulation and owner integration, distinct from SDP.
 - [x] All bounded DIN/ISO-2 parameter forms and ISO-2 multi-parameter sets.
-- [ ] Broader ISO-2 payment/service/mode offers and selection.
+- [x] Broader ISO-2 payment/service/mode offers and explicit EIM primary/ancillary selection.
+- [ ] Secondary ServiceDetail parameter negotiation (ancillary application implementations remain separate).
 - [x] ISO-2 three-phase AC, balanced phase limits and explicit invalid-phase rejection (asymmetric dispatch remains open).
 - [ ] ISO-2 charging profiles, richer schedule/tariff and completion/notification handling.
 - [ ] DIN metering branches where represented by the pinned model.

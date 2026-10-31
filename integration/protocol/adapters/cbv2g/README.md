@@ -126,3 +126,11 @@ normative golden vectors. Original schema/generator provenance, exact licensed
 editions, legal acceptance, target compiler/MISRA/resources, long-running fuzzing,
 physical interoperability and conformance remain separate gates. See the
 [current evidence and closure inventory](../../../../docs/architecture/EXI_WIRE_IMPLEMENTATION_STATUS.md).
+
+## Project cardinality overlay — 31/10/2026
+
+The ISO-2 generated encoder/decoder are now compiled from build copies with one
+hash-checked project correction for the terminal grammar after six advertised
+energy modes. The upstream checkout and original SHA256 manifest remain intact.
+Python applies the bounded overlay at configure time, and the package checksum
+includes the patch digest. See [details and independent checks](../../../../simulation/linux/SERVICE_OFFERS.md).

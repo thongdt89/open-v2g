@@ -2,7 +2,7 @@
   "date": "2026-10-31",
   "candidate_codec_commit": "03350be048b35b179905129005a97144a4bdcf93",
   "oracle_commit": "733d4f43cb6579c705d59c7386786ce12a0a0026",
-  "method": "Candidate-constructed bounded AC and unsigned metering DTOs, independently decoded/re-encoded byte-identically by the separate pinned OpenV2G iso1 model. Differential regression, not independently authored standards vectors. Profile labels iso2-ac and iso2-meter select the same explicit ISO-2 schema. Six lifecycle additions cover DC/AC Renegotiate, Pause and OldSessionJoined; all profile labels still select ISO-2. Original nineteen rows are unchanged. Two balanced three-phase AC mode/CPD request additions select the same ISO-2 schema; earlier 25 rows unchanged. Two typed DIN/ISO-2 parameter bundles add all remaining value choices; earlier 27 rows unchanged.",
+  "method": "Candidate-constructed bounded AC and unsigned metering DTOs, independently decoded/re-encoded byte-identically by the separate pinned OpenV2G iso1 model. Differential regression, not independently authored standards vectors. Profile labels iso2-ac and iso2-meter select the same explicit ISO-2 schema. Six lifecycle additions cover DC/AC Renegotiate, Pause and OldSessionJoined; all profile labels still select ISO-2. Original nineteen rows are unchanged. Two balanced three-phase AC mode/CPD request additions select the same ISO-2 schema; earlier 25 rows unchanged. Two typed DIN/ISO-2 parameter bundles add all remaining value choices; earlier 27 rows unchanged. Two multi-offer/selection additions preserve earlier 29 rows.",
   "vectors": [
     {
       "schema": "iso2-ac",
@@ -148,6 +148,16 @@
       "schema": "din-parameters",
       "message_type_id": 115,
       "hex": "809a0200000000000000001180000400080341008800801a109378800c01a192440400800d112001c5e820050068ab40ac2c4c6280"
+    },
+    {
+      "schema": "iso2-offers",
+      "message_type_id": 102,
+      "hex": "809802000000000000000011c00100004019a1bdcdd004000410308140008b0046576010"
+    },
+    {
+      "schema": "iso2-offers",
+      "message_type_id": 3,
+      "hex": "80980200000000000000001130001000800450"
     }
   ]
 }

@@ -42,7 +42,7 @@ static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenari
     if (tls_config != NULL) { return false; }
 #endif
     fd = Ov2g_TcpAccept(listener, Ov2g_OsNow() + 30000000u);
-    bool ac_mode = (scenario >= OV_WIRE_AC && scenario <= OV_WIRE_AC_WRONG_MODE) || scenario == OV_WIRE_PAUSE_AC || scenario == OV_WIRE_RESUME_AC || scenario == OV_WIRE_RENEGOTIATE_AC || scenario == OV_WIRE_SIGNED_RECEIPT_AC || scenario == OV_WIRE_AC3 || scenario == OV_WIRE_AC3_WRONG_PHASE;
+    bool ac_mode = (scenario >= OV_WIRE_AC && scenario <= OV_WIRE_AC_WRONG_MODE) || scenario == OV_WIRE_PAUSE_AC || scenario == OV_WIRE_RESUME_AC || scenario == OV_WIRE_RENEGOTIATE_AC || scenario == OV_WIRE_SIGNED_RECEIPT_AC || scenario == OV_WIRE_AC3 || scenario == OV_WIRE_AC3_WRONG_PHASE || scenario == OV_WIRE_MULTI_AC;
     size_t step_count = sizeof(sequence) / sizeof(sequence[0]);
     OpenV2g_ProtocolMessageKind steps[24];
     (void)memcpy(steps, sequence, sizeof(sequence));
@@ -90,7 +90,7 @@ static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenari
         if (ac_mode && (steps[index] == OPENV2G_PROTOCOL_MESSAGE_CABLE_CHECK || steps[index] == OPENV2G_PROTOCOL_MESSAGE_PRECHARGE ||
             steps[index] == OPENV2G_PROTOCOL_MESSAGE_WELDING_DETECTION)) { continue; }
         OpenV2g_ExiDcDocument response = OpenV2g_ExiDc_Default(steps[index], true);
-        response.ac_mode = ac_mode; response.ac_phases = scenario == OV_WIRE_AC3 || scenario == OV_WIRE_AC3_WRONG_PHASE ? 3u : 1u;
+        response.ac_mode = ac_mode; response.ac_phases = scenario == OV_WIRE_AC3 || scenario == OV_WIRE_AC3_WRONG_PHASE || scenario == OV_WIRE_MULTI_AC ? 3u : 1u;
         if (scenario == OV_WIRE_AC3_WRONG_PHASE) { response.ac_phases = 1u; }
         if ((scenario == OV_WIRE_RENEGOTIATE || scenario == OV_WIRE_RENEGOTIATE_AC) && index > 10u) { response.schedule_id = 2u; }
         if (ac_mode) {
@@ -99,12 +99,37 @@ static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenari
             if (scenario == OV_WIRE_AC_WRONG_MODE && steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER) { response.ac_mode = false; }
             if (scenario == OV_WIRE_AC_RCD && steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS) { response.rcd_fault = true; }
         }
+        if (scenario == OV_WIRE_MULTI_OFFER || scenario == OV_WIRE_CONTRACT_ONLY || scenario == OV_WIRE_UNSUPPORTED_MODE || scenario == OV_WIRE_BAD_SERVICE || scenario == OV_WIRE_MULTI_AC) {
+            if (steps[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY) {
+                response.payment_options = scenario == OV_WIRE_CONTRACT_ONLY ? OPENV2G_PAYMENT_CONTRACT : OPENV2G_PAYMENT_EXTERNAL|OPENV2G_PAYMENT_CONTRACT;
+                response.transfer_mode_count = scenario == OV_WIRE_UNSUPPORTED_MODE ? 1u : 3u;
+                response.transfer_modes[0] = OPENV2G_TRANSFER_AC_SINGLE; response.transfer_modes[1] = OPENV2G_TRANSFER_DC_CORE;
+                response.transfer_modes[2] = OPENV2G_TRANSFER_AC_THREE;
+                response.extra_service_count = 2u;
+                response.extra_services[0].id = 2u; response.extra_services[0].category = OPENV2G_SERVICE_INTERNET;
+                response.extra_services[0].free_service = true; response.extra_services[0].has_name = true;
+                response.extra_services[0].name_length = 4u; (void)memcpy(response.extra_services[0].name,"host",4u);
+                response.extra_services[1].id = 3u; response.extra_services[1].category = OPENV2G_SERVICE_CERTIFICATE;
+            }
+        }
         uint16_t response_id = (uint16_t)((unsigned)response.kind + OPENV2G_EXI_DC_RESPONSE_OFFSET);
         if (index == 0u && (scenario == OV_WIRE_RESUME || scenario == OV_WIRE_RESUME_AC)) { response.new_session = false; response.resumed_session = true; }
 
         if (!OvWireIo_Receive(&io, &received, Ov2g_OsNow() + OV_WIRE_TIMEOUT_US) ||
-            !OvWireDecode(&codec, 1u, schema, (uint16_t)steps[index], &received, &request, sizeof(request))) { goto stop; }
+            !OvWireDecode(&codec, 1u, schema, (uint16_t)steps[index], &received, &request, sizeof(request))) {
+            if ((scenario == OV_WIRE_BAD_SERVICE || scenario == OV_WIRE_BAD_PARAMETER_SET) && steps[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION) { success = true; }
+            goto stop;
+        }
         if (steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER && ac_mode && request.ac_phases != response.ac_phases) { goto stop; }
+        if (steps[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION && protocol == OPENV2G_PROTOCOL_ISO_15118_2) {
+            unsigned selected;
+            if (request.selected_payment != OPENV2G_PAYMENT_EXTERNAL || request.service_id != 1u ||
+                request.selected_service_count != ((scenario == OV_WIRE_MULTI_OFFER || scenario == OV_WIRE_MULTI_AC) ? 2u : 1u)) { goto stop; }
+            for (selected = 0u; selected < request.selected_service_count; ++selected) {
+                if (request.selected_services[selected].id != selected+1u ||
+                    (request.selected_services[selected].has_parameter_set && (selected != 0u || request.selected_services[selected].parameter_set != 1))) { goto stop; }
+            }
+        }
         if (index != 0u && memcmp(request.session_id, session_id, 8u) != 0) { goto stop; }
         if (index == 0u && (scenario == OV_WIRE_RESUME || scenario == OV_WIRE_RESUME_AC) && memcmp(request.session_id, session_id, sizeof(session_id)) != 0) { goto stop; }
         if (steps[index] == OPENV2G_PROTOCOL_MESSAGE_SESSION_STOP &&
@@ -166,6 +191,7 @@ static bool run_station(int listener, OpenV2g_ProtocolId protocol, OvWireScenari
             (void)send_fragmented(&io, bytes, length); success = true; goto stop;
         }
         if (!send_fragmented(&io, bytes, length)) { goto stop; }
+        if ((scenario == OV_WIRE_CONTRACT_ONLY || scenario == OV_WIRE_UNSUPPORTED_MODE) && steps[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY) { success = true; goto stop; }
         if (scenario == OV_WIRE_AC3_WRONG_PHASE && steps[index] == OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY) { success = true; goto stop; }
         if ((scenario == OV_WIRE_AC_RCD && steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGING_STATUS) ||
             (scenario == OV_WIRE_AC_WRONG_MODE && steps[index] == OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER)) { success = true; goto stop; }

@@ -274,3 +274,16 @@ codec test and two independent bundles (29 feature vectors, earlier cases intact
 Broader service/payment/mode offers and profiles remain open. See
 [contracts](../../simulation/linux/SERVICE_PARAMETERS.md) and
 [evidence](evidence/service_parameter_verification.json).
+
+## Multiple ISO-2 offers and correlated selection — 31/10/2026
+
+Added bounded payments/modes/named services and selected services/ParameterSetIDs.
+The EIM runner caches only correlated owned evidence, checks generation and host
+expiry before selection, and rejects unoffered IDs/sets/modes and contract-only
+offers before energy. Added mixed AC3/DC and negative socket cases (51 scenarios)
+and independent offer/selection vectors (31 feature cases, prior 29 intact).
+Independent decoding found a real six-mode terminal grammar disagreement; an
+exact-hash build-copy overlay corrects both generated paths without changing the
+external checkout. The previous candidate payload is a permanent rejection case.
+See [contracts](../../simulation/linux/SERVICE_OFFERS.md) and
+[evidence](evidence/service_offer_verification.json).

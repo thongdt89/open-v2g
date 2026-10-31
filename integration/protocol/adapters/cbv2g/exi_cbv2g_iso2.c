@@ -219,6 +219,66 @@ static bool parameter_in(const struct iso2_ParameterType *source, int16_t set_id
     }
     return true;
 }
+static bool transfer_out(OpenV2g_ExiTransferMode source, iso2_EnergyTransferModeType *target)
+{
+    switch (source) {
+    case OPENV2G_TRANSFER_AC_SINGLE: *target = iso2_EnergyTransferModeType_AC_single_phase_core; return true;
+    case OPENV2G_TRANSFER_AC_THREE: *target = iso2_EnergyTransferModeType_AC_three_phase_core; return true;
+    case OPENV2G_TRANSFER_DC_CORE: *target = iso2_EnergyTransferModeType_DC_core; return true;
+    case OPENV2G_TRANSFER_DC_EXTENDED: *target = iso2_EnergyTransferModeType_DC_extended; return true;
+    case OPENV2G_TRANSFER_DC_COMBO: *target = iso2_EnergyTransferModeType_DC_combo_core; return true;
+    case OPENV2G_TRANSFER_DC_UNIQUE: *target = iso2_EnergyTransferModeType_DC_unique; return true;
+    default: return false;
+    }
+}
+static bool transfer_in(iso2_EnergyTransferModeType source, OpenV2g_ExiTransferMode *target)
+{
+    switch (source) {
+    case iso2_EnergyTransferModeType_AC_single_phase_core: *target = OPENV2G_TRANSFER_AC_SINGLE; return true;
+    case iso2_EnergyTransferModeType_AC_three_phase_core: *target = OPENV2G_TRANSFER_AC_THREE; return true;
+    case iso2_EnergyTransferModeType_DC_core: *target = OPENV2G_TRANSFER_DC_CORE; return true;
+    case iso2_EnergyTransferModeType_DC_extended: *target = OPENV2G_TRANSFER_DC_EXTENDED; return true;
+    case iso2_EnergyTransferModeType_DC_combo_core: *target = OPENV2G_TRANSFER_DC_COMBO; return true;
+    case iso2_EnergyTransferModeType_DC_unique: *target = OPENV2G_TRANSFER_DC_UNIQUE; return true;
+    default: return false;
+    }
+}
+static bool service_out(const OpenV2g_ExiService *source, struct iso2_ServiceType *target)
+{
+    if (source->id == 0u || source->name_length > sizeof(source->name) || source->scope_length > sizeof(source->scope) ||
+        source->name_length > sizeof(target->ServiceName.characters) || source->scope_length > sizeof(target->ServiceScope.characters) ||
+        (!source->has_name && source->name_length != 0u) || (!source->has_scope && source->scope_length != 0u)) { return false; }
+    target->ServiceID = source->id; target->FreeService = source->free_service;
+    switch (source->category) {
+    case OPENV2G_SERVICE_CHARGING: target->ServiceCategory = iso2_serviceCategoryType_EVCharging; break;
+    case OPENV2G_SERVICE_INTERNET: target->ServiceCategory = iso2_serviceCategoryType_Internet; break;
+    case OPENV2G_SERVICE_CERTIFICATE: target->ServiceCategory = iso2_serviceCategoryType_ContractCertificate; break;
+    case OPENV2G_SERVICE_CUSTOM: target->ServiceCategory = iso2_serviceCategoryType_OtherCustom; break;
+    default: return false;
+    }
+    target->ServiceName_isUsed = source->has_name; target->ServiceName.charactersLen = source->name_length;
+    (void)memcpy(target->ServiceName.characters,source->name,source->name_length);
+    target->ServiceScope_isUsed = source->has_scope; target->ServiceScope.charactersLen = source->scope_length;
+    (void)memcpy(target->ServiceScope.characters,source->scope,source->scope_length); return true;
+}
+static bool service_in(const struct iso2_ServiceType *source, OpenV2g_ExiService *target)
+{
+    if (source->ServiceID == 0u || (source->FreeService != 0 && source->FreeService != 1) ||
+        (source->ServiceName_isUsed && source->ServiceName.charactersLen > sizeof(target->name)) ||
+        (source->ServiceScope_isUsed && source->ServiceScope.charactersLen > sizeof(target->scope))) { return false; }
+    target->id = source->ServiceID; target->free_service = source->FreeService != 0;
+    switch (source->ServiceCategory) {
+    case iso2_serviceCategoryType_EVCharging: target->category = OPENV2G_SERVICE_CHARGING; break;
+    case iso2_serviceCategoryType_Internet: target->category = OPENV2G_SERVICE_INTERNET; break;
+    case iso2_serviceCategoryType_ContractCertificate: target->category = OPENV2G_SERVICE_CERTIFICATE; break;
+    case iso2_serviceCategoryType_OtherCustom: target->category = OPENV2G_SERVICE_CUSTOM; break;
+    default: return false;
+    }
+    target->has_name = source->ServiceName_isUsed; target->has_scope = source->ServiceScope_isUsed;
+    if (target->has_name) { target->name_length = source->ServiceName.charactersLen; (void)memcpy(target->name,source->ServiceName.characters,target->name_length); }
+    if (target->has_scope) { target->scope_length = source->ServiceScope.charactersLen; (void)memcpy(target->scope,source->ServiceScope.characters,target->scope_length); }
+    return true;
+}
 static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocument *generated)
 {
     struct iso2_BodyType *body = &generated->V2G_Message.Body;
@@ -239,11 +299,26 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
             body->ServiceDetailReq_isUsed = 1u; body->ServiceDetailReq.ServiceID = value->service_id; break;
         case OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY:
             body->ServiceDiscoveryReq_isUsed = 1u; break;
-        case OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION:
+        case OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION: {
+            unsigned i,j; uint8_t payment = value->selected_payment == 0u ? OPENV2G_PAYMENT_EXTERNAL : value->selected_payment;
+            REQUIRE(payment == OPENV2G_PAYMENT_EXTERNAL || payment == OPENV2G_PAYMENT_CONTRACT);
+            REQUIRE(value->selected_service_count <= OPENV2G_EXI_SERVICES_MAX);
             body->PaymentServiceSelectionReq_isUsed = 1u;
-            body->PaymentServiceSelectionReq.SelectedPaymentOption = iso2_paymentOptionType_ExternalPayment;
-            body->PaymentServiceSelectionReq.SelectedServiceList.SelectedService.arrayLen = 1u;
-            body->PaymentServiceSelectionReq.SelectedServiceList.SelectedService.array[0].ServiceID = value->service_id; break;
+            body->PaymentServiceSelectionReq.SelectedPaymentOption = payment == OPENV2G_PAYMENT_EXTERNAL ? iso2_paymentOptionType_ExternalPayment : iso2_paymentOptionType_Contract;
+            body->PaymentServiceSelectionReq.SelectedServiceList.SelectedService.arrayLen = value->selected_service_count == 0u ? 1u : value->selected_service_count;
+            if (value->selected_service_count == 0u) { REQUIRE(value->service_id != 0u); body->PaymentServiceSelectionReq.SelectedServiceList.SelectedService.array[0].ServiceID = value->service_id; }
+            else {
+                REQUIRE(value->selected_services[0].id == value->service_id);
+                for (i = 0u; i < value->selected_service_count; ++i) {
+                    struct iso2_SelectedServiceType *target = &body->PaymentServiceSelectionReq.SelectedServiceList.SelectedService.array[i];
+                    REQUIRE(value->selected_services[i].id != 0u);
+                    for (j = 0u; j < i; ++j) { REQUIRE(value->selected_services[i].id != value->selected_services[j].id); }
+                    target->ServiceID = value->selected_services[i].id; target->ParameterSetID_isUsed = value->selected_services[i].has_parameter_set;
+                    target->ParameterSetID = value->selected_services[i].parameter_set;
+                }
+            }
+            break;
+        }
         case OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION:
             body->AuthorizationReq_isUsed = 1u; break;
         case OPENV2G_PROTOCOL_MESSAGE_CHARGE_PARAMETER: {
@@ -348,15 +423,45 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
             }
             break;
         }
-        case OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY:
+        case OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY: {
+            unsigned i,j; uint8_t payments = value->payment_options == 0u ? OPENV2G_PAYMENT_EXTERNAL : value->payment_options;
+            struct iso2_ServiceType primary = {0}; OpenV2g_ExiService metadata = value->charge_service;
+            REQUIRE((payments & ~(OPENV2G_PAYMENT_EXTERNAL|OPENV2G_PAYMENT_CONTRACT)) == 0u &&
+                value->extra_service_count <= OPENV2G_EXI_SERVICES_MAX && value->transfer_mode_count <= OPENV2G_EXI_TRANSFER_MODES_MAX);
+            if (metadata.id == 0u) { metadata.id = value->service_id; metadata.category = OPENV2G_SERVICE_CHARGING; metadata.free_service = true; }
+            REQUIRE(metadata.id == value->service_id && metadata.category == OPENV2G_SERVICE_CHARGING && service_out(&metadata,&primary));
             body->ServiceDiscoveryRes_isUsed = 1u; body->ServiceDiscoveryRes.ResponseCode = code;
-            body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.arrayLen = 1u;
-            body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.array[0] = iso2_paymentOptionType_ExternalPayment;
-            body->ServiceDiscoveryRes.ChargeService.ServiceID = value->service_id;
-            body->ServiceDiscoveryRes.ChargeService.ServiceCategory = iso2_serviceCategoryType_EVCharging;
-            body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.arrayLen = 1u;
-            body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.array[0] = (value->ac_mode ? (value->ac_phases == 3u ? iso2_EnergyTransferModeType_AC_three_phase_core : iso2_EnergyTransferModeType_AC_single_phase_core) : iso2_EnergyTransferModeType_DC_core);
-            body->ServiceDiscoveryRes.ChargeService.FreeService = 1; break;
+            body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.arrayLen = 0u;
+            if ((payments & OPENV2G_PAYMENT_EXTERNAL) != 0u) { body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.array[body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.arrayLen++] = iso2_paymentOptionType_ExternalPayment; }
+            if ((payments & OPENV2G_PAYMENT_CONTRACT) != 0u) { body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.array[body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.arrayLen++] = iso2_paymentOptionType_Contract; }
+            body->ServiceDiscoveryRes.ChargeService.ServiceID = primary.ServiceID;
+            body->ServiceDiscoveryRes.ChargeService.ServiceCategory = primary.ServiceCategory;
+            body->ServiceDiscoveryRes.ChargeService.FreeService = primary.FreeService;
+            body->ServiceDiscoveryRes.ChargeService.ServiceName_isUsed = primary.ServiceName_isUsed;
+            body->ServiceDiscoveryRes.ChargeService.ServiceName.charactersLen = primary.ServiceName.charactersLen;
+            (void)memcpy(body->ServiceDiscoveryRes.ChargeService.ServiceName.characters,primary.ServiceName.characters,primary.ServiceName.charactersLen);
+            body->ServiceDiscoveryRes.ChargeService.ServiceScope_isUsed = primary.ServiceScope_isUsed;
+            body->ServiceDiscoveryRes.ChargeService.ServiceScope.charactersLen = primary.ServiceScope.charactersLen;
+            (void)memcpy(body->ServiceDiscoveryRes.ChargeService.ServiceScope.characters,primary.ServiceScope.characters,primary.ServiceScope.charactersLen);
+            body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.arrayLen = value->transfer_mode_count == 0u ? 1u : value->transfer_mode_count;
+            if (value->transfer_mode_count == 0u) {
+                body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.array[0] = value->ac_mode ?
+                    (value->ac_phases == 3u ? iso2_EnergyTransferModeType_AC_three_phase_core : iso2_EnergyTransferModeType_AC_single_phase_core) : iso2_EnergyTransferModeType_DC_core;
+            } else {
+                for (i = 0u; i < value->transfer_mode_count; ++i) {
+                    for (j = 0u; j < i; ++j) { REQUIRE(value->transfer_modes[i] != value->transfer_modes[j]); }
+                    REQUIRE(transfer_out(value->transfer_modes[i],&body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.array[i]));
+                }
+            }
+            body->ServiceDiscoveryRes.ServiceList_isUsed = value->extra_service_count != 0u;
+            body->ServiceDiscoveryRes.ServiceList.Service.arrayLen = value->extra_service_count;
+            for (i = 0u; i < value->extra_service_count; ++i) {
+                REQUIRE(value->extra_services[i].id != value->service_id);
+                for (j = 0u; j < i; ++j) { REQUIRE(value->extra_services[i].id != value->extra_services[j].id); }
+                REQUIRE(service_out(&value->extra_services[i],&body->ServiceDiscoveryRes.ServiceList.Service.array[i]));
+            }
+            break;
+        }
         case OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION:
             body->PaymentServiceSelectionRes_isUsed = 1u; body->PaymentServiceSelectionRes.ResponseCode = code; break;
         case OPENV2G_PROTOCOL_MESSAGE_AUTHORIZATION:
@@ -546,19 +651,65 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
         REQUIRE(!body->ServiceDiscoveryReq.ServiceScope_isUsed && !body->ServiceDiscoveryReq.ServiceCategory_isUsed);
     }
     if (body->ServiceDiscoveryRes_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY; value->response = true;
+        unsigned i,j; struct iso2_ServiceType primary = {0};
         value->accepted = body->ServiceDiscoveryRes.ResponseCode == iso2_responseCodeType_OK;
-        REQUIRE(body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.arrayLen == 1u && body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.array[0] == iso2_paymentOptionType_ExternalPayment);
-        REQUIRE(body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.arrayLen == 1u);
-        value->ac_phases = body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.array[0] == iso2_EnergyTransferModeType_AC_three_phase_core ? 3u : 1u;
-        value->ac_mode = value->ac_phases == 3u || body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.array[0] == iso2_EnergyTransferModeType_AC_single_phase_core;
-        REQUIRE(value->ac_mode || body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.array[0] == iso2_EnergyTransferModeType_DC_core);
-        REQUIRE(body->ServiceDiscoveryRes.ChargeService.ServiceCategory == iso2_serviceCategoryType_EVCharging && !body->ServiceDiscoveryRes.ServiceList_isUsed);
-        value->service_id = body->ServiceDiscoveryRes.ChargeService.ServiceID;
+        REQUIRE(body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.arrayLen > 0u && body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.arrayLen <= 2u);
+        for (i = 0u; i < body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.arrayLen; ++i) {
+            uint8_t flag;
+            switch (body->ServiceDiscoveryRes.PaymentOptionList.PaymentOption.array[i]) {
+            case iso2_paymentOptionType_ExternalPayment: flag = OPENV2G_PAYMENT_EXTERNAL; break;
+            case iso2_paymentOptionType_Contract: flag = OPENV2G_PAYMENT_CONTRACT; break;
+            default: return false;
+            }
+            REQUIRE((value->payment_options & flag) == 0u); value->payment_options |= flag;
+        }
+        REQUIRE(body->ServiceDiscoveryRes.ChargeService.ServiceCategory == iso2_serviceCategoryType_EVCharging);
+        primary.ServiceID = body->ServiceDiscoveryRes.ChargeService.ServiceID;
+        primary.ServiceCategory = body->ServiceDiscoveryRes.ChargeService.ServiceCategory; primary.FreeService = body->ServiceDiscoveryRes.ChargeService.FreeService;
+        primary.ServiceName_isUsed = body->ServiceDiscoveryRes.ChargeService.ServiceName_isUsed;
+        primary.ServiceScope_isUsed = body->ServiceDiscoveryRes.ChargeService.ServiceScope_isUsed;
+        if (primary.ServiceName_isUsed) {
+            primary.ServiceName.charactersLen = body->ServiceDiscoveryRes.ChargeService.ServiceName.charactersLen;
+            REQUIRE(primary.ServiceName.charactersLen <= sizeof(primary.ServiceName.characters));
+            (void)memcpy(primary.ServiceName.characters,body->ServiceDiscoveryRes.ChargeService.ServiceName.characters,primary.ServiceName.charactersLen);
+        }
+        if (primary.ServiceScope_isUsed) {
+            primary.ServiceScope.charactersLen = body->ServiceDiscoveryRes.ChargeService.ServiceScope.charactersLen;
+            REQUIRE(primary.ServiceScope.charactersLen <= sizeof(primary.ServiceScope.characters));
+            (void)memcpy(primary.ServiceScope.characters,body->ServiceDiscoveryRes.ChargeService.ServiceScope.characters,primary.ServiceScope.charactersLen);
+        }
+        REQUIRE(service_in(&primary,&value->charge_service)); value->service_id = primary.ServiceID;
+        REQUIRE(body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.arrayLen > 0u && body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.arrayLen <= OPENV2G_EXI_TRANSFER_MODES_MAX);
+        value->transfer_mode_count = (uint8_t)body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.arrayLen;
+        for (i = 0u; i < value->transfer_mode_count; ++i) {
+            REQUIRE(transfer_in(body->ServiceDiscoveryRes.ChargeService.SupportedEnergyTransferMode.EnergyTransferMode.array[i],&value->transfer_modes[i]));
+            for (j = 0u; j < i; ++j) { REQUIRE(value->transfer_modes[i] != value->transfer_modes[j]); }
+        }
+        value->ac_mode = value->transfer_modes[0] == OPENV2G_TRANSFER_AC_SINGLE || value->transfer_modes[0] == OPENV2G_TRANSFER_AC_THREE;
+        value->ac_phases = value->transfer_modes[0] == OPENV2G_TRANSFER_AC_THREE ? 3u : 1u;
+        if (body->ServiceDiscoveryRes.ServiceList_isUsed) {
+            REQUIRE(body->ServiceDiscoveryRes.ServiceList.Service.arrayLen > 0u && body->ServiceDiscoveryRes.ServiceList.Service.arrayLen <= OPENV2G_EXI_SERVICES_MAX);
+            value->extra_service_count = (uint8_t)body->ServiceDiscoveryRes.ServiceList.Service.arrayLen;
+            for (i = 0u; i < value->extra_service_count; ++i) {
+                REQUIRE(service_in(&body->ServiceDiscoveryRes.ServiceList.Service.array[i],&value->extra_services[i]) && value->extra_services[i].id != value->service_id);
+                for (j = 0u; j < i; ++j) { REQUIRE(value->extra_services[i].id != value->extra_services[j].id); }
+            }
+        }
     }
     if (body->PaymentServiceSelectionReq_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION; value->response = false;
-        REQUIRE(body->PaymentServiceSelectionReq.SelectedPaymentOption == iso2_paymentOptionType_ExternalPayment && body->PaymentServiceSelectionReq.SelectedServiceList.SelectedService.arrayLen == 1u);
-        REQUIRE(!body->PaymentServiceSelectionReq.SelectedServiceList.SelectedService.array[0].ParameterSetID_isUsed);
-        value->service_id = body->PaymentServiceSelectionReq.SelectedServiceList.SelectedService.array[0].ServiceID;
+        unsigned i,j;
+        REQUIRE(body->PaymentServiceSelectionReq.SelectedPaymentOption == iso2_paymentOptionType_ExternalPayment || body->PaymentServiceSelectionReq.SelectedPaymentOption == iso2_paymentOptionType_Contract);
+        value->selected_payment = body->PaymentServiceSelectionReq.SelectedPaymentOption == iso2_paymentOptionType_Contract ? OPENV2G_PAYMENT_CONTRACT : OPENV2G_PAYMENT_EXTERNAL;
+        REQUIRE(body->PaymentServiceSelectionReq.SelectedServiceList.SelectedService.arrayLen > 0u && body->PaymentServiceSelectionReq.SelectedServiceList.SelectedService.arrayLen <= OPENV2G_EXI_SERVICES_MAX);
+        value->selected_service_count = (uint8_t)body->PaymentServiceSelectionReq.SelectedServiceList.SelectedService.arrayLen;
+        for (i = 0u; i < value->selected_service_count; ++i) {
+            const struct iso2_SelectedServiceType *source = &body->PaymentServiceSelectionReq.SelectedServiceList.SelectedService.array[i];
+            REQUIRE(source->ServiceID != 0u);
+            value->selected_services[i].id = source->ServiceID; value->selected_services[i].has_parameter_set = source->ParameterSetID_isUsed;
+            value->selected_services[i].parameter_set = source->ParameterSetID;
+            for (j = 0u; j < i; ++j) { REQUIRE(value->selected_services[i].id != value->selected_services[j].id); }
+        }
+        value->service_id = value->selected_services[0].id;
     }
     if (body->PaymentServiceSelectionRes_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION; value->response = true;
         value->accepted = body->PaymentServiceSelectionRes.ResponseCode == iso2_responseCodeType_OK;
@@ -837,7 +988,7 @@ OpenV2g_Result OpenV2g_Cbv2gIso2_Bind(OpenV2g_ExiCodec *codec)
     static const OpenV2g_SchemaDescriptor descriptor = {
         OPENV2G_SCHEMA_ISO_15118_2, OPENV2G_PROTOCOL_ISO_15118_2, OPENV2G_MODE_DC,
         OPENV2G_EXI_DC_PAYLOAD_MAX, OPENV2G_EXI_DC_WORKSPACE_SIZE, sizeof(OpenV2g_ExiDcDocument), 1u,
-        "libcbv2g-iso2-dc-host/" OPENV2G_CBV2G_COMMIT,
+        "libcbv2g-iso2-cardinality-v1-host/" OPENV2G_CBV2G_COMMIT,
         "upstream generated model; exact XSD provenance OPEN", OPENV2G_CBV2G_DIGEST
     };
     const OpenV2g_ExiBackend backend = {NULL, encode, decode, reset};

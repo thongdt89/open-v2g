@@ -22,12 +22,17 @@ static int run(OpenV2g_ProtocolId protocol, OvWireScenario scenario)
     Ov2g_TcpClose(&listener);
     fd = Ov2g_TcpConnect(port, Ov2g_OsNow() + 1000000u);
     TEST_ASSERT(fd >= 0);
-    TEST_ASSERT(OvWireClient_InitMode(&client, fd, protocol, scenario == OV_WIRE_FREEZE_ENERGY, (scenario >= OV_WIRE_AC && scenario <= OV_WIRE_AC_WRONG_MODE) || scenario == OV_WIRE_AC3 || scenario == OV_WIRE_AC3_WRONG_PHASE));
-    if (scenario == OV_WIRE_AC3 || scenario == OV_WIRE_AC3_WRONG_PHASE) {
+    TEST_ASSERT(OvWireClient_InitMode(&client, fd, protocol, scenario == OV_WIRE_FREEZE_ENERGY, (scenario >= OV_WIRE_AC && scenario <= OV_WIRE_AC_WRONG_MODE) || scenario == OV_WIRE_AC3 || scenario == OV_WIRE_AC3_WRONG_PHASE || scenario == OV_WIRE_MULTI_AC));
+    if (scenario == OV_WIRE_AC3 || scenario == OV_WIRE_AC3_WRONG_PHASE || scenario == OV_WIRE_MULTI_AC) {
         const int32_t caps[3] = {16000,10000,12000};
         TEST_ASSERT(!OvWireClient_SetAcPhaseLimits(&client,2u,caps));
         TEST_ASSERT(OvWireClient_SetAcPhaseLimits(&client,3u,caps));
     }
+    if (scenario == OV_WIRE_MULTI_OFFER || scenario == OV_WIRE_MULTI_AC || scenario == OV_WIRE_BAD_SERVICE) {
+        const OpenV2g_ExiSelectedService extra = {scenario == OV_WIRE_BAD_SERVICE ? 4u : 2u,false,0};
+        TEST_ASSERT(OvWireClient_SetSelectedServices(&client,&extra,1u,true,1));
+    }
+    if (scenario == OV_WIRE_BAD_PARAMETER_SET) { TEST_ASSERT(OvWireClient_SetSelectedServices(&client,NULL,0u,true,2)); }
     client.allow_unsigned_receipts = scenario == OV_WIRE_METERING || scenario == OV_WIRE_AC_METERING || scenario == OV_WIRE_SIGNED_METER;
     success = OvWireClient_Run(&client); Ov2g_TcpClose(&fd);
     TEST_ASSERT(waitpid(child, &status, 0) == child);
@@ -37,16 +42,17 @@ static int run(OpenV2g_ProtocolId protocol, OvWireScenario scenario)
             (int)client.environment.rte.coordinator.permission_manager.current.env.reason, status);
     }
     TEST_ASSERT(WIFEXITED(status) && WEXITSTATUS(status) == 0);
-    TEST_ASSERT(success == (scenario == OV_WIRE_AC3 || scenario == OV_WIRE_NORMAL || scenario == OV_WIRE_MINOR_DEVIATION || scenario == OV_WIRE_PENDING || scenario == OV_WIRE_DYNAMIC_LIMIT || scenario == OV_WIRE_METERING || scenario == OV_WIRE_AC || scenario == OV_WIRE_AC_METERING));
+    TEST_ASSERT(success == (scenario == OV_WIRE_MULTI_AC || scenario == OV_WIRE_MULTI_OFFER || scenario == OV_WIRE_AC3 || scenario == OV_WIRE_NORMAL || scenario == OV_WIRE_MINOR_DEVIATION || scenario == OV_WIRE_PENDING || scenario == OV_WIRE_DYNAMIC_LIMIT || scenario == OV_WIRE_METERING || scenario == OV_WIRE_AC || scenario == OV_WIRE_AC_METERING));
     TEST_ASSERT(client.environment.rte.coordinator.permission_manager.current.decision == OPENV2G_PERMISSION_DENY);
     TEST_ASSERT(!client.io.queued && client.environment.os.count == 0u);
-    if (success) { TEST_ASSERT(client.messages == ((scenario == OV_WIRE_AC || scenario == OV_WIRE_AC3) ? 12u : (scenario == OV_WIRE_METERING ? 18u : (scenario == OV_WIRE_PENDING ? 16u : 15u))) && client.loops == 3u && client.energy_started); }
+    if (success) { TEST_ASSERT(client.messages == ((scenario == OV_WIRE_AC || scenario == OV_WIRE_AC3 || scenario == OV_WIRE_MULTI_AC) ? 12u : (scenario == OV_WIRE_METERING ? 18u : (scenario == OV_WIRE_PENDING ? 16u : 15u))) && client.loops == 3u && client.energy_started); }
     if (scenario == OV_WIRE_AC || scenario == OV_WIRE_AC_METERING) { TEST_ASSERT(client.peer_limits.max_charge_current_ma == 16000); }
     if (scenario == OV_WIRE_AC_RCD) {
         TEST_ASSERT(client.energy_started && client.environment.rte.hardware.status.state == OPENV2G_HW_SAFE);
         TEST_ASSERT(!client.environment.rte.hardware.status.positive_contactor_closed && !client.environment.rte.hardware.status.negative_contactor_closed);
     }
     if (scenario == OV_WIRE_AC3) { TEST_ASSERT(client.environment.rte.coordinator.energy.limits.max_charge_current_ma == 10000 && client.environment.rte.coordinator.energy.ac_phases == 3u); }
+    if (scenario == OV_WIRE_CONTRACT_ONLY || scenario == OV_WIRE_UNSUPPORTED_MODE || scenario == OV_WIRE_BAD_SERVICE || scenario == OV_WIRE_BAD_PARAMETER_SET) { TEST_ASSERT(!client.energy_started); }
     if (scenario == OV_WIRE_AC3_WRONG_PHASE) { TEST_ASSERT(!client.energy_started); }
     if (scenario == OV_WIRE_AC_WRONG_MODE) { TEST_ASSERT(!client.energy_started); }
     if (scenario == OV_WIRE_METERING || scenario == OV_WIRE_AC_METERING) { TEST_ASSERT(client.receipts == 3u && client.meter_correlation == 0u); }
@@ -106,6 +112,12 @@ int main(void)
 {
     unsigned scenario;
     TEST_ASSERT(assessment_guards() == 0);
+    TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2,OV_WIRE_BAD_SERVICE) == 0);
+    TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2,OV_WIRE_BAD_PARAMETER_SET) == 0);
+    TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2,OV_WIRE_MULTI_AC) == 0);
+    TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2,OV_WIRE_MULTI_OFFER) == 0);
+    TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2,OV_WIRE_CONTRACT_ONLY) == 0);
+    TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2,OV_WIRE_UNSUPPORTED_MODE) == 0);
     TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2, OV_WIRE_AC3) == 0);
     TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2, OV_WIRE_AC3_WRONG_PHASE) == 0);
     TEST_ASSERT(run(OPENV2G_PROTOCOL_ISO_15118_2, OV_WIRE_AC) == 0);

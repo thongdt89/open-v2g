@@ -140,6 +140,8 @@ static bool parameter_in(const struct din_ParameterType *source, int16_t set_id,
 static bool to_generated(const OpenV2g_ExiDcDocument *value, struct din_exiDocument *generated)
 {
     struct din_BodyType *body = &generated->V2G_Message.Body;
+    if (value->payment_options != 0u || value->selected_payment != 0u || value->transfer_mode_count != 0u ||
+        value->extra_service_count != 0u || value->selected_service_count != 0u || value->charge_service.id != 0u) { return false; }
     din_responseCodeType code = value->accepted ?
         (value->new_session ? din_responseCodeType_OK_NewSessionEstablished : din_responseCodeType_OK) : din_responseCodeType_FAILED;
     if (value->has_signature || value->signature.body_id_length != 0u || value->ac_mode || value->has_meter_info || value->receipt_required) { return false; }

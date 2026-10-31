@@ -1,0 +1,53 @@
+{
+  "date": "2026-10-31",
+  "base_commit": "504e510",
+  "scope": "Bounded ISO-2 multiple offers and explicit EIM selection. Contract serialization does not enable PnC. No production claim. System OpenSSL libraries are not sanitizer-instrumented.",
+  "builds": {
+    "normal_generated_openssl_oracle": {
+      "passed": 44,
+      "failed": 0,
+      "ctest_log_sha256": "8b313d81df59eb2f50af48746488b6f447e05f2767aeda8c4b6fc86ed0d75188"
+    },
+    "asan_ubsan_generated_openssl": {
+      "passed": 42,
+      "failed": 0,
+      "ctest_log_sha256": "fb4e763911a5f54cb3b263dbc89135bccf967e44d88ffedf658ae4fe5a8666f5"
+    },
+    "generated_oracle_openssl_off": {
+      "passed": 37,
+      "failed": 0,
+      "ctest_log_sha256": "5e1900e386f686052af9a87e0d3bbc1dcfb694d42b3755dd3cdcbf0d0a6f71ca"
+    }
+  },
+  "source_sha256": {
+    "integration/protocol/adapters/cbv2g/CMakeLists.txt": "f2d908fefc0f22a7c4aaac3eb8199fce4cbfe902d49c67d7d285220bbe579a60",
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_din.c": "ce06c6a8d158d3605755bf2b972073054cf4d675ef0f201443fc5af86332776a",
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_iso2.c": "4e7ac5b5531a6c32272924d071a74106065d7a6f2e8eb9bb38433ec85d6af589",
+    "integration/protocol/adapters/cbv2g/include/openv2g/exi_cbv2g_dc.h": "2780c03328a026c451c5722e503c069e1995e0fd4370d77f72c9e7bdb069b874",
+    "integration/protocol/adapters/cbv2g/tests/feature_vector_dump.c": "33a1e9c0ad3a8d9be706c51e4d6415392f772a553a720f73adf64e89759b7b80",
+    "simulation/linux/wire/client.c": "1047c9908c1fa20b05b2e1103da2fd60e3617281dd7b8f8f7a16a768014433ec",
+    "simulation/linux/wire/station.c": "9a325adf535685d97ff398b81695967dfcb322b0fa33ed077a9bd2bd0d65a462",
+    "simulation/linux/wire/test_wire.c": "9313423c5050cfc673fbb4dcf6654c7df81a2cd1c4f6b1392409859ba64cfbe4",
+    "simulation/linux/wire/wire.h": "abb093235dd33fd29c17603c62275014bc7d8623244811e6c0fe5a1cb2a87589",
+    "tests/oracle/differential.py": "2eb18d31cfd90af0d6e9d0680d91b8d4ae4945b63af311fb3c46fa7fd3d2caf7",
+    "integration/protocol/adapters/cbv2g/tests/test_cbv2g_offers.c": "9211069784dbb8070923f5283b4632f8f1a88be4e9fe1d831d8ccf59b78c9332",
+    "integration/protocol/adapters/cbv2g/patches/iso2_transfer_mode_cardinality.py": "36dba4f02830137bde47fd9b38308cb92b6ea12f27cac36bbc6859d8fdbec20d"
+  },
+  "baseline_vectors_unchanged": 50,
+  "earlier_feature_vectors_unchanged": 29,
+  "new_independent_offer_vectors": 2,
+  "wire_scenarios": 51,
+  "overlay": {
+    "patch": "iso2-transfer-mode-cardinality-v1",
+    "files": {
+      "iso2_msgDefEncoder.c": {
+        "upstream_sha256": "cda605929689af3a5e1625f3b0ea563c15825b69f4753aef771dd8ccdebe61ed",
+        "compiled_copy_sha256": "dbafce639432f4aa537fbabd7d947063d039f5284835625421c51264006717e9"
+      },
+      "iso2_msgDefDecoder.c": {
+        "upstream_sha256": "b35e0e6dd14804c7e7483d27af87db9b1a43e74fbdc6ec4ab9de1c67c7d7201e",
+        "compiled_copy_sha256": "0e0fa8eb8035b41b31becd8c5d36f27d358faee60c6d95bbfec36302349c32b3"
+      }
+    }
+  }
+}

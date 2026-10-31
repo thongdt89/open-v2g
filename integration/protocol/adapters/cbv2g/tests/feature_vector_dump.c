@@ -101,5 +101,20 @@ int main(void)
             if (emit(din != 0u ? "din-parameters" : "iso2-parameters",&document) != 0) { return 1; }
         }
     }
+    {
+        unsigned i; OpenV2g_ExiDcDocument document = OpenV2g_ExiDc_Default(OPENV2G_PROTOCOL_MESSAGE_SERVICE_DISCOVERY,true);
+        document.payment_options = OPENV2G_PAYMENT_EXTERNAL|OPENV2G_PAYMENT_CONTRACT; document.transfer_mode_count = 6u;
+        for (i = 0u; i < 6u; ++i) { document.transfer_modes[i] = (OpenV2g_ExiTransferMode)(i+1u); }
+        document.charge_service.id = 1u; document.charge_service.category = OPENV2G_SERVICE_CHARGING;
+        document.charge_service.has_name = true; document.charge_service.name_length = 4u; (void)memcpy(document.charge_service.name,"host",4u);
+        document.extra_service_count = 1u; document.extra_services[0].id = 2u; document.extra_services[0].category = OPENV2G_SERVICE_CUSTOM;
+        document.extra_services[0].has_scope = true; document.extra_services[0].scope_length = 2u; (void)memcpy(document.extra_services[0].scope,"ev",2u);
+        if (emit("iso2-offers",&document) != 0) { return 1; }
+        document = OpenV2g_ExiDc_Default(OPENV2G_PROTOCOL_MESSAGE_SERVICE_SELECTION,false);
+        document.selected_payment = OPENV2G_PAYMENT_CONTRACT; document.selected_service_count = 2u;
+        document.selected_services[0].id = 1u; document.selected_services[0].has_parameter_set = true; document.selected_services[0].parameter_set = 1;
+        document.selected_services[1].id = 2u;
+        if (emit("iso2-offers",&document) != 0) { return 1; }
+    }
     return 0;
 }

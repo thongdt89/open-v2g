@@ -22,6 +22,21 @@ typedef struct {
     OpenV2g_ParameterKind kind;
     int16_t physical_value; int8_t physical_multiplier; OpenV2g_ParameterUnit physical_unit;
 } OpenV2g_ExiParameter;
+#define OPENV2G_EXI_TRANSFER_MODES_MAX 6u
+#define OPENV2G_EXI_SERVICES_MAX 4u
+#define OPENV2G_PAYMENT_EXTERNAL 1u
+#define OPENV2G_PAYMENT_CONTRACT 2u
+typedef enum { OPENV2G_TRANSFER_AC_SINGLE = 1, OPENV2G_TRANSFER_AC_THREE,
+    OPENV2G_TRANSFER_DC_CORE, OPENV2G_TRANSFER_DC_EXTENDED, OPENV2G_TRANSFER_DC_COMBO,
+    OPENV2G_TRANSFER_DC_UNIQUE } OpenV2g_ExiTransferMode;
+typedef enum { OPENV2G_SERVICE_CHARGING = 0, OPENV2G_SERVICE_INTERNET,
+    OPENV2G_SERVICE_CERTIFICATE, OPENV2G_SERVICE_CUSTOM } OpenV2g_ExiServiceCategory;
+typedef struct {
+    uint16_t id; OpenV2g_ExiServiceCategory category; bool free_service;
+    bool has_name; uint16_t name_length; char name[32];
+    bool has_scope; uint16_t scope_length; char scope[32];
+} OpenV2g_ExiService;
+typedef struct { uint16_t id; bool has_parameter_set; int16_t parameter_set; } OpenV2g_ExiSelectedService;
 #define OPENV2G_EXI_SCHEDULE_MAX 3u
 #define OPENV2G_EXI_SCHEDULE_POINTS_MAX 5u
 typedef struct { uint32_t start_s; uint32_t duration_s; int32_t power_w; } OpenV2g_ExiSchedulePoint;
@@ -82,6 +97,15 @@ typedef struct {
     bool voltage_limit_achieved;
     bool current_limit_achieved;
     bool power_limit_achieved;
+    uint8_t payment_options; /* Bitmask; zero encodes legacy external-only offer. */
+    uint8_t selected_payment; /* Zero encodes legacy external selection. */
+    uint8_t transfer_mode_count;
+    OpenV2g_ExiTransferMode transfer_modes[OPENV2G_EXI_TRANSFER_MODES_MAX];
+    OpenV2g_ExiService charge_service; /* id zero encodes legacy metadata. */
+    uint8_t extra_service_count;
+    OpenV2g_ExiService extra_services[OPENV2G_EXI_SERVICES_MAX];
+    uint8_t selected_service_count;
+    OpenV2g_ExiSelectedService selected_services[OPENV2G_EXI_SERVICES_MAX];
     uint8_t parameter_count;
     OpenV2g_ExiParameter parameters[OPENV2G_EXI_PARAMETER_MAX];
     uint8_t schedule_count;

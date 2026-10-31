@@ -26,7 +26,18 @@ foreach(_line IN LISTS _checksums)
     endif()
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_file}")
 endforeach()
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+set(_cardinality_patch "${CMAKE_CURRENT_SOURCE_DIR}/patches/iso2_transfer_mode_cardinality.py")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${_cardinality_patch}")
+execute_process(COMMAND "${Python3_EXECUTABLE}" "${_cardinality_patch}"
+    "${OPENV2G_CBV2G_SOURCE_DIR}/lib/cbv2g/iso_2" "${CMAKE_CURRENT_BINARY_DIR}/iso2_overlay"
+    RESULT_VARIABLE _patch_result)
+if(NOT _patch_result EQUAL 0)
+    message(FATAL_ERROR "Pinned ISO-2 cardinality overlay validation failed")
+endif()
+file(SHA256 "${_cardinality_patch}" _patch_digest)
 file(SHA256 "${_manifest}" _digest)
+string(SHA256 _digest "${_digest};${_patch_digest}")
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/cbv2g_pin.h"
     "#define OPENV2G_CBV2G_COMMIT \"${_pin}\"\n#define OPENV2G_CBV2G_DIGEST \"${_digest}\"\n")
 set(_base "${OPENV2G_CBV2G_SOURCE_DIR}/lib/cbv2g")
@@ -44,8 +55,8 @@ add_library(openv2g_cbv2g_sap_generated STATIC
     ${_base}/din/din_msgDefEncoder.c
     ${_base}/din/din_msgDefDecoder.c
     ${_base}/iso_2/iso2_msgDefDatatypes.c
-    ${_base}/iso_2/iso2_msgDefEncoder.c
-    ${_base}/iso_2/iso2_msgDefDecoder.c)
+    ${CMAKE_CURRENT_BINARY_DIR}/iso2_overlay/iso2_msgDefEncoder.c
+    ${CMAKE_CURRENT_BINARY_DIR}/iso2_overlay/iso2_msgDefDecoder.c)
 target_include_directories(openv2g_cbv2g_sap_generated PRIVATE "${OPENV2G_CBV2G_SOURCE_DIR}/include")
 target_compile_features(openv2g_cbv2g_sap_generated PRIVATE c_std_11)
 # Generated warnings are visible but not promoted to project-owned errors.
@@ -98,4 +109,12 @@ if(OPENV2G_BUILD_TESTS)
     target_include_directories(openv2g_test_cbv2g_parameters PRIVATE ${PROJECT_SOURCE_DIR}/tests)
     openv2g_enable_strict_warnings(openv2g_test_cbv2g_parameters)
     add_test(NAME openv2g_test_cbv2g_parameters COMMAND openv2g_test_cbv2g_parameters)
+endif()
+
+if(OPENV2G_BUILD_TESTS)
+    add_executable(openv2g_test_cbv2g_offers tests/test_cbv2g_offers.c)
+    target_link_libraries(openv2g_test_cbv2g_offers PRIVATE openv2g_exi_cbv2g_sap)
+    target_include_directories(openv2g_test_cbv2g_offers PRIVATE ${PROJECT_SOURCE_DIR}/tests)
+    openv2g_enable_strict_warnings(openv2g_test_cbv2g_offers)
+    add_test(NAME openv2g_test_cbv2g_offers COMMAND openv2g_test_cbv2g_offers)
 endif()

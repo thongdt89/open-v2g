@@ -1,9 +1,22 @@
 # Current feature completion status
 
-Revision: Draft 0.9 — 31/10/2026. **Overall implementation remains in progress.**
+Revision: Draft 0.10 — 31/10/2026. **Overall implementation remains in progress.**
 This is the current inventory; older audits/work-log entries describe their own
 snapshots. Implemented means host code, not selected supplier, frozen design,
 vehicle safety allocation or protocol conformance.
+
+## Multiple-offer/selection increment — 31/10/2026
+
+ISO-2 retains both payments, six advertised transfer modes and bounded named
+services/selections. The EIM runner selects its explicit mode/external payment,
+checks requested ancillary IDs and primary parameter sets against correlated,
+generation-bound, expiring copied evidence, and clears it on stop. AC3/DC mixed
+offer sessions and before-energy negative selections are exercised. A pinned
+build-copy overlay fixes the independently exposed six-mode terminal grammar;
+old emitted bytes are now a rejection regression. See [contracts](../../simulation/linux/SERVICE_OFFERS.md).
+Contract serialization does not enable PnC. Secondary ServiceDetail selection,
+charging profiles/tariffs/notifications and ancillary application behavior remain
+separate work; the primary charging-service flow stays bounded and explicit.
 
 ## Typed service-parameter increment — 31/10/2026
 
