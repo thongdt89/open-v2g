@@ -32,6 +32,11 @@ int main(int argc, char **argv)
         (void)memset(&document, 0, sizeof(document));
         result = decode_dinExiDocument(&reader, &document);
         if (result == 0) { result = encode_dinExiDocument(&writer, &document); }
+    } else if (strcmp(argv[1], "iso2-fragment") == 0) {
+        struct iso1EXIFragment fragment;
+        (void)memset(&fragment, 0, sizeof(fragment));
+        result = decode_iso1ExiFragment(&reader, &fragment);
+        if (result == 0) { result = encode_iso1ExiFragment(&writer, &fragment); }
     } else if (strcmp(argv[1], "iso2") == 0) {
         /* External OpenV2G calls the 2013 model iso1; iso2 is a different
          * model disabled in that pinned checkout. Do not conflate names. */

@@ -78,6 +78,9 @@ typedef struct {
     uint32_t evidence_id;
     uint32_t source_correlation_id;
     bool signature_required;
+    bool signature_ready;
+    uint32_t signing_key_version;
+    uint8_t signed_digest[32];
 } OpenV2g_ProtocolMeteringEvidence;
 
 typedef struct {

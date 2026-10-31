@@ -5,6 +5,7 @@
 #include "openv2g/common/types.h"
 #define OV2G_CRYPTO_KEYS 4u
 #define OV2G_CRYPTO_JOBS 4u
+#define OV2G_CRYPTO_LEASES 4u
 #define OV2G_CRYPTO_INPUT_MAX 4096u
 #define OV2G_CRYPTO_SIGNATURE_SIZE 64u
 /* PROJECT typed host seam; not a supplier Csm ABI or XMLDSIG canonicalizer. */
@@ -30,11 +31,19 @@ typedef struct {
     uint8_t signature[OV2G_CRYPTO_SIGNATURE_SIZE];
 } Ov2g_CryptoJob;
 typedef struct {
+    uint32_t id;
+    uint32_t key_handle;
+    uint32_t key_version;
+    uint32_t generation;
+} Ov2g_CryptoKeyLease;
+typedef struct {
     uint32_t generation;
     void *keys[OV2G_CRYPTO_KEYS];
     uint32_t versions[OV2G_CRYPTO_KEYS];
     bool can_sign[OV2G_CRYPTO_KEYS];
     Ov2g_CryptoJob jobs[OV2G_CRYPTO_JOBS];
+    Ov2g_CryptoKeyLease leases[OV2G_CRYPTO_LEASES];
+    uint32_t next_lease_id;
 } Ov2g_Crypto;
 void Ov2g_CryptoInit(Ov2g_Crypto *crypto);
 void Ov2g_CryptoClose(Ov2g_Crypto *crypto);
@@ -42,6 +51,12 @@ OpenV2g_Result Ov2g_CryptoBeginGeneration(Ov2g_Crypto *crypto, uint32_t generati
 OpenV2g_Result Ov2g_CryptoLoadPrivateKey(Ov2g_Crypto *crypto, uint32_t handle, const char *path);
 /* Imports a public key, not a certificate trust decision. */
 OpenV2g_Result Ov2g_CryptoLoadPublicCertificate(Ov2g_Crypto *crypto, uint32_t handle, const char *path);
+/* Freeze a prepared signature's key version until TX/ack/cancel cleanup. */
+OpenV2g_Result Ov2g_CryptoAcquireKeyLease(Ov2g_Crypto *crypto, uint32_t generation,
+    uint32_t key_handle, uint32_t key_version, uint32_t *lease_id);
+bool Ov2g_CryptoKeyLeaseIsCurrent(const Ov2g_Crypto *crypto, uint32_t generation,
+    uint32_t lease_id, uint32_t key_handle, uint32_t key_version);
+OpenV2g_Result Ov2g_CryptoReleaseKeyLease(Ov2g_Crypto *crypto, uint32_t generation, uint32_t lease_id);
 OpenV2g_Result Ov2g_CryptoSubmit(Ov2g_Crypto *crypto, uint32_t generation, uint32_t job_id,
     Ov2g_CryptoOperation operation, uint32_t key_handle, const uint8_t *input, size_t input_length,
     const uint8_t *signature, size_t signature_length, OpenV2g_TimeUs now, OpenV2g_TimeUs deadline);

@@ -211,3 +211,11 @@ processing. The host uses 2 seconds/8 Ongoing responses per stage; retries canno
 restart this budget. These settings are provisional host limits. [Full provider,
 crypto, timer and test contracts](../TLS_CRYPTO.md). None of this enables PnC or
 signed metering automatically.
+
+## Restricted signed receipt host path
+
+The optional OpenSSL build adds explicit signed AC/DC MeteringReceiptReq APIs
+and TLS station verification with provisioned fixture key handles. Unsigned
+fallback remains disabled by default; unverified meter-vendor signatures remain
+rejected. See [profile, APIs and tests](../SIGNED_RECEIPTS.md). This is separate
+from unfinished PnC and production credential/trust lifecycle integration.

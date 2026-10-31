@@ -9,6 +9,16 @@ static bool ok(OpenV2g_Result result)
 {
     return result == OPENV2G_RESULT_OK || result == OPENV2G_RESULT_ACCEPTED;
 }
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+static void release_prepared_receipt(OvWireClient *client)
+{
+    if (client->receipt_crypto != NULL && client->receipt_key_lease != 0u) {
+        (void)Ov2g_CryptoReleaseKeyLease(client->receipt_crypto, client->io.generation, client->receipt_key_lease);
+    }
+    client->receipt_key_lease = 0u; client->receipt_key_version = 0u;
+    (void)memset(&client->prepared_receipt,0,sizeof(client->prepared_receipt));
+}
+#endif
 static bool sync_hlc(OvWireClient *client)
 {
     OpenV2g_HostSimulation *sim = &client->environment.rte;
@@ -136,6 +146,12 @@ bool OvWireClient_InitDiscovery(OvWireClient *client, OpenV2g_ProtocolId protoco
     return OvWireClient_InitDiscoveryMode(client, protocol, discovery_port, false);
 }
 #ifdef OPENV2G_HAVE_OPENSSL_HOST
+bool OvWireClient_SetReceiptSigner(OvWireClient *client, Ov2g_Crypto *crypto, uint32_t key)
+{
+    if (client == NULL || crypto == NULL || key == 0u || key > OV2G_CRYPTO_KEYS || !client->tls_enabled ||
+        client->environment.rte.coordinator.generation != 0u) { return false; }
+    client->receipt_crypto = crypto; client->receipt_signing_key = key; return true;
+}
 bool OvWireClient_SetTls(OvWireClient *client, const Ov2g_TlsConfig *config)
 {
     if (client == NULL || config == NULL || config->server || client->environment.rte.config.features.din_70121_dc_eim ||
@@ -187,6 +203,12 @@ static bool sap(OvWireClient *client)
     size_t index;
     if (!ok(OpenV2g_HostSimulation_InjectCpPp(sim, &cp, now)) ||
         !ok(OpenV2g_HostSimulation_AdvancePlcToReady(sim, now))) { return false; }
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+    if (client->receipt_crypto != NULL) {
+        if (Ov2g_CryptoBeginGeneration(client->receipt_crypto, sim->coordinator.generation) != OPENV2G_RESULT_OK) { return false; }
+        client->receipt_job = 0u;
+    }
+#endif
     if (client->discovery_port != 0u) { if (!discover(client)) { return false; } }
     else if (!ok(OpenV2g_Iso15118Chrg_OnSdpComplete(&sim->hlc, sim->coordinator.generation, Ov2g_OsNow() + 10u, &sim->config.peer_endpoint))) { return false; }
     client->io.connection = sim->hlc.tcp_tls_session.status.connection_id;
@@ -267,12 +289,29 @@ static bool exchange_protocol(OvWireClient *client)
         request.voltage_mv = pending->target_voltage_mv; request.current_ma = pending->target_current_ma;
     }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT) {
-        if (!client->allow_unsigned_receipts || !pending->has_metering_evidence || client->meter_correlation == 0u ||
+        if (!pending->has_metering_evidence || client->meter_correlation == 0u ||
             pending->metering_evidence.generation != client->io.generation ||
             pending->metering_evidence.evidence_id != client->meter_correlation ||
-            pending->metering_evidence.source_correlation_id != client->meter_correlation ||
-            pending->metering_evidence.signature_required) { return false; }
-        request.has_meter_info = true; request.meter_info = client->meter_info;
+            pending->metering_evidence.source_correlation_id != client->meter_correlation) { return false; }
+        if (pending->metering_evidence.signature_required) {
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+            if (!pending->metering_evidence.signature_ready || client->receipt_crypto == NULL || !client->tls_enabled ||
+                client->tls.state != OV2G_TLS_READY || !client->tls.peer_verified ||
+                client->receipt_crypto->generation != client->io.generation || client->receipt_signing_key == 0u || client->receipt_signing_key > OV2G_CRYPTO_KEYS ||
+                client->receipt_crypto->versions[client->receipt_signing_key - 1u] != pending->metering_evidence.signing_key_version ||
+                client->receipt_key_version != pending->metering_evidence.signing_key_version ||
+                !Ov2g_CryptoKeyLeaseIsCurrent(client->receipt_crypto,client->io.generation,client->receipt_key_lease,client->receipt_signing_key,client->receipt_key_version) || !client->prepared_receipt.has_signature ||
+                memcmp(client->prepared_receipt.signature.digest,pending->metering_evidence.signed_digest,32u) != 0 ||
+                memcmp(client->prepared_receipt.session_id,client->environment.rte.hlc.session_context.session_id,8u) != 0 ||
+                client->prepared_receipt.schedule_id != client->environment.rte.hlc.session_context.schedule_id) { return false; }
+            request = client->prepared_receipt;
+#else
+            return false;
+#endif
+        } else {
+            if (!client->allow_unsigned_receipts) { return false; }
+            request.has_meter_info = true; request.meter_info = client->meter_info;
+        }
     }
     response_id = (uint16_t)((unsigned)((pending->kind == OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_STOP || pending->kind == OPENV2G_PROTOCOL_MESSAGE_RENEGOTIATE) ? OPENV2G_PROTOCOL_MESSAGE_POWER_DELIVERY_START : pending->kind) + OPENV2G_EXI_DC_RESPONSE_OFFSET);
     if (!OvWireEncode(&client->codec, client->io.generation, pending->schema, (uint16_t)pending->kind, &request, sizeof(request), bytes, &length) ||
@@ -374,11 +413,37 @@ static bool exchange_protocol(OvWireClient *client)
         message.metering_evidence.source_correlation_id = pending->correlation_id;
         /* An opaque meter signature is never treated as verified evidence. */
         message.metering_evidence.signature_required = !client->allow_unsigned_receipts || response.meter_info.signature_length != 0u;
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+        if (client->receipt_crypto != NULL && response.meter_info.signature_length == 0u) {
+            int id_length;
+            if (!client->tls_enabled || client->tls.state != OV2G_TLS_READY || !client->tls.peer_verified || client->receipt_job > UINT32_MAX - 2u) { return false; }
+            client->prepared_receipt = OpenV2g_ExiDc_Default(OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT, false);
+            client->prepared_receipt.ac_mode = client->ac_mode; client->prepared_receipt.has_meter_info = true;
+            client->prepared_receipt.meter_info = client->meter_info;
+            (void)memcpy(client->prepared_receipt.session_id,client->environment.rte.hlc.session_context.session_id,8u);
+            client->prepared_receipt.schedule_id = client->environment.rte.hlc.session_context.schedule_id;
+            id_length = snprintf(client->prepared_receipt.signature.body_id, sizeof(client->prepared_receipt.signature.body_id), "meter_%u", client->meter_correlation);
+            if (id_length <= 0 || (size_t)id_length >= sizeof(client->prepared_receipt.signature.body_id)) { return false; }
+            client->prepared_receipt.signature.body_id_length = (uint16_t)id_length;
+            if (!OvWireSignReceipt(client->receipt_crypto,client->io.generation,client->receipt_signing_key,
+                client->receipt_job + 1u,&client->prepared_receipt,now + OV_WIRE_TIMEOUT_US,&client->receipt_key_version)) { return false; }
+            if (Ov2g_CryptoAcquireKeyLease(client->receipt_crypto,client->io.generation,client->receipt_signing_key,
+                client->receipt_key_version,&client->receipt_key_lease) != OPENV2G_RESULT_OK) { return false; }
+            client->receipt_job += 2u;
+            message.metering_evidence.signature_required = true; message.metering_evidence.signature_ready = true;
+            message.metering_evidence.signing_key_version = client->receipt_key_version;
+            (void)memcpy(message.metering_evidence.signed_digest, client->prepared_receipt.signature.digest,32u);
+        }
+#endif
+
     }
     if (pending->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT) {
         if (!response.ready || response.rcd_fault || response.ac_mode != client->ac_mode || (!client->ac_mode && !response.isolation_valid) || client->meter_correlation == 0u) { return false; }
         message.ongoing = client->loops < 3u; ++client->receipts;
         (void)memset(&client->meter_info, 0, sizeof(client->meter_info)); client->meter_correlation = 0u;
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+        release_prepared_receipt(client);
+#endif
     }
     ++client->messages;
     (void)printf("wire schema=%d message=%d loop=%u\n", (int)pending->schema, (int)pending->kind, client->loops);
@@ -410,6 +475,9 @@ stop:
     if (client->discovery_port != 0u) { Ov2g_TcpClose(&client->io.fd); }
     (void)OpenV2g_ExiCodec_Stop(&client->codec.codec, client->io.generation);
     (void)memset(&client->meter_info, 0, sizeof(client->meter_info)); client->meter_correlation = 0u;
+#ifdef OPENV2G_HAVE_OPENSSL_HOST
+    release_prepared_receipt(client);
+#endif
     client->io.queued = false; client->io.pending.data = NULL;
     return success;
 }

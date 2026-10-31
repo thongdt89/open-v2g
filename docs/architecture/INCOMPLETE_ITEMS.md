@@ -1,9 +1,24 @@
 # Current feature completion status
 
-Revision: Draft 0.4 — 30/10/2026. **Overall implementation remains in progress.**
+Revision: Draft 0.5 — 31/10/2026. **Overall implementation remains in progress.**
 This is the current inventory; older audits/work-log entries describe their own
 snapshots. Implemented means host code, not selected supplier, frozen design,
 vehicle safety allocation or protocol conformance.
+
+## Signed-receipt increment — 31/10/2026
+
+Implemented a restricted one-reference ISO-2 signed MeteringReceiptReq profile,
+actual SHA256/P-256 body/SignedInfo signing and verification over TLS AC/DC,
+and key-version leases through transmission/acknowledgement. Default unsigned
+policy remains off. Malformed/unknown signature profiles and wrong keys fail
+closed. The signed document and both fragments independently round-trip through
+the pinned separate oracle; Python independently verifies digest/signature.
+See [signed-receipt host contracts](../../simulation/linux/SIGNED_RECEIPTS.md).
+
+This is an explicit fixture key-pinning profile. Chain provisioning, trusted-time,
+revocation, contract/eMAID authorization, certificate transactions and general PnC
+remain incomplete. Opaque meter-vendor signatures remain unverified/rejected.
+Production profile selection is an external decision; no supplier ABI is invented.
 
 ## Portable session/lifecycle increment — 30/10/2026
 
@@ -73,11 +88,11 @@ settlement, identity or signature-verification evidence.
 | Work item | Already present | Remaining implementation |
 |---|---|---|
 | TLS / credential integration | Actual verified host TLS and typed software crypto jobs, with explicit development trust/identity and optional CRL configuration | Selected supplier/HSM integration, OEM provisioning/trust/time/OCSP policy, exact-edition TLS profile and qualified resources; no automatic plaintext fallback |
-| PnC / signed receipts | Disabled feature gates; bounded opaque meter signatures; signed headers rejected | PaymentDetails, certificate install/update, challenge binding, EXI/XMLDSIG signing/verification and transactional credential lifecycle |
+| PnC / credentials | Restricted signed receipt EXI/TLS path with explicit pinned fixture keys; PnC feature gate remains disabled | PaymentDetails, certificate install/update, challenge binding, other signed message profiles, trusted contract identity and transactional credential lifecycle |
 | Broader timing supervision | Configurable cumulative Authorization/CPD/CableCheck budgets plus exchange/session guards | Target watchdog/physical-stop integration and exact-edition configuration; select normative budgets from exact editions and vehicle timing work products |
 | Services and schedules | ServiceDetail integer/string sets; bounded three tuples/five intervals with conservative selection | Multiple payment/service/mode offers, more parameter forms, tariffs/profiles, notifications and richer completion/schedule policy |
 | Broader AC | Single-phase EIM through real IPv4/IPv6 sockets | Three-phase, phase-specific limits, actual OBC control/measurement and complete AC protocol feature coverage |
-| Broader metering | ISO-2 unsigned host AC/DC receipt loop | DIN metering branches, authenticated meter data, signed receipt policy and compliant signature generation/verification |
+| Broader metering | ISO-2 unsigned opt-in and signed TLS host AC/DC receipt loops | DIN metering branches, authenticated meter-vendor data, OEM receipt/settlement policy and exact-edition qualification |
 | ISO-20 | Disabled registry/factory seams; separate generated models exist in the external candidate checkout | Pinned/hash-controlled Common/AC/DC bindings, message mappings, scheduled/dynamic adapters, independent vectors and sessions |
 | BPT | Coordinator semantic model and measured-zero/new-permission invariants; wire feature disabled | ISO-20 BPT services/loops, vehicle capability contract, reversal/cancel/expiry integration; protocol support alone cannot authorize powertrain reversal |
 | Network/PLC | Real unicast loopback IPv6 SDP and TCP before SAP/EXI | Multicast/link-local scopes, retries, real modem/SLAC and selected TcpIp/SoAd integration |

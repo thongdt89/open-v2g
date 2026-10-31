@@ -74,6 +74,33 @@ int main(int argc, char **argv)
     TEST_ASSERT(Ov2g_CryptoPump(&crypto, 7u, now) == OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(Ov2g_CryptoTakeResult(&crypto, 8u, 31u, &result) == OPENV2G_RESULT_BUSY);
     TEST_ASSERT(complete(&crypto, 8u, 31u, &result) == 0 && result.result == OPENV2G_RESULT_OK);
+    {
+        uint32_t leases[OV2G_CRYPTO_LEASES], extra, version = crypto.versions[0];
+        for (i = 0u; i < OV2G_CRYPTO_LEASES; ++i) {
+            TEST_ASSERT(Ov2g_CryptoAcquireKeyLease(&crypto,8u,1u,version,&leases[i]) == OPENV2G_RESULT_OK);
+        }
+        TEST_ASSERT(Ov2g_CryptoAcquireKeyLease(&crypto,8u,1u,version,&extra) == OPENV2G_RESULT_OVERFLOW);
+        TEST_ASSERT(Ov2g_CryptoLoadPrivateKey(&crypto,1u,key) == OPENV2G_RESULT_BUSY);
+        TEST_ASSERT(Ov2g_CryptoReleaseKeyLease(&crypto,7u,leases[0]) == OPENV2G_RESULT_REJECTED);
+        TEST_ASSERT(Ov2g_CryptoKeyLeaseIsCurrent(&crypto,8u,leases[0],1u,version));
+        TEST_ASSERT(Ov2g_CryptoBeginGeneration(&crypto,8u) == OPENV2G_RESULT_OK);
+        TEST_ASSERT(Ov2g_CryptoKeyLeaseIsCurrent(&crypto,8u,leases[0],1u,version));
+        for (i = 0u; i < OV2G_CRYPTO_LEASES; ++i) {
+            TEST_ASSERT(Ov2g_CryptoReleaseKeyLease(&crypto,8u,leases[i]) == OPENV2G_RESULT_OK);
+        }
+        TEST_ASSERT(Ov2g_CryptoReleaseKeyLease(&crypto,8u,leases[0]) == OPENV2G_RESULT_REJECTED);
+        TEST_ASSERT(Ov2g_CryptoLoadPrivateKey(&crypto,1u,key) == OPENV2G_RESULT_OK && crypto.versions[0] != version);
+        TEST_ASSERT(Ov2g_CryptoAcquireKeyLease(&crypto,8u,1u,version,&extra) == OPENV2G_RESULT_REJECTED);
+        TEST_ASSERT(Ov2g_CryptoAcquireKeyLease(&crypto,8u,1u,crypto.versions[0],&extra) == OPENV2G_RESULT_OK);
+        TEST_ASSERT(Ov2g_CryptoBeginGeneration(&crypto,9u) == OPENV2G_RESULT_OK);
+        TEST_ASSERT(Ov2g_CryptoReleaseKeyLease(&crypto,8u,extra) == OPENV2G_RESULT_REJECTED);
+        TEST_ASSERT(Ov2g_CryptoLoadPrivateKey(&crypto,1u,key) == OPENV2G_RESULT_OK);
+    }
+    {
+        void *previous = crypto.keys[0];
+        crypto.versions[0] = UINT32_MAX;
+        TEST_ASSERT(Ov2g_CryptoLoadPrivateKey(&crypto,1u,key) == OPENV2G_RESULT_OVERFLOW && crypto.keys[0] == previous && crypto.versions[0] == UINT32_MAX);
+    }
     Ov2g_CryptoClose(&crypto); Ov2g_CryptoClose(&crypto); TEST_ASSERT(crypto.generation == 0u);
     return 0;
 }

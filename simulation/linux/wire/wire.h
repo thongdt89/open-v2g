@@ -2,6 +2,7 @@
 #define OPENV2G_LINUX_WIRE_H
 #include "openv2g/linux/bsw.h"
 #include "openv2g/linux/tls.h"
+#include "openv2g/linux/crypto.h"
 #include "openv2g/exi_cbv2g_sap.h"
 #include "openv2g/exi_cbv2g_dc.h"
 #define OV_WIRE_FRAME_MAX (OPENV2G_EXI_DC_PAYLOAD_MAX + OPENV2G_V2GTP_HEADER_SIZE)
@@ -47,7 +48,7 @@ typedef enum {
     OV_WIRE_REPLAY_SAP = 9, OV_WIRE_WRONG_SCHEDULE = 10,
     OV_WIRE_WRONG_EVSE = 11, OV_WIRE_WRONG_SCHEMA = 12,
     OV_WIRE_ZERO_PRECHARGE = 13, OV_WIRE_WELDED = 14, OV_WIRE_MINOR_DEVIATION = 15, OV_WIRE_PENDING = 16, OV_WIRE_DYNAMIC_LIMIT = 17, OV_WIRE_METERING = 18, OV_WIRE_SIGNED_METER = 19,
-    OV_WIRE_AC = 20, OV_WIRE_AC_METERING = 21, OV_WIRE_AC_RCD = 22, OV_WIRE_AC_WRONG_MODE = 23, OV_WIRE_RECEIPT_POLICY = 24, OV_WIRE_PAUSE = 25, OV_WIRE_RESUME = 26, OV_WIRE_PAUSE_AC = 27, OV_WIRE_RESUME_AC = 28, OV_WIRE_RENEGOTIATE = 29, OV_WIRE_RENEGOTIATE_AC = 30
+    OV_WIRE_AC = 20, OV_WIRE_AC_METERING = 21, OV_WIRE_AC_RCD = 22, OV_WIRE_AC_WRONG_MODE = 23, OV_WIRE_RECEIPT_POLICY = 24, OV_WIRE_PAUSE = 25, OV_WIRE_RESUME = 26, OV_WIRE_PAUSE_AC = 27, OV_WIRE_RESUME_AC = 28, OV_WIRE_RENEGOTIATE = 29, OV_WIRE_RENEGOTIATE_AC = 30, OV_WIRE_SIGNED_RECEIPT = 31, OV_WIRE_SIGNED_RECEIPT_AC = 32
 } OvWireScenario;
 
 typedef struct {
@@ -58,6 +59,12 @@ typedef struct {
     Ov2g_Tls tls;
     Ov2g_TlsConfig tls_config;
     bool tls_enabled;
+    Ov2g_Crypto *receipt_crypto; /* Borrowed service instance; lifetime covers Run/resume. */
+    uint32_t receipt_signing_key;
+    uint32_t receipt_key_version;
+    uint32_t receipt_key_lease;
+    uint32_t receipt_job;
+    OpenV2g_ExiDcDocument prepared_receipt;
 #endif
     OpenV2g_SapTxRequest pending_sap;
     OpenV2g_ProtocolTxRequest pending_protocol;
@@ -82,6 +89,15 @@ typedef struct {
 } OvWireClient;
 
 #ifdef OPENV2G_HAVE_OPENSSL_HOST
+bool OvWireClient_SetReceiptSigner(OvWireClient *client, Ov2g_Crypto *crypto, uint32_t key);
+bool OvWireStation_RunSigned(int listener, bool ac_mode, const Ov2g_TlsConfig *tls_config,
+    Ov2g_Crypto *verification_crypto, uint32_t key);
+bool OvWireStation_RunDiscoveredSigned(int listener, int udp, uint16_t tcp_port, bool ac_mode,
+    const Ov2g_TlsConfig *tls_config, Ov2g_Crypto *verification_crypto, uint32_t key);
+bool OvWireSignReceipt(Ov2g_Crypto *crypto, uint32_t generation, uint32_t key,
+    uint32_t job, OpenV2g_ExiDcDocument *document, OpenV2g_TimeUs deadline, uint32_t *key_version);
+bool OvWireVerifyReceipt(Ov2g_Crypto *crypto, uint32_t generation, uint32_t key,
+    uint32_t job, const OpenV2g_ExiDcDocument *document, OpenV2g_TimeUs deadline);
 /* Config path/name strings must outlive Run/start; no private bytes cross this seam. */
 bool OvWireClient_SetTls(OvWireClient *client, const Ov2g_TlsConfig *config);
 bool OvWireIo_Handshake(OvWireIo *io, Ov2g_Tls *tls, const Ov2g_TlsConfig *config);

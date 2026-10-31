@@ -1,0 +1,61 @@
+{
+  "date": "2026-10-31",
+  "base_commit": "1dcea23",
+  "scope": "Restricted signed ISO-2 receipt host profile with explicit fixture key pinning. Not production PnC, normative profile qualification or target safety. OpenSSL shared libraries are outside sanitizer instrumentation.",
+  "builds": {
+    "normal_generated_openssl_oracle": {
+      "passed": 40,
+      "failed": 0,
+      "ctest_log_sha256": "b2fc9a856830c4ed29c4773dd84915b52cc166bb24b2e32664ae1f85c1b011f5"
+    },
+    "asan_ubsan_generated_openssl": {
+      "passed": 38,
+      "failed": 0,
+      "ctest_log_sha256": "1243e06223da4d2307c2e74f14d2f874de2193960b25864fd4cda4fabd0ae27a"
+    },
+    "generated_oracle_openssl_off": {
+      "passed": 34,
+      "failed": 0,
+      "ctest_log_sha256": "991a7058d81bbb53fd77e4c74e7981f0dbe9e2b50b312b54bf5ecb7dc895b329"
+    },
+    "default_codecs_openssl_off": {
+      "passed": 25,
+      "failed": 0,
+      "ctest_log_sha256": "eebf4b59d008fdb1c67cca77ebdb3fb0ae2b6b5053bfb42e07f8d6b2c79509ee"
+    }
+  },
+  "independent_checks": [
+    "Python cryptography verifies SHA256 body digest and P-256 signature",
+    "Separate pinned EXI oracle round-trips signed document, MeteringReceiptReq fragment and SignedInfo fragment"
+  ],
+  "signed_socket_sessions": 6,
+  "negative_cases": [
+    "wrong key",
+    "tampered body/signature/Id",
+    "unsupported method/reference/cardinality/length",
+    "wrong generation/deadline",
+    "queue and key-lease exhaustion",
+    "key reload during pending transmission",
+    "key-version overflow"
+  ],
+  "project_source_sha256": {
+    "include/openv2g/iso15118_chrg/protocol_adapter.h": "afa8e37bc563305fc206c0da67955b8e9f25ebb7bfa16e135c5075bac0d7f729",
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_din.c": "0f3cf74e79c43d5cb9877b1575ea416151692304649738957ceba222b9587044",
+    "integration/protocol/adapters/cbv2g/exi_cbv2g_iso2.c": "81c0aa02318260e0b74fb629f840a6380a65fa5c5e600460da69860367e64e43",
+    "integration/protocol/adapters/cbv2g/include/openv2g/exi_cbv2g_dc.h": "718528906f1694797546ba71e37ec1af790fe934f6599efb217c657c28fc9ca2",
+    "simulation/linux/include/openv2g/linux/crypto.h": "5ddc0efec5eb5d0bd61a148a0750244d7054db2e32282d9e82abe50d285249f7",
+    "simulation/linux/src/crypto.c": "931e603b4274d278e68fd1949b43b80fd8bf0bc3aa6d6ce4a9c8e6f6ac9415fb",
+    "simulation/linux/tests/test_crypto.c": "abbcabc20f2a75d1a4a51c526cf815d678426dd1f914844e0977f7841a62411c",
+    "simulation/linux/wire/CMakeLists.txt": "08a3fb92fa542059041589ddea1f20523352828564f76b174dffa3a66a8962e7",
+    "simulation/linux/wire/client.c": "77329cb9af7cf4cff3e40a79c2dbde1f4e9a9c5dbb98f7f77703a8f462265f87",
+    "simulation/linux/wire/signature.c": "f8ff08939fb6e9d0d3032de75540fc7e1465d0f14ab2573c4db88a2aa42aa5df",
+    "simulation/linux/wire/station.c": "bd30821510218bd06ee7b43596519fe1a1150dfabd0cbe914863893e1afa66e9",
+    "simulation/linux/wire/test_signature.c": "65237e1ffaca2fe1a7426d10c47406986f00c790939aae853ada6268484c332c",
+    "simulation/linux/wire/test_wire_signed.c": "e503963f63ca04513568b326da16462c0bbe8d7ba62d10e4f741b3df1242af1c",
+    "simulation/linux/wire/wire.h": "4fd082d779b141a78ff68a9d7f510cfb0345b8906f6b50afe81621131781eed8",
+    "src/iso15118_chrg/iso15118_2_adapter.c": "d1d456d02c0c6309a8ab7f914708e1c1cb7ece0e7083403f3bcb7dad160d9c30",
+    "src/iso15118_chrg/protocol_data_flow.c": "41bf9f6aa9a57953e9fdd390708a338a10cb94a9dbb9144c0f1c4aafd2c56d39",
+    "tests/oracle/openv2g_oracle.c": "09467b02c3647110307f8996d63c8cc3c12da53dd094d011ac8471e4e5772c3e",
+    "tests/security/fixture.py": "ca617431c1c64533306fca84645a22998d11572904a997d36398fbfea792a8dd"
+  }
+}

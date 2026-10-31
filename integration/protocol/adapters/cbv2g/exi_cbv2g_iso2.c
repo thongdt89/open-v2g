@@ -95,6 +95,57 @@ static bool meter_in(const struct iso2_MeterInfoType *source, OpenV2g_ExiMeterIn
     }
     return true;
 }
+/* Restricted, auditable host XMLDSIG profile: one local MeteringReceiptReq. */
+#define CANONICAL_EXI "http://www.w3.org/TR/canonical-exi/"
+#define ECDSA_SHA256 "http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256"
+#define DIGEST_SHA256 "http://www.w3.org/2001/04/xmlenc#sha256"
+#define TEXT_SET(field, text) do { (field).charactersLen = (uint16_t)(sizeof(text) - 1u); (void)memcpy((field).characters, text, sizeof(text) - 1u); } while (0)
+#define TEXT_IS(field, text) ((field).charactersLen == sizeof(text) - 1u && memcmp((field).characters, text, sizeof(text) - 1u) == 0)
+static bool signature_id_valid(const OpenV2g_ExiSignature *signature)
+{
+    unsigned i;
+    if (signature->body_id_length == 0u || signature->body_id_length > sizeof(signature->body_id)) { return false; }
+    for (i = 0u; i < signature->body_id_length; ++i) {
+        unsigned char c = (unsigned char)signature->body_id[i];
+        bool letter = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_';
+        if (!letter && (i == 0u || !((c >= '0' && c <= '9') || c == '-' || c == '.'))) { return false; }
+    }
+    return true;
+}
+static bool signed_info_out(const OpenV2g_ExiSignature *source, struct iso2_SignedInfoType *target)
+{
+    struct iso2_ReferenceType *reference = &target->Reference.array[0];
+    REQUIRE(signature_id_valid(source));
+    REQUIRE(source->body_id_length + 1u <= sizeof(reference->URI.characters));
+    TEXT_SET(target->CanonicalizationMethod.Algorithm, CANONICAL_EXI);
+    TEXT_SET(target->SignatureMethod.Algorithm, ECDSA_SHA256);
+    target->Reference.arrayLen = 1u; reference->URI_isUsed = 1u;
+    reference->URI.characters[0] = '#'; reference->URI.charactersLen = source->body_id_length + 1u;
+    (void)memcpy(reference->URI.characters + 1u, source->body_id, source->body_id_length);
+    reference->Transforms_isUsed = 1u; TEXT_SET(reference->Transforms.Transform.Algorithm, CANONICAL_EXI);
+    TEXT_SET(reference->DigestMethod.Algorithm, DIGEST_SHA256);
+    reference->DigestValue.bytesLen = 32u; (void)memcpy(reference->DigestValue.bytes, source->digest, 32u);
+    return true;
+}
+static bool signature_in(const struct iso2_SignatureType *source, OpenV2g_ExiSignature *target)
+{
+    const struct iso2_SignedInfoType *info = &source->SignedInfo;
+    const struct iso2_ReferenceType *reference = &info->Reference.array[0];
+    REQUIRE(!source->Id_isUsed && !source->KeyInfo_isUsed && !source->Object_isUsed && !source->SignatureValue.Id_isUsed);
+    REQUIRE(source->SignatureValue.CONTENT.bytesLen == 64u && !info->Id_isUsed && info->Reference.arrayLen == 1u);
+    REQUIRE(!info->CanonicalizationMethod.ANY_isUsed && TEXT_IS(info->CanonicalizationMethod.Algorithm, CANONICAL_EXI));
+    REQUIRE(!info->SignatureMethod.ANY_isUsed && !info->SignatureMethod.HMACOutputLength_isUsed && TEXT_IS(info->SignatureMethod.Algorithm, ECDSA_SHA256));
+    REQUIRE(!reference->Id_isUsed && !reference->Type_isUsed && reference->URI_isUsed &&
+        reference->URI.charactersLen == target->body_id_length + 1u && reference->URI.characters[0] == '#');
+    REQUIRE(signature_id_valid(target) && memcmp(reference->URI.characters + 1u, target->body_id, target->body_id_length) == 0);
+    REQUIRE(reference->Transforms_isUsed && !reference->Transforms.Transform.ANY_isUsed && !reference->Transforms.Transform.XPath_isUsed &&
+        TEXT_IS(reference->Transforms.Transform.Algorithm, CANONICAL_EXI));
+    REQUIRE(!reference->DigestMethod.ANY_isUsed && TEXT_IS(reference->DigestMethod.Algorithm, DIGEST_SHA256) && reference->DigestValue.bytesLen == 32u);
+    (void)memcpy(target->digest, reference->DigestValue.bytes, 32u);
+    (void)memcpy(target->value, source->SignatureValue.CONTENT.bytes, 64u);
+    return true;
+}
+
 static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocument *generated)
 {
     struct iso2_BodyType *body = &generated->V2G_Message.Body;
@@ -166,6 +217,11 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
         case OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT:
             REQUIRE(value->has_meter_info);
             body->MeteringReceiptReq_isUsed = 1u;
+            if (value->signature.body_id_length != 0u) {
+                REQUIRE(signature_id_valid(&value->signature) && value->signature.body_id_length <= sizeof(body->MeteringReceiptReq.Id.characters));
+                body->MeteringReceiptReq.Id_isUsed = 1u; body->MeteringReceiptReq.Id.charactersLen = value->signature.body_id_length;
+                (void)memcpy(body->MeteringReceiptReq.Id.characters, value->signature.body_id, value->signature.body_id_length);
+            }
             body->MeteringReceiptReq.SessionID.bytesLen = 8u;
             (void)memcpy(body->MeteringReceiptReq.SessionID.bytes, value->session_id, 8u);
             body->MeteringReceiptReq.SAScheduleTupleID_isUsed = 1u;
@@ -353,6 +409,13 @@ static bool to_generated(const OpenV2g_ExiDcDocument *value, struct iso2_exiDocu
         default: return false;
         }
     }
+    if (value->has_signature) {
+        REQUIRE(!value->response && value->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT);
+        generated->V2G_Message.Header.Signature_isUsed = 1u;
+        REQUIRE(signed_info_out(&value->signature, &generated->V2G_Message.Header.Signature.SignedInfo));
+        generated->V2G_Message.Header.Signature.SignatureValue.CONTENT.bytesLen = 64u;
+        (void)memcpy(generated->V2G_Message.Header.Signature.SignatureValue.CONTENT.bytes, value->signature.value, 64u);
+    }
     return true;
 }
 static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_ExiDcDocument *value)
@@ -362,7 +425,7 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
     unsigned selected = 0u;
     (void)physical;
     REQUIRE(generated->V2G_Message.Header.SessionID.bytesLen == 8u);
-    REQUIRE(!generated->V2G_Message.Header.Signature_isUsed && !generated->V2G_Message.Header.Notification_isUsed);
+    REQUIRE(!generated->V2G_Message.Header.Notification_isUsed);
     (void)memcpy(value->session_id, generated->V2G_Message.Header.SessionID.bytes, 8u);
     if (body->SessionSetupReq_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_SESSION_SETUP; value->response = false;
         REQUIRE(body->SessionSetupReq.EVCCID.bytesLen == 6u); (void)memcpy(value->evcc_id, body->SessionSetupReq.EVCCID.bytes, 6u);
@@ -569,7 +632,13 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
         REQUIRE(!value->receipt_required || value->has_meter_info);
     }
     if (body->MeteringReceiptReq_isUsed) { ++selected; value->kind = OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT;
-        REQUIRE(!body->MeteringReceiptReq.Id_isUsed && body->MeteringReceiptReq.SessionID.bytesLen == 8u);
+        REQUIRE(body->MeteringReceiptReq.SessionID.bytesLen == 8u);
+        if (body->MeteringReceiptReq.Id_isUsed) {
+            REQUIRE(body->MeteringReceiptReq.Id.charactersLen > 0u && body->MeteringReceiptReq.Id.charactersLen <= sizeof(value->signature.body_id));
+            value->signature.body_id_length = body->MeteringReceiptReq.Id.charactersLen;
+            (void)memcpy(value->signature.body_id, body->MeteringReceiptReq.Id.characters, value->signature.body_id_length);
+            REQUIRE(signature_id_valid(&value->signature));
+        }
         REQUIRE(memcmp(body->MeteringReceiptReq.SessionID.bytes, value->session_id, 8u) == 0);
         REQUIRE(body->MeteringReceiptReq.SAScheduleTupleID_isUsed && body->MeteringReceiptReq.SAScheduleTupleID != 0u);
         value->schedule_id = body->MeteringReceiptReq.SAScheduleTupleID; value->has_meter_info = true;
@@ -625,6 +694,10 @@ static bool from_generated(const struct iso2_exiDocument *generated, OpenV2g_Exi
         value->accepted = body->SessionStopRes.ResponseCode == iso2_responseCodeType_OK;
     }
     REQUIRE(selected == 1u);
+    if (generated->V2G_Message.Header.Signature_isUsed) {
+        REQUIRE(value->kind == OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT && !value->response);
+        REQUIRE(signature_in(&generated->V2G_Message.Header.Signature, &value->signature)); value->has_signature = true;
+    }
     return true;
 }
 
@@ -693,4 +766,42 @@ OpenV2g_Result OpenV2g_Cbv2gIso2_Bind(OpenV2g_ExiCodec *codec)
     };
     const OpenV2g_ExiBackend backend = {NULL, encode, decode, reset};
     return OpenV2g_ExiCodec_Bind(codec, &descriptor, &backend);
+}
+
+static OpenV2g_Result encode_fragment(struct iso2_exiFragment *fragment, uint8_t *output, size_t capacity, size_t *length)
+{
+    uint8_t guarded[OPENV2G_EXI_DC_WORKSPACE_SIZE] = {0};
+    exi_bitstream_t stream;
+    if (length != NULL) { *length = 0u; }
+    if (output == NULL || length == NULL || capacity == 0u) { return OPENV2G_RESULT_REJECTED; }
+    if (capacity > OPENV2G_EXI_DC_PAYLOAD_MAX) { capacity = OPENV2G_EXI_DC_PAYLOAD_MAX; }
+    exi_bitstream_init(&stream, guarded, capacity, 0u, NULL);
+    if (encode_iso2_exiFragment(&stream, fragment) != 0 || exi_bitstream_get_length(&stream) > capacity) { return OPENV2G_RESULT_REJECTED; }
+    *length = exi_bitstream_get_length(&stream); (void)memcpy(output, guarded, *length); return OPENV2G_RESULT_OK;
+}
+OpenV2g_Result OpenV2g_Cbv2gIso2_ReceiptFragment(const OpenV2g_ExiDcDocument *document,
+    uint8_t *output, size_t capacity, size_t *length)
+{
+    OpenV2g_ExiDcDocument unsigned_document;
+    struct iso2_exiDocument generated;
+    struct iso2_exiFragment fragment;
+    if (length != NULL) { *length = 0u; }
+    if (document == NULL || document->kind != OPENV2G_PROTOCOL_MESSAGE_METERING_RECEIPT || document->response ||
+        !signature_id_valid(&document->signature)) { return OPENV2G_RESULT_REJECTED; }
+    unsigned_document = *document; unsigned_document.has_signature = false;
+    (void)memset(&generated, 0, sizeof(generated)); init_iso2_exiDocument(&generated);
+    if (!to_generated(&unsigned_document, &generated)) { return OPENV2G_RESULT_REJECTED; }
+    (void)memset(&fragment, 0, sizeof(fragment)); fragment.MeteringReceiptReq_isUsed = 1u;
+    fragment.MeteringReceiptReq = generated.V2G_Message.Body.MeteringReceiptReq;
+    return encode_fragment(&fragment, output, capacity, length);
+}
+OpenV2g_Result OpenV2g_Cbv2gIso2_SignedInfoFragment(const OpenV2g_ExiSignature *signature,
+    uint8_t *output, size_t capacity, size_t *length)
+{
+    struct iso2_exiFragment fragment;
+    if (length != NULL) { *length = 0u; }
+    if (signature == NULL) { return OPENV2G_RESULT_REJECTED; }
+    (void)memset(&fragment, 0, sizeof(fragment)); fragment.SignedInfo_isUsed = 1u;
+    if (!signed_info_out(signature, &fragment.SignedInfo)) { return OPENV2G_RESULT_REJECTED; }
+    return encode_fragment(&fragment, output, capacity, length);
 }

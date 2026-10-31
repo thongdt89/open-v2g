@@ -21,9 +21,51 @@ void Ov2g_CryptoClose(Ov2g_Crypto *crypto)
 OpenV2g_Result Ov2g_CryptoBeginGeneration(Ov2g_Crypto *crypto, uint32_t generation)
 {
     if (crypto == NULL || generation == 0u) { return OPENV2G_RESULT_REJECTED; }
-    if (generation != crypto->generation) { OPENSSL_cleanse(crypto->jobs, sizeof(crypto->jobs)); crypto->generation = generation; }
+    if (generation != crypto->generation) { OPENSSL_cleanse(crypto->jobs, sizeof(crypto->jobs));
+        (void)memset(crypto->leases,0,sizeof(crypto->leases)); crypto->next_lease_id = 0u; crypto->generation = generation; }
     return OPENV2G_RESULT_OK;
 }
+OpenV2g_Result Ov2g_CryptoAcquireKeyLease(Ov2g_Crypto *crypto, uint32_t generation,
+    uint32_t key_handle, uint32_t key_version, uint32_t *lease_id)
+{
+    unsigned i;
+    if (lease_id != NULL) { *lease_id = 0u; }
+    if (crypto == NULL || lease_id == NULL || generation == 0u || crypto->generation != generation ||
+        key_handle == 0u || key_handle > OV2G_CRYPTO_KEYS || key_version == 0u ||
+        crypto->keys[key_handle-1u] == NULL || crypto->versions[key_handle-1u] != key_version) { return OPENV2G_RESULT_REJECTED; }
+    if (crypto->next_lease_id == UINT32_MAX) { return OPENV2G_RESULT_OVERFLOW; }
+    for (i = 0u; i < OV2G_CRYPTO_LEASES; ++i) {
+        if (crypto->leases[i].id == 0u) {
+            crypto->leases[i] = (Ov2g_CryptoKeyLease){++crypto->next_lease_id,key_handle,key_version,generation};
+            *lease_id = crypto->leases[i].id; return OPENV2G_RESULT_OK;
+        }
+    }
+    return OPENV2G_RESULT_OVERFLOW;
+}
+bool Ov2g_CryptoKeyLeaseIsCurrent(const Ov2g_Crypto *crypto, uint32_t generation,
+    uint32_t lease_id, uint32_t key_handle, uint32_t key_version)
+{
+    unsigned i;
+    if (crypto == NULL || generation == 0u || crypto->generation != generation || lease_id == 0u ||
+        key_handle == 0u || key_handle > OV2G_CRYPTO_KEYS || crypto->versions[key_handle-1u] != key_version) { return false; }
+    for (i = 0u; i < OV2G_CRYPTO_LEASES; ++i) {
+        if (crypto->leases[i].id == lease_id && crypto->leases[i].generation == generation &&
+            crypto->leases[i].key_handle == key_handle && crypto->leases[i].key_version == key_version) { return true; }
+    }
+    return false;
+}
+OpenV2g_Result Ov2g_CryptoReleaseKeyLease(Ov2g_Crypto *crypto, uint32_t generation, uint32_t lease_id)
+{
+    unsigned i;
+    if (crypto == NULL || generation == 0u || crypto->generation != generation || lease_id == 0u) { return OPENV2G_RESULT_REJECTED; }
+    for (i = 0u; i < OV2G_CRYPTO_LEASES; ++i) {
+        if (crypto->leases[i].id == lease_id && crypto->leases[i].generation == generation) {
+            (void)memset(&crypto->leases[i],0,sizeof(crypto->leases[i])); return OPENV2G_RESULT_OK;
+        }
+    }
+    return OPENV2G_RESULT_REJECTED;
+}
+
 static int no_password(char *buffer, int size, int writing, void *context)
 {
     (void)buffer; (void)size; (void)writing; (void)context; return 0;
@@ -40,6 +82,10 @@ static OpenV2g_Result load(Ov2g_Crypto *crypto, uint32_t handle, const char *pat
     for (i = 0u; i < OV2G_CRYPTO_JOBS; ++i) {
         if (crypto->jobs[i].used && !crypto->jobs[i].done && crypto->jobs[i].result.key_handle == handle) { return OPENV2G_RESULT_BUSY; }
     }
+    for (i = 0u; i < OV2G_CRYPTO_LEASES; ++i) {
+        if (crypto->leases[i].id != 0u && crypto->leases[i].key_handle == handle) { return OPENV2G_RESULT_BUSY; }
+    }
+    if (crypto->versions[handle - 1u] == UINT32_MAX) { return OPENV2G_RESULT_OVERFLOW; }
     ERR_clear_error(); bio = BIO_new_file(path, "r");
     if (bio == NULL) { return OPENV2G_RESULT_REJECTED; }
     if (private_key) { key = PEM_read_bio_PrivateKey(bio, NULL, no_password, NULL); }
@@ -56,7 +102,7 @@ static OpenV2g_Result load(Ov2g_Crypto *crypto, uint32_t handle, const char *pat
     EVP_PKEY_CTX_free(context);
     if (!valid) { EVP_PKEY_free(key); return OPENV2G_RESULT_REJECTED; }
     EVP_PKEY_free(crypto->keys[handle - 1u]); crypto->keys[handle - 1u] = key;
-    if (++crypto->versions[handle - 1u] == 0u) { crypto->versions[handle - 1u] = 1u; }
+    ++crypto->versions[handle - 1u];
     crypto->can_sign[handle - 1u] = private_key; return OPENV2G_RESULT_OK;
 }
 OpenV2g_Result Ov2g_CryptoLoadPrivateKey(Ov2g_Crypto *crypto, uint32_t handle, const char *path) { return load(crypto, handle, path, true); }

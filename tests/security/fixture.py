@@ -1,6 +1,8 @@
 """Ephemeral test-only credentials. No private material is committed or printed."""
 import datetime as dt
 import ipaddress
+import hashlib
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -77,3 +79,19 @@ if __name__ == "__main__":
                 raise AssertionError("Invalid raw P-256 signature size")
             public = x509.load_pem_x509_certificate((folder / "server.pem").read_bytes()).public_key()
             public.verify(utils.encode_dss_signature(int.from_bytes(signature[:32], "big"), int.from_bytes(signature[32:], "big")), b"abc", ec.ECDSA(hashes.SHA256()))
+
+        receipt_signature = folder / "receipt.sig"
+        if receipt_signature.exists():
+            signature = receipt_signature.read_bytes()
+            if len(signature) != 64:
+                raise AssertionError("Invalid receipt signature size")
+            public = x509.load_pem_x509_certificate((folder / "client.pem").read_bytes()).public_key()
+            public.verify(utils.encode_dss_signature(int.from_bytes(signature[:32], "big"), int.from_bytes(signature[32:], "big")),
+                          (folder / "receipt-info.exi").read_bytes(), ec.ECDSA(hashes.SHA256()))
+            assert hashlib.sha256((folder / "receipt-body.exi").read_bytes()).digest() == (folder / "receipt-digest.bin").read_bytes()
+            oracle = os.environ.get("OPENV2G_EXI_ORACLE")
+            if oracle:
+                for name, schema in [("receipt.exi", "iso2"), ("receipt-body.exi", "iso2-fragment"), ("receipt-info.exi", "iso2-fragment")]:
+                    data = (folder / name).read_bytes()
+                    result = subprocess.run([oracle, schema], input=data, capture_output=True, check=True, timeout=5)
+                    assert result.stdout == data, name

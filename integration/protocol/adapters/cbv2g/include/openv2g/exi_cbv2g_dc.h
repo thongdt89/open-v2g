@@ -27,12 +27,21 @@ typedef struct {
     uint16_t signature_length;
     uint8_t signature[OPENV2G_EXI_METER_SIGNATURE_MAX];
 } OpenV2g_ExiMeterInfo;
+#define OPENV2G_EXI_SIGNATURE_ID_MAX 32u
+typedef struct {
+    char body_id[OPENV2G_EXI_SIGNATURE_ID_MAX];
+    uint16_t body_id_length;
+    uint8_t digest[32];
+    uint8_t value[64]; /* Raw P-256 r || s; not DER. */
+} OpenV2g_ExiSignature;
 /* Bounded host data model; capacities are explicit, not imported ABI.
  * No imported/generated type is exported. Physical fields use project SI units.
  */
 typedef struct {
     OpenV2g_ProtocolMessageKind kind;
     bool response;
+    bool has_signature;
+    OpenV2g_ExiSignature signature;
     bool accepted;
     bool new_session;
     bool ongoing;
@@ -78,6 +87,11 @@ typedef struct {
     int32_t schedule_power_w;
     uint32_t schedule_duration_s;
 } OpenV2g_ExiDcDocument;
+/* Strict one-local-reference ISO-2 receipt profile. Serialization is not trust verification. */
+OpenV2g_Result OpenV2g_Cbv2gIso2_ReceiptFragment(const OpenV2g_ExiDcDocument *document,
+    uint8_t *output, size_t capacity, size_t *length);
+OpenV2g_Result OpenV2g_Cbv2gIso2_SignedInfoFragment(const OpenV2g_ExiSignature *signature,
+    uint8_t *output, size_t capacity, size_t *length);
 OpenV2g_Result OpenV2g_Cbv2gDin_Bind(OpenV2g_ExiCodec *codec);
 OpenV2g_Result OpenV2g_Cbv2gIso2_Bind(OpenV2g_ExiCodec *codec);
 /* Configuration defaults for a closed host test fixture, never a normative profile. */

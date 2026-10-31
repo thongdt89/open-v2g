@@ -256,7 +256,8 @@ static OpenV2g_Result advance_charge_loop(
             (message->metering_evidence.evidence_id == 0u) ||
             (message->metering_evidence.source_correlation_id !=
              message->correlation_id) ||
-            message->metering_evidence.signature_required) {
+            (message->metering_evidence.signature_required &&
+             (!message->metering_evidence.signature_ready || message->metering_evidence.signing_key_version == 0u))) {
             fail_adapter(
                 adapter,
                 message->kind,

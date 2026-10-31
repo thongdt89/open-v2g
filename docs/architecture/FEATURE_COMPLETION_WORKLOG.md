@@ -209,3 +209,21 @@ remain open; this increment does not claim full completion.
 Final verification for this increment: **38/38** normal, **36/36** ASan/UBSan
 and **25/25** default-codec/OpenSSL-OFF checks passed. See
 [verification and source hashes](evidence/session_lifecycle_verification.json).
+
+## Restricted signed receipts — 31/10/2026
+
+Added bounded ISO-2 MeteringReceiptReq XMLDSIG mapping and fixed one-local-
+reference profile. Actual SHA256/P-256 jobs sign/verify body and SignedInfo
+fragments; unsupported algorithms/extra references/Id mismatch fail closed.
+Station tests verify signed AC/DC receipts over TLS using explicit provisioned
+public-key handles, with no unsigned fallback. Key-version leases prevent reload
+while a prepared receipt is in flight and are retired on acknowledgement/cancel.
+
+Independent Python verifies the digest/signature; the separate pinned oracle
+round-trips the signed document and both fragments. Fixture key pinning does not
+complete PnC, certificate provisioning/transactions or OEM trust/time/revocation
+policy. See [host signature guide](../../simulation/linux/SIGNED_RECEIPTS.md).
+
+Verification for signed receipts: **40/40** normal, **38/38** sanitizer,
+**34/34** generated-code/OpenSSL-OFF and **25/25** default-build checks passed.
+See [verification/source hashes](evidence/signed_receipt_verification.json).

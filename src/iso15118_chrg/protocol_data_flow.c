@@ -435,7 +435,8 @@ OpenV2g_Result OpenV2g_ProtocolDataFlow_PrepareRequest(
         if ((metering_evidence == NULL) ||
             (metering_evidence->generation != generation) ||
             (metering_evidence->evidence_id == 0u) ||
-            (metering_evidence->source_correlation_id == 0u)) {
+            (metering_evidence->source_correlation_id == 0u) ||
+            (metering_evidence->signature_required && (!metering_evidence->signature_ready || metering_evidence->signing_key_version == 0u))) {
             *reason = OPENV2G_REASON_PRECONDITION;
             return OPENV2G_RESULT_REJECTED;
         }

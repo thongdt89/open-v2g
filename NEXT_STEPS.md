@@ -1,3 +1,12 @@
+## Current continuation — signatures, 31/10/2026
+
+Restricted signed ISO-2 receipts and prepared-signature key leases now extend
+the TLS host profile. Continue credential transactions/trust/time and PnC
+challenge binding, then richer AC/service/schedule profiles and ISO-20/BPT.
+The requested production edition/PKI profile remains an external input; generic
+Linux host work can continue independently. See
+[signed receipt scope](simulation/linux/SIGNED_RECEIPTS.md).
+
 ## Current continuation — session lifecycle, 30/10/2026
 
 Independent limit intersection, protocol readiness, portable session validation,
