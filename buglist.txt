@@ -1,0 +1,109 @@
+EVCC bug-fix tasks
+Created: 2026-10-31
+Review baseline: 4f4df51184d2c279c86e791681201f601fc3c759
+Source: docs/architecture/reviews/ARCHITECTURE_REVIEW_2026-10-31.md
+Task labels below are local tracking labels, not requirement IDs.
+
+[x] TASK-1 | P1 | Stop active charging when HLC event overflow revokes permission
+Status: FIXED — implementation 91cd37030d2af3c1c0a28616561ad34415e24704
+Review finding: 1
+Primary file: src/charging_coordinator/charging_coordinator.c
+Operations: MarkHlcEventOverflow, EvaluatePermission, Tick
+
+Problem:
+  MarkHlcEventOverflow revokes permission and requires status resynchronization
+  without starting a hardware safe-state/stop transaction. EvaluatePermission
+  returns early during resynchronization; Tick only checks permission expiry
+  while ALLOW. Simulated hardware can therefore remain ENERGIZED under DENY.
+
+Reproduction:
+  Establish energy transfer at time 160. Mark current-generation HLC overflow
+  at 170, evaluate permission at 171, then Tick(10000000). At the review
+  baseline, permission is DENY, hardware is ENERGIZED, safe_requested is false
+  and teardown_started is false.
+  Historical probe: docs/architecture/reviews/evidence/architecture_probe_20261031.c
+
+Implementation task:
+  Route active charging overflow through the coordinator's idempotent stop
+  transaction after revoking permission. Preserve the resynchronization state
+  and existing stop deadline/result. Fresh or late HLC status must not cancel
+  the stop or restart transfer. Keep hardware command ownership in the
+  coordinator and require measured safe-state confirmation for completion.
+  Do not invent actuator retry policy or vehicle safety deadlines.
+
+Acceptance criteria:
+  - Overflow in READY_FOR_ENERGY and ENERGY_TRANSFER revokes permission before
+    requesting coordinated safe stopping and arms bounded stop supervision.
+  - Missing/delayed resynchronization cannot leave active charging outside a
+    supervised stop transaction.
+  - Repeated overflow is idempotent and preserves failures and deadlines.
+  - Rejected/BUSY safe-state requests retain their result and reach the existing
+    timeout escalation when measured safety is absent.
+  - Fresh and stale status cannot revive a stopping session; completion requires
+    current measured-safe evidence and the existing teardown conditions.
+  - Add desired-behavior regressions for these cases and pass the portable suite.
+
+[x] TASK-2 | P1 | Use trusted owner time for fault-triggered stop supervision
+Status: FIXED — implementation 91cd37030d2af3c1c0a28616561ad34415e24704
+Review finding: 2
+Primary file: src/charging_coordinator/charging_coordinator.c
+Related scope: coordinator public interfaces and affected callers/tests
+Operations: OnHlcStatus, OnLinkStatus, OnHardwareStatus, Stop, Tick
+
+Problem:
+  Fault handlers pass producer envelope timestamps into Stop. Stop copies the
+  timestamp into owner_time and arms the stop deadline from it. A future sample
+  can make normal owner Tick calls return early and postpone timeout escalation.
+
+Reproduction:
+  Establish energy transfer at time 160, configure a rejecting hardware
+  safe-state port, and inject a current-generation, higher-sequence HLC_ERROR
+  with timestamp 1000000. With a synthetic stop budget of 100, owner_time
+  becomes 1000000 and stop_deadline becomes 1000100. Tick(270) leaves STOPPING
+  and simulated hardware ENERGIZED; timeout only latches at 1000100.
+  Historical probe: docs/architecture/reviews/evidence/architecture_probe_20261031.c
+
+Implementation task:
+  Separate producer evidence time from trusted monotonic receipt/dispatch time.
+  Provide trusted owner time to the affected ingress/control paths and use it
+  for reactions and deadlines. Define future/stale evidence handling explicitly;
+  invalid fault evidence must fail closed without moving or rewinding the owner
+  clock. Preserve existing stop deadlines on repeated faults. Update affected
+  PROJECT interfaces, callers and contract documentation as needed; preserve
+  imported AUTOSAR ABI. Do not invent clock tolerances or normative deadlines.
+
+Acceptance criteria:
+  - Future-dated HLC_ERROR, PLC_DOWN and HW_FAULT cannot advance owner_time or
+    defer a stop deadline beyond trusted receipt time plus the configured budget.
+  - Delayed/reordered/invalid-quality samples cannot rewind owner time, extend
+    an existing deadline, or revive a session; unrelated generations are rejected.
+  - Normal owner ticks supervise rejected safe-state requests and missing
+    measured confirmation at the configured deadline despite bad source times.
+  - Repeated fault callbacks preserve stop idempotence, failure results and the
+    original deadline.
+  - Add desired-behavior regressions for all three ingress paths and pass the
+    portable suite; run affected integration tests if interfaces change.
+
+Shared verification and closure:
+  Use a fresh out-of-tree build; the review's portable configuration was:
+    cmake -S . -B /tmp/openv2g-bugfix-build -DOPENV2G_BUILD_LINUX_STUBS=OFF -DOPENV2G_ENABLE_CBV2G_SAP_POC=OFF
+    cmake --build /tmp/openv2g-bugfix-build -j 4
+    ctest --test-dir /tmp/openv2g-bugfix-build --output-on-failure
+  The review observed 26/26 portable tests passing before these fixes. Those
+  results do not cover the reproduced defects or establish target safety.
+  Preserve dated review probes: they assert historical defects, not acceptance
+  behavior. Add new regressions rather than changing those historical assertions.
+  On closure, record implementation commit, regression names, commands/results,
+  and a traceable review disposition. No target architecture freeze is implied.
+
+Closure — 2026-10-31
+  Both P1 findings are fixed and verified for the host implementation.
+  Regression: openv2g_test_coordinator_fault_ingress (overflow and fault_times).
+  Portable suite: 27/27 passed in a fresh out-of-tree build.
+  Portable ASAN/UBSAN suite: 27/27 passed.
+  Integration suite: 51/51 passed; after final resynchronization-watermark
+  tightening, the 3 affected coordinator regressions passed again in that build.
+  Commands, exact scope, hashes and review disposition:
+    docs/architecture/BUGLIST_FIX_DISPOSITION_2026-10-31.md
+    docs/architecture/evidence/coordinator_bugfix_verification.json
+  Historical review report/probes are preserved. No target safety/freeze claim.

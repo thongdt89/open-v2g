@@ -1,0 +1,59 @@
+{
+  "date": "2026-10-31",
+  "implementation_commit": "91cd37030d2af3c1c0a28616561ad34415e24704",
+  "review_baseline": "4f4df51184d2c279c86e791681201f601fc3c759",
+  "findings": {
+    "TASK-1": "fixed",
+    "TASK-2": "fixed"
+  },
+  "scope": "PROJECT host control-path fixes; no production or safety freeze",
+  "regression": "openv2g_test_coordinator_fault_ingress",
+  "builds": {
+    "fresh_portable": {
+      "passed": 27,
+      "failed": 0,
+      "log": "/tmp/bugfix-portable-final-tests.log",
+      "log_sha256": "0af230b8be6e3a8bb2e7e4e294557e541dcecb012ec8ad03ecb1f9cb798c52aa"
+    },
+    "portable_asan_ubsan": {
+      "passed": 27,
+      "failed": 0,
+      "log": "/tmp/bugfix-sanitize-final-tests.log",
+      "log_sha256": "427afab922157d3369ccbaa792003ec636994caff38391107ea24880681f9828"
+    },
+    "tls_full_before_last_resync_tightening": {
+      "passed": 51,
+      "failed": 0,
+      "log": "/tmp/bugfix-tls-final-tests.log",
+      "log_sha256": "629e323da1e59bc469c0329e9e19b12f39a962e292cab76ba89e6f898fa0c49e"
+    },
+    "tls_final_affected_regressions": {
+      "passed": 3,
+      "failed": 0,
+      "log": "/tmp/bugfix-tls-focused-tests.log",
+      "log_sha256": "4066f02b3aa5d8407b2d2844e16972cd2ba0360b054848e444ae2a8b64cf45f6"
+    }
+  },
+  "verification_sequence": "Full 51-test integration run passed. Final resync guard additionally rejects pre-overflow fault snapshots without clearing the resync flag; after that change, complete fresh portable and portable sanitizer suites and 3 affected coordinator tests in the TLS build passed.",
+  "source_sha256": {
+    "docs/architecture/CONTROL_BOUNDARY_HARDENING.md": "8a307b70bb11f846c2102ce81dc2b616cdd4f8439122a0d19db7527ddfe34792",
+    "include/openv2g/charging_coordinator/charging_coordinator.h": "45453701410010160401c980ae86a60daa239db38162f274a26d9589ae92cce8",
+    "simulation/include/openv2g/simulation/host_simulation.h": "d0f2c2ef8c9e15a10f74cf7e0d57a1e77ca7779640758aef7e6abc1db92ae895",
+    "simulation/linux/src/rte.c": "45c1b93fe1c5178792b609a9b4bd63a0b46bade785b22196a05fa1290455b9d2",
+    "simulation/linux/wire/client.c": "7528700d0a74a1fd674ba86e843e8180d6bbcb92fadbc948b15d32ede4ebd4c2",
+    "simulation/src/host_simulation.c": "3920b90a853a478fd0d60507018320e51f7104feaca0b61a3b0ffb6d21622226",
+    "src/charging_coordinator/charging_coordinator.c": "148dd396943ffbf08c97f678a15178cd0fb3ec7ad4c6c2a27419367f5ca0f3aa",
+    "tests/CMakeLists.txt": "8960b4094f593980d7ec25d28a6c1d8f40061618dac5b145e55404c818138743",
+    "tests/integration/test_control_boundaries.c": "01875678f0aef51fea6a0ce5d0cf1676f6bd9400551bba8ce1889c8517e7ccfd",
+    "tests/integration/test_host_simulation.c": "36689e691090245f99bffccfc5ab5487a4c0bee26bf780a08095901f3464cf15",
+    "tests/integration/test_nominal_flow.c": "5c4818733e6b7cfc81de34c2d2ff16e6f2309970cef03a1aa93eb1cfa21724b0",
+    "tests/unit/test_hlc_event_bridge.c": "798d6f065f15141810eb5471d6447442bda6af0aa178bf72e75f5bb88c1a8038",
+    "tests/integration/test_coordinator_fault_ingress.c": "40d45041f0e2994e9b69a539865c0c59dde0502bba5563f39b95712eb556682a"
+  },
+  "limitations": [
+    "Trusted receipt clock is supplied by the serialized owner, independently of producer timestamps",
+    "Configured synthetic test stop budgets are not vehicle deadlines",
+    "Historical review probes intentionally remain pinned to their old defect baseline",
+    "No imported AUTOSAR ABI, target safety allocation or physical vehicle evidence is established"
+  ]
+}
