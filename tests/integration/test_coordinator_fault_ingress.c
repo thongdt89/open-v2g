@@ -12,26 +12,34 @@ static OpenV2g_Result safe_probe(void *context, uint32_t generation, OpenV2g_Tim
     ++safe_calls; revoke_seen = observed->permission_manager.current.decision == OPENV2G_PERMISSION_DENY && observed->owner_time == now;
     return safe_result;
 }
-static int setup(OpenV2g_HostSimulation *s, bool energized, OpenV2g_Result result)
+static int setup_profile(OpenV2g_HostSimulation *s, bool energized, OpenV2g_Result result, bool physical)
 {
     OpenV2g_HostSimulationConfig config = OpenV2g_HostSimulation_DefaultConfig();
     OpenV2g_QualifiedCpPp cp; OpenV2g_EvEnergySnapshot energy;
-    config.coordinator.stop_timeout_us = 100u;
+    config.coordinator.stop_timeout_us = 100u; config.coordinator.require_physical_assessment = physical;
     TEST_ASSERT(ok(OpenV2g_HostSimulation_Init(s,&config)));
     cp = OpenV2g_HostSimulation_DefaultCpPp(s,100u);
     TEST_ASSERT(ok(OpenV2g_HostSimulation_InjectCpPp(s,&cp,100u)));
     TEST_ASSERT(ok(OpenV2g_HostSimulation_AdvancePlcToReady(s,110u)));
     TEST_ASSERT(ok(OpenV2g_HostSimulation_EstablishHlc(s,120u)));
     energy = OpenV2g_HostSimulation_DefaultEnergy(s,140u);
-    TEST_ASSERT(ok(OpenV2g_HostSimulation_InjectEnergy(s,&energy)));
+    TEST_ASSERT(ok(OpenV2g_HostSimulation_InjectEnergy(s,&energy, 140u)));
     TEST_ASSERT(ok(OpenV2g_HostSimulation_InitializeHardwareSafe(s,141u)));
     TEST_ASSERT(ok(OpenV2g_HostSimulation_PrepareEnergyTransfer(s,150u)));
+    if (physical) {
+        OpenV2g_PhysicalAssessment a = {0}; a.env = s->coordinator.hardware.env; a.env.timestamp = 155u;
+        a.kind = OPENV2G_ASSESS_PRECHARGE; a.correlation_id = 1u; a.passed = true;
+        a.hardware_sequence = s->coordinator.hardware.env.sequence_counter;
+        TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_ApplyAssessment(&s->coordinator,&a,1u,155u)));
+    }
     if (energized) { TEST_ASSERT(ok(OpenV2g_HostSimulation_StartEnergyTransfer(s,160u))); }
     else { TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_EvaluatePermission(&s->coordinator,160u))); }
     TEST_ASSERT(s->coordinator.state_machine.state == (energized ? OPENV2G_COORDINATOR_ENERGY_TRANSFER : OPENV2G_COORDINATOR_READY_FOR_ENERGY));
     safe_calls = 0u; revoke_seen = false; safe_result = result; observed = &s->coordinator;
     s->coordinator.ports.hardware.request_safe_state = safe_probe; return 0;
 }
+static int setup(OpenV2g_HostSimulation *s, bool energized, OpenV2g_Result result)
+{ return setup_profile(s,energized,result,false); }
 static int measured_safe(OpenV2g_HostSimulation *s, OpenV2g_TimeUs source, OpenV2g_TimeUs receipt)
 {
     OpenV2g_ChargeHardwareStatus h = s->coordinator.hardware;
@@ -235,7 +243,173 @@ static int cp_recovery(void)
     }
     return 0;
 }
+static unsigned prepare_calls;
+static OpenV2g_Result count_prepare(void *context, uint32_t generation, OpenV2g_TimeUs now, OpenV2g_ChargeMode mode)
+{ (void)context; (void)generation; (void)now; (void)mode; ++prepare_calls; return OPENV2G_RESULT_ACCEPTED; }
+static int transfer_hardware(void)
+{
+    unsigned physical, mode;
+    for (physical = 0u; physical < 2u; ++physical) for (mode = 0u; mode < 8u; ++mode) {
+        OpenV2g_HostSimulation s; OpenV2g_ChargeHardwareStatus h;
+        TEST_ASSERT(setup_profile(&s,true,OPENV2G_RESULT_ACCEPTED,physical != 0u) == 0);
+        s.coordinator.ports.hardware.prepare = count_prepare; prepare_calls = 0u;
+        h = s.coordinator.hardware; ++h.env.sequence_counter; h.env.timestamp = 170u;
+        if (mode < 6u) { h.state = (OpenV2g_HardwareState)mode; }
+        if (mode == 6u) { h.env.quality = OPENV2G_QUALITY_INVALID; }
+        if (mode == 7u) { h.env.timestamp = 1u; s.coordinator.config.permission.hardware_max_age_us = 100u; }
+        (void)OpenV2g_ChargingCoordinator_OnHardwareStatus(&s.coordinator,&h,170u);
+        if (mode == OPENV2G_HW_ENERGIZED) {
+            TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_EvaluatePermission(&s.coordinator,171u)));
+            TEST_ASSERT(!s.coordinator.teardown_started && s.coordinator.permission_manager.current.decision == OPENV2G_PERMISSION_ALLOW);
+            TEST_ASSERT(s.coordinator.permission_manager.current.action == OPENV2G_ACTION_ENERGIZE && safe_calls == 0u);
+        } else {
+            TEST_ASSERT(OpenV2g_ChargingCoordinator_EvaluatePermission(&s.coordinator,171u) == OPENV2G_RESULT_REJECTED);
+            TEST_ASSERT(s.coordinator.teardown_started && safe_calls == 1u && revoke_seen);
+            TEST_ASSERT(s.coordinator.permission_manager.current.decision == OPENV2G_PERMISSION_DENY && s.coordinator.safe_requested);
+            h = s.coordinator.hardware; h.state = OPENV2G_HW_ENERGIZED; h.env.quality = OPENV2G_QUALITY_VALID; h.env.timestamp = 172u; ++h.env.sequence_counter;
+            TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_OnHardwareStatus(&s.coordinator,&h,172u)));
+            TEST_ASSERT(OpenV2g_ChargingCoordinator_EvaluatePermission(&s.coordinator,173u) == OPENV2G_RESULT_REJECTED && safe_calls == 1u);
+        }
+        TEST_ASSERT(prepare_calls == 0u);
+    }
+    return 0;
+}
+static int negotiating(OpenV2g_HostSimulation *s)
+{
+    OpenV2g_HostSimulationConfig config = OpenV2g_HostSimulation_DefaultConfig();
+    OpenV2g_QualifiedCpPp cp; OpenV2g_EvEnergySnapshot e;
+    config.coordinator.stop_timeout_us = 100u; config.coordinator.permission.limit_max_age_us = 100u;
+    TEST_ASSERT(ok(OpenV2g_HostSimulation_Init(s,&config)));
+    cp = OpenV2g_HostSimulation_DefaultCpPp(s,100u); TEST_ASSERT(ok(OpenV2g_HostSimulation_InjectCpPp(s,&cp,100u)));
+    TEST_ASSERT(ok(OpenV2g_HostSimulation_AdvancePlcToReady(s,110u)) && ok(OpenV2g_HostSimulation_EstablishHlc(s,120u)));
+    e = OpenV2g_HostSimulation_DefaultEnergy(s,140u); TEST_ASSERT(ok(OpenV2g_HostSimulation_InjectEnergy(s,&e,140u)));
+    TEST_ASSERT(ok(OpenV2g_HostSimulation_InitializeHardwareSafe(s,141u)));
+    TEST_ASSERT(s->coordinator.state_machine.state == OPENV2G_COORDINATOR_HLC_NEGOTIATION);
+    return 0;
+}
+static int limit_energy_recovery(void)
+{
+    unsigned source, bad;
+    for (source = 0u; source < OPENV2G_LIMIT_SOURCE_COUNT; ++source) for (bad = 0u; bad < 8u; ++bad) {
+        OpenV2g_HostSimulation s; OpenV2g_LimitEvidence l = {0}, accepted;
+        TEST_ASSERT(negotiating(&s) == 0);
+        l.env = s.coordinator.energy.env; l.env.timestamp = 145u; l.env.sequence_counter = 1u;
+        l.source = (OpenV2g_LimitSource)source; l.mode = OPENV2G_MODE_DC; l.correlation_id = 1u; l.valid_until = 10000u; l.limits = s.coordinator.energy.limits;
+        TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_OnLimitEvidence(&s.coordinator,&l,145u))); accepted = l;
+        l.env.timestamp = 170u; l.env.sequence_counter = UINT32_MAX;
+        if (bad == 0u) { l.env.timestamp = 1000000u; }
+        if (bad == 1u) { l.env.quality = OPENV2G_QUALITY_INVALID; }
+        if (bad == 2u) { l.env.timestamp = 0u; }
+        if (bad == 3u) { l.env.timestamp = 1u; }
+        if (bad == 4u) { l.limits.max_import_power_w = -1; }
+        if (bad == 5u) { l.correlation_id = 0u; }
+        if (bad == 6u) { l.valid_until = 169u; }
+        if (bad == 7u) { l.mode = OPENV2G_MODE_NONE; }
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_OnLimitEvidence(&s.coordinator,&l,170u) == OPENV2G_RESULT_REJECTED);
+        TEST_ASSERT(!s.coordinator.has_limits[source] && memcmp(&s.coordinator.limits[source],&accepted,sizeof(l)) == 0 && !s.coordinator.teardown_started);
+        l = accepted; l.env.timestamp = 180u; l.env.sequence_counter = 2u;
+        TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_OnLimitEvidence(&s.coordinator,&l,180u)) && s.coordinator.has_limits[source]); accepted = l;
+        l.limits.max_import_power_w = 1;
+        TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_OnLimitEvidence(&s.coordinator,&l,181u)) && s.coordinator.limits[source].limits.max_import_power_w == accepted.limits.max_import_power_w);
+        l.env.timestamp = 179u; l.env.sequence_counter = 1u;
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_OnLimitEvidence(&s.coordinator,&l,182u) == OPENV2G_RESULT_REJECTED && s.coordinator.has_limits[source]);
+        l = accepted; ++l.env.session_generation;
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_OnLimitEvidence(&s.coordinator,&l,1000000u) == OPENV2G_RESULT_REJECTED && s.coordinator.owner_time == 182u);
+    }
+    for (bad = 0u; bad < 7u; ++bad) {
+        OpenV2g_HostSimulation s; OpenV2g_EvEnergySnapshot e, accepted;
+        TEST_ASSERT(negotiating(&s) == 0); accepted = s.coordinator.energy; e = accepted;
+        e.env.timestamp = 170u; e.env.sequence_counter = UINT32_MAX;
+        if (bad == 0u) { e.env.timestamp = 1000000u; }
+        if (bad == 1u) { e.env.quality = OPENV2G_QUALITY_INVALID; }
+        if (bad == 2u) { e.env.timestamp = 0u; }
+        if (bad == 3u) { e.env.timestamp = 1u; s.config.coordinator.permission.energy_max_age_us = s.coordinator.config.permission.energy_max_age_us = 100u; }
+        if (bad == 4u) { e.limits.max_import_power_w = -1; }
+        if (bad == 5u) { e.interlock_closed = false; }
+        if (bad == 6u) { e.availability_mask = 0u; }
+        TEST_ASSERT(OpenV2g_HostSimulation_InjectEnergy(&s,&e,170u) == OPENV2G_RESULT_REJECTED);
+        TEST_ASSERT(!s.coordinator.has_energy && memcmp(&accepted,&s.coordinator.energy,sizeof(e)) == 0 && !s.coordinator.teardown_started);
+        TEST_ASSERT(s.energy.accepted_env.timestamp == accepted.env.timestamp && s.energy.snapshot.env.quality == OPENV2G_QUALITY_INVALID);
+        e = accepted; e.env.timestamp = 180u; ++e.env.sequence_counter;
+        TEST_ASSERT(ok(OpenV2g_HostSimulation_InjectEnergy(&s,&e,180u)) && s.coordinator.has_energy); accepted = e;
+        e.limits.max_import_power_w = 1;
+        TEST_ASSERT(ok(OpenV2g_HostSimulation_InjectEnergy(&s,&e,181u)) && s.coordinator.energy.limits.max_import_power_w == accepted.limits.max_import_power_w);
+        e.env.timestamp = 179u; e.env.sequence_counter = 0u;
+        TEST_ASSERT(OpenV2g_HostSimulation_InjectEnergy(&s,&e,182u) == OPENV2G_RESULT_REJECTED);
+        e = accepted; ++e.env.session_generation;
+        TEST_ASSERT(OpenV2g_HostSimulation_InjectEnergy(&s,&e,1000000u) == OPENV2G_RESULT_REJECTED && s.coordinator.owner_time == 181u);
+        e = accepted; e.env.timestamp = 1000000u; e.env.sequence_counter = UINT32_MAX;
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_OnEnergySnapshot(&s.coordinator,&e,183u) == OPENV2G_RESULT_REJECTED && s.coordinator.owner_time == 183u);
+        e = accepted; e.env.timestamp = 184u; ++e.env.sequence_counter;
+        TEST_ASSERT(ok(OpenV2g_HostSimulation_InjectEnergy(&s,&e,184u)) && s.coordinator.has_energy);
+    }
+    for (source = 0u; source <= OPENV2G_LIMIT_SOURCE_COUNT; ++source) {
+        OpenV2g_HostSimulation s;
+        TEST_ASSERT(setup(&s,true,OPENV2G_RESULT_ACCEPTED) == 0);
+        s.coordinator.config.permission.limit_max_age_us = 100u;
+        if (source < OPENV2G_LIMIT_SOURCE_COUNT) {
+            OpenV2g_LimitEvidence l = {0}; l.env = s.coordinator.energy.env; l.env.timestamp = 1000000u;
+            l.source = (OpenV2g_LimitSource)source; l.mode = OPENV2G_MODE_DC; l.correlation_id = 1u; l.valid_until = 2000000u; l.limits = s.coordinator.energy.limits;
+            TEST_ASSERT(OpenV2g_ChargingCoordinator_OnLimitEvidence(&s.coordinator,&l,170u) == OPENV2G_RESULT_REJECTED);
+            l.env.timestamp = 180u; ++l.env.sequence_counter;
+            TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_OnLimitEvidence(&s.coordinator,&l,180u)));
+        } else {
+            OpenV2g_EvEnergySnapshot e = s.coordinator.energy; e.env.timestamp = 1000000u;
+            TEST_ASSERT(OpenV2g_HostSimulation_InjectEnergy(&s,&e,170u) == OPENV2G_RESULT_REJECTED);
+            e.env.timestamp = 180u; ++e.env.sequence_counter;
+            TEST_ASSERT(ok(OpenV2g_HostSimulation_InjectEnergy(&s,&e,180u)));
+        }
+        TEST_ASSERT(revoke_seen && safe_calls == 1u && s.coordinator.stop_deadline == 270u);
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_EvaluatePermission(&s.coordinator,181u) == OPENV2G_RESULT_REJECTED && safe_calls == 1u);
+    }
+    return 0;
+}
+static int fault_escalation(void)
+{
+    OpenV2g_FaultCoordinator f; OpenV2g_BlockingFaultStatus root, peak, read; OpenV2g_BlockingFaultStatusSrPort port;
+    OpenV2g_FaultCoordinator_Init(&f); OpenV2g_FaultCoordinator_BeginSession(&f,7u,100u);
+    OpenV2g_FaultCoordinator_Raise(&f,7u,110u,OPENV2G_FAULT_CONTROLLED_STOP,OPENV2G_REASON_INTERNAL); root = f.status;
+    OpenV2g_FaultCoordinator_Raise(&f,6u,120u,OPENV2G_FAULT_EMERGENCY_STOP,OPENV2G_REASON_TIMEOUT);
+    TEST_ASSERT(memcmp(&root,&f.status,sizeof(root)) == 0);
+    OpenV2g_FaultCoordinator_Raise(&f,7u,109u,OPENV2G_FAULT_EMERGENCY_STOP,OPENV2G_REASON_TIMEOUT);
+    TEST_ASSERT(memcmp(&root,&f.status,sizeof(root)) == 0);
+    OpenV2g_FaultCoordinator_Raise(&f,7u,120u,OPENV2G_FAULT_EMERGENCY_STOP,OPENV2G_REASON_TIMEOUT); peak = f.status;
+    TEST_ASSERT(peak.latched && peak.severity == OPENV2G_FAULT_EMERGENCY_STOP && peak.cause == OPENV2G_REASON_INTERNAL && peak.root_timestamp == 110u && peak.fault_id == root.fault_id);
+    TEST_ASSERT(peak.has_escalation && peak.escalation_cause == OPENV2G_REASON_TIMEOUT && peak.escalation_timestamp == 120u && peak.env.reason == OPENV2G_REASON_TIMEOUT);
+    TEST_ASSERT(ok(OpenV2g_FaultCoordinator_CreateStatusSenderReceiverPort(&f,&port)) && ok(port.read(port.context,&read)) && memcmp(&peak,&read,sizeof(peak)) == 0);
+    OpenV2g_FaultCoordinator_Raise(&f,7u,130u,OPENV2G_FAULT_WARNING,OPENV2G_REASON_LINK_LOSS);
+    OpenV2g_FaultCoordinator_Raise(&f,7u,140u,OPENV2G_FAULT_EMERGENCY_STOP,OPENV2G_REASON_HW_MISMATCH);
+    TEST_ASSERT(memcmp(&peak,&f.status,sizeof(peak)) == 0);
+    OpenV2g_FaultCoordinator_BeginSession(&f,8u,150u);
+    TEST_ASSERT(!f.status.latched && !f.status.has_escalation && f.status.root_timestamp == 0u);
+    root = f.status; OpenV2g_FaultCoordinator_Raise(&f,7u,160u,OPENV2G_FAULT_EMERGENCY_STOP,OPENV2G_REASON_TIMEOUT);
+    TEST_ASSERT(memcmp(&root,&f.status,sizeof(root)) == 0);
+    {
+        OpenV2g_HostSimulation s; OpenV2g_HlcSessionStatus h;
+        TEST_ASSERT(setup(&s,true,OPENV2G_RESULT_REJECTED) == 0);
+        h = s.coordinator.hlc; ++h.env.sequence_counter; h.env.timestamp = 170u; h.state = OPENV2G_HLC_ERROR; h.env.reason = OPENV2G_REASON_INTERNAL;
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_OnHlcStatus(&s.coordinator,&h,170u) == OPENV2G_RESULT_REJECTED);
+        TEST_ASSERT(s.coordinator.fault_coordinator.status.cause == OPENV2G_REASON_INTERNAL);
+        root = s.coordinator.fault_coordinator.status;
+        OpenV2g_ChargingCoordinator_Tick(&s.coordinator,270u); read = s.coordinator.fault_coordinator.status;
+        TEST_ASSERT(read.fault_id == root.fault_id && read.root_timestamp == 170u && read.escalation_timestamp == 270u);
+        TEST_ASSERT(read.severity == OPENV2G_FAULT_EMERGENCY_STOP && read.cause == OPENV2G_REASON_INTERNAL && read.has_escalation && read.escalation_cause == OPENV2G_REASON_TIMEOUT);
+        TEST_ASSERT(s.coordinator.state_machine.state == OPENV2G_COORDINATOR_FAULT_LATCHED && s.coordinator.permission_manager.current.decision == OPENV2G_PERMISSION_DENY && safe_calls == 1u);
+    }
+    {
+        OpenV2g_HostSimulation s; OpenV2g_HlcSessionStatus h; OpenV2g_ChargeHardwareStatus hw;
+        TEST_ASSERT(setup(&s,true,OPENV2G_RESULT_REJECTED) == 0);
+        h = s.coordinator.hlc; ++h.env.sequence_counter; h.env.timestamp = 170u; h.state = OPENV2G_HLC_ERROR; h.env.reason = OPENV2G_REASON_INTERNAL;
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_OnHlcStatus(&s.coordinator,&h,170u) == OPENV2G_RESULT_REJECTED);
+        hw = s.coordinator.hardware; ++hw.env.sequence_counter; hw.env.timestamp = 180u; hw.state = OPENV2G_HW_FAULT;
+        TEST_ASSERT(OpenV2g_ChargingCoordinator_OnHardwareStatus(&s.coordinator,&hw,180u) == OPENV2G_RESULT_REJECTED);
+        read = s.coordinator.fault_coordinator.status;
+        TEST_ASSERT(read.severity == OPENV2G_FAULT_EMERGENCY_STOP && read.cause == OPENV2G_REASON_INTERNAL && read.escalation_cause == OPENV2G_REASON_HW_MISMATCH && read.escalation_timestamp == 180u && safe_calls == 1u && s.coordinator.stop_deadline == 270u);
+    }
+    return 0;
+}
 int main(void) {
     TEST_ASSERT(overflow() == 0); TEST_ASSERT(fault_times() == 0);
-    TEST_ASSERT(stop_evidence_expiry() == 0); TEST_ASSERT(cp_recovery() == 0); return 0;
+    TEST_ASSERT(stop_evidence_expiry() == 0); TEST_ASSERT(cp_recovery() == 0);
+    TEST_ASSERT(transfer_hardware() == 0); TEST_ASSERT(limit_energy_recovery() == 0); TEST_ASSERT(fault_escalation() == 0); return 0;
 }

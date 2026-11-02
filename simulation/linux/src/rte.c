@@ -107,7 +107,7 @@ bool Ov2g_EnvironmentRun(Ov2g_LinuxEnvironment *environment, int station_fd)
     cp = OpenV2g_HostSimulation_DefaultCpPp(sim, now);
     energy = OpenV2g_HostSimulation_DefaultEnergy(sim, now);
     if (!ok(OpenV2g_HostSimulation_InjectCpPp(sim, &cp, now)) ||
-        !ok(OpenV2g_HostSimulation_InjectEnergy(sim, &energy)) ||
+        !ok(OpenV2g_HostSimulation_InjectEnergy(sim, &energy, now)) ||
         !ok(OpenV2g_HostSimulation_InitializeHardwareSafe(sim, now + 1u)) ||
         !ok(OpenV2g_HostSimulation_PrepareEnergyTransfer(sim, now + 10u)) ||
         !ok(OpenV2g_HostSimulation_StartEnergyTransfer(sim, now + 20u))) { goto stop; }

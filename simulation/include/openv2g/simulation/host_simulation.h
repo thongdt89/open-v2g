@@ -102,7 +102,7 @@ OpenV2g_Result OpenV2g_HostSimulation_InjectCpPp(
 
 OpenV2g_Result OpenV2g_HostSimulation_InjectEnergy(
     OpenV2g_HostSimulation *simulation,
-    const OpenV2g_EvEnergySnapshot *value);
+    const OpenV2g_EvEnergySnapshot *value, OpenV2g_TimeUs now);
 
 /* Surrounding-component drivers for the nominal host flow. */
 OpenV2g_Result OpenV2g_HostSimulation_AdvancePlcToReady(

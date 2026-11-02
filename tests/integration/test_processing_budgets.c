@@ -17,7 +17,7 @@ static int setup(OpenV2g_HostSimulation *simulation, OpenV2g_ProtocolId protocol
     TEST_ASSERT(OpenV2g_HostSimulation_AdvancePlcToReady(simulation, 110u) == OPENV2G_RESULT_ACCEPTED);
     TEST_ASSERT(OpenV2g_HostSimulation_EstablishHlc(simulation, 120u) == OPENV2G_RESULT_OK);
     { OpenV2g_EvEnergySnapshot energy = OpenV2g_HostSimulation_DefaultEnergy(simulation, 130u);
-      TEST_ASSERT(OpenV2g_HostSimulation_InjectEnergy(simulation, &energy) == OPENV2G_RESULT_OK); }
+      TEST_ASSERT(OpenV2g_HostSimulation_InjectEnergy(simulation, &energy, 130u) == OPENV2G_RESULT_OK); }
     for (i = 0u; i < 3u; ++i) {
         OpenV2g_ProtocolTxRequest request;
         OpenV2g_ProtocolMessage response = {0};

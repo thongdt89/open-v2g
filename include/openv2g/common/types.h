@@ -321,8 +321,12 @@ typedef struct {
     OpenV2g_CommEnvelope env;
     uint32_t fault_id;
     OpenV2g_FaultSeverity severity;
-    OpenV2g_ReasonCode cause;
+    OpenV2g_ReasonCode cause; /* First latched root cause; retained on escalation. */
     bool latched;
+    OpenV2g_TimeUs root_timestamp;
+    bool has_escalation;
+    OpenV2g_ReasonCode escalation_cause;
+    OpenV2g_TimeUs escalation_timestamp;
 } OpenV2g_BlockingFaultStatus;
 
 typedef struct {

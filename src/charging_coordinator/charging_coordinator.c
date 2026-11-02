@@ -218,18 +218,17 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnLimitEvidence(
         coordinator->generation == 0u || evidence->env.session_generation != coordinator->generation ||
         (unsigned)evidence->source >= OPENV2G_LIMIT_SOURCE_COUNT) { return OPENV2G_RESULT_REJECTED; }
     source = (unsigned)evidence->source;
-    if (evidence->env.timestamp != 0u && obsolete(&coordinator->limits[source].env, &evidence->env)) { return OPENV2G_RESULT_REJECTED; }
     coordinator->owner_time = now;
-    if (evidence->env.quality != OPENV2G_QUALITY_VALID || evidence->env.timestamp == 0u || evidence->env.timestamp > now ||
+    if (!OpenV2g_EnvelopeIsCurrent(&evidence->env, coordinator->generation, now, coordinator->config.permission.limit_max_age_us) ||
+        (evidence->mode != OPENV2G_MODE_AC && evidence->mode != OPENV2G_MODE_DC) ||
+        (coordinator->has_hlc && coordinator->hlc.selected_mode != OPENV2G_MODE_NONE && evidence->mode != coordinator->hlc.selected_mode) ||
         evidence->correlation_id == 0u || evidence->valid_until <= now || evidence->valid_until <= evidence->env.timestamp ||
         evidence->limits.max_import_power_w < 0 || evidence->limits.max_export_power_w < 0 ||
         evidence->limits.max_charge_current_ma < 0 || evidence->limits.max_discharge_current_ma < 0 || evidence->limits.max_voltage_mv == 0u) {
-        OpenV2g_CommEnvelope previous = coordinator->limits[source].env;
-        coordinator->has_limits[source] = false; coordinator->limits[source] = *evidence;
-        if (evidence->env.timestamp == 0u) { coordinator->limits[source].env.timestamp = previous.timestamp;
-            coordinator->limits[source].env.sequence_counter = previous.sequence_counter; }
+        coordinator->has_limits[source] = false;
         evidence_lost(coordinator); return OPENV2G_RESULT_REJECTED;
     }
+    if (obsolete(&coordinator->limits[source].env, &evidence->env)) { return OPENV2G_RESULT_REJECTED; }
     if (duplicate(&coordinator->limits[source].env, &evidence->env)) {
         return coordinator->has_limits[source] ? OPENV2G_RESULT_OK : OPENV2G_RESULT_REJECTED;
     }
@@ -245,37 +244,27 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnLimitEvidence(
 
 OpenV2g_Result OpenV2g_ChargingCoordinator_OnEnergySnapshot(
     OpenV2g_ChargingCoordinator *coordinator,
-    const OpenV2g_EvEnergySnapshot *energy)
+    const OpenV2g_EvEnergySnapshot *energy, OpenV2g_TimeUs now)
 {
     if (coordinator == NULL || energy == NULL || coordinator->generation == 0u ||
-        energy->env.session_generation != coordinator->generation ||
-        (energy->env.timestamp != 0u && obsolete(&coordinator->energy.env, &energy->env))) { return OPENV2G_RESULT_REJECTED; }
-    if (energy->env.quality != OPENV2G_QUALITY_VALID || energy->env.timestamp == 0u) {
-        OpenV2g_CommEnvelope previous = coordinator->energy.env;
-        coordinator->energy = *energy; coordinator->has_energy = false;
-        if (energy->env.timestamp == 0u) { coordinator->energy.env.timestamp = previous.timestamp;
-            coordinator->energy.env.sequence_counter = previous.sequence_counter; }
-        evidence_lost(coordinator); return OPENV2G_RESULT_REJECTED;
+        energy->env.session_generation != coordinator->generation || now == 0u || now < coordinator->owner_time) { return OPENV2G_RESULT_REJECTED; }
+    coordinator->owner_time = now;
+    if (!OpenV2g_EnvelopeIsCurrent(&energy->env,coordinator->generation,now,coordinator->config.permission.energy_max_age_us) ||
+        !energy->interlock_closed || energy->snapshot_id == 0u ||
+        (energy->availability_mask & (OPENV2G_ENERGY_FIELD_INTERLOCK | OPENV2G_ENERGY_FIELD_LIMITS)) !=
+        (OPENV2G_ENERGY_FIELD_INTERLOCK | OPENV2G_ENERGY_FIELD_LIMITS) ||
+        energy->limits.max_import_power_w < 0 || energy->limits.max_export_power_w < 0 ||
+        energy->limits.max_charge_current_ma < 0 || energy->limits.max_discharge_current_ma < 0 || energy->limits.max_voltage_mv == 0u) {
+        coordinator->has_energy = false; evidence_lost(coordinator); return OPENV2G_RESULT_REJECTED;
     }
-    if ((coordinator == NULL) || (energy == NULL) ||
-        (energy->env.session_generation != coordinator->generation) ||
-        (energy->env.quality != OPENV2G_QUALITY_VALID) ||
-        (energy->env.timestamp == 0u)) {
-        return OPENV2G_RESULT_REJECTED;
-    }
+    if (obsolete(&coordinator->energy.env,&energy->env)) { return OPENV2G_RESULT_REJECTED; }
     if (duplicate(&coordinator->energy.env, &energy->env)) {
         return coordinator->has_energy ? OPENV2G_RESULT_OK : OPENV2G_RESULT_REJECTED;
     }
     if (coordinator->energy.env.session_generation == coordinator->generation &&
         coordinator->energy.env.sequence_counter != 0u &&
         coordinator->energy.env.sequence_counter == energy->env.sequence_counter) { return OPENV2G_RESULT_REJECTED; }
-    coordinator->energy = *energy;
-    coordinator->has_energy = true;
-    if (!energy->interlock_closed || energy->snapshot_id == 0u ||
-        (energy->availability_mask & (OPENV2G_ENERGY_FIELD_INTERLOCK | OPENV2G_ENERGY_FIELD_LIMITS)) !=
-        (OPENV2G_ENERGY_FIELD_INTERLOCK | OPENV2G_ENERGY_FIELD_LIMITS)) {
-        coordinator->has_energy = false; evidence_lost(coordinator); return OPENV2G_RESULT_REJECTED;
-    }
+    coordinator->energy = *energy; coordinator->has_energy = true;
     return OPENV2G_RESULT_OK;
 }
 

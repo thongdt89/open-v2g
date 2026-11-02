@@ -1,6 +1,6 @@
 # Coordinator control-boundary changes
 
-Revision: Draft 0.3 — 31/10/2026. PROJECT host implementation, following
+Revision: Draft 0.4 — 02/11/2026. PROJECT host implementation, following
 Atomic Rev.3 §§4, 5, 25 and 26. This revision changes C11 interfaces; it does not
 change imported AUTOSAR datatypes or freeze supplier/vehicle contracts.
 
@@ -181,3 +181,51 @@ desired behavior, short synthetic evidence ages, missing/invalid CP/PP and hardw
 fresh normal completion, pre-deadline proof recovery, late evidence after fault,
 connected/unplug recovery after six invalid CP/PP forms, accepted-sample ordering
 and generation isolation. Historical probes and observations remain unchanged.
+
+
+## Additional findings: TASK-5 through TASK-7 — 2 November 2026
+
+TASK-5: Permission evaluation requires ENERGIZED hardware throughout
+ENERGY_TRANSFER, independent of whether start assessment is enabled. SAFE,
+PREPARING, READY, STOPPING, FAULT or invalid/stale evidence cannot select PREPARE
+in transfer. The coordinator's existing denial path revokes before supervised
+stop. Initial preparation and explicit renegotiation use their existing lifecycle
+states and guards; no new hardware retry or reaction sequence is introduced.
+
+TASK-6: Limit and energy ingress retain only accepted source ordering metadata.
+Current-generation invalid/future/zero/stale evidence clears usability and revokes;
+negative limits, invalid mode/correlation/validity, missing interlock/required
+energy availability and zero snapshot ID are rejected before caching. Reordering
+and duplicate handling apply after validation. Source recovery during negotiation
+is allowed; recovery while stopping never grants renewed transfer permission.
+
+Changed PROJECT contracts:
+
+| Operation | Inputs and ownership | Bounded delivery/failure semantics |
+|---|---|---|
+| `OnEnergySnapshot(coordinator, energy, now)` | Owner receipt time is distinct from energy producer time | Copies accepted evidence only; invalid current evidence clears usability; unrelated generation/receipt rewind rejects before adoption. |
+| `HostSimulation_InjectEnergy(simulation, value, now)` | Explicit synthetic/OS owner clock | Rejects unrelated owner generations before publication; forwards qualified/invalid publications to the coordinator. |
+| `EnergyDataProvider_Publish(provider, snapshot, now, max_age)` | Source owner supplies receipt time and configured freshness age | Owns one visible publication plus separate accepted envelope. Invalid data is delivered as INVALID without advancing accepted ordering; valid reordered/duplicate-mutation data is rejected. Delivery OK does not mean qualification. |
+
+The energy provider change closes the upstream route as well as the coordinator
+cache; otherwise the simulator could still reject recovery before ingress.
+Linux, examples and portable callers now supply receipt time explicitly. These
+are PROJECT interfaces; imported AUTOSAR/BSW ABI and envelopes are unchanged.
+
+TASK-7: `BlockingFaultStatus` is a PROJECT status extended with `root_timestamp`,
+`has_escalation`, `escalation_cause` and `escalation_timestamp`. Its existing `cause`
+and `fault_id` retain the first latched blocking root. A current-generation report
+with strictly stronger severity updates `severity`, envelope reason/time/sequence
+and the bounded escalation fields, leaving root identity and latch intact. Equal
+or lower reports do not overwrite that trace or refresh timestamps. There is at
+most one strictly stronger level after CONTROLLED_STOP in the current enum.
+The S/R read exposes the same authoritative status. Wrong-generation, invalid
+severity and rewinding reports are ignored. Explicit trusted BeginSession/clear
+operations retain lifecycle ownership; this is not a new physical emergency policy.
+
+Desired-behavior regressions in `openv2g_test_coordinator_fault_ingress`:
+`transfer_hardware`, `limit_energy_recovery`, and `fault_escalation`. They cover
+assessment-enabled/disabled transfer, all three limit sources, the public energy
+publication path, negotiation recovery, stopped-session denial, timeout/hardware
+escalation with root trace and publication, duplicate/lower severity and generation
+isolation. Dated additional-review probes remain unchanged at their old baseline.

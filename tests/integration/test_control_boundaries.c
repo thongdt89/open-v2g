@@ -15,7 +15,7 @@ static int ready(OpenV2g_HostSimulation *s, bool assessment)
     TEST_ASSERT(ok(OpenV2g_HostSimulation_AdvancePlcToReady(s, 110u)));
     TEST_ASSERT(ok(OpenV2g_HostSimulation_EstablishHlc(s, 120u)));
     energy = OpenV2g_HostSimulation_DefaultEnergy(s, 140u);
-    TEST_ASSERT(ok(OpenV2g_HostSimulation_InjectEnergy(s, &energy)));
+    TEST_ASSERT(ok(OpenV2g_HostSimulation_InjectEnergy(s, &energy, 140u)));
     TEST_ASSERT(ok(OpenV2g_HostSimulation_InitializeHardwareSafe(s, 141u)));
     TEST_ASSERT(ok(OpenV2g_HostSimulation_PrepareEnergyTransfer(s, 150u)));
     return 0;
@@ -38,22 +38,22 @@ int main(void)
     unsigned source;
     TEST_ASSERT(ready(&s, false) == 0);
     energy = s.coordinator.energy; energy.env.session_generation++; energy.env.quality = OPENV2G_QUALITY_INVALID;
-    TEST_ASSERT(OpenV2g_ChargingCoordinator_OnEnergySnapshot(&s.coordinator, &energy) == OPENV2G_RESULT_REJECTED);
+    TEST_ASSERT(OpenV2g_ChargingCoordinator_OnEnergySnapshot(&s.coordinator, &energy, 160u) == OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(s.coordinator.has_energy && ok(OpenV2g_ChargingCoordinator_EvaluatePermission(&s.coordinator, 160u)));
     older = s.coordinator.energy; older.env.timestamp = 160u; older.env.sequence_counter = 9u;
     energy = older; energy.env.timestamp = 170u; energy.env.sequence_counter = 10u; energy.limits.max_charge_current_ma = 1000;
-    TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_OnEnergySnapshot(&s.coordinator, &energy)));
-    TEST_ASSERT(OpenV2g_ChargingCoordinator_OnEnergySnapshot(&s.coordinator, &older) == OPENV2G_RESULT_REJECTED);
+    TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_OnEnergySnapshot(&s.coordinator, &energy, 170u)));
+    TEST_ASSERT(OpenV2g_ChargingCoordinator_OnEnergySnapshot(&s.coordinator, &older, 170u) == OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_EvaluatePermission(&s.coordinator, 171u)));
     TEST_ASSERT(s.coordinator.permission_manager.current.limits.max_charge_current_ma == 1000);
     energy.limits.max_charge_current_ma = 999999;
-    TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_OnEnergySnapshot(&s.coordinator, &energy)));
+    TEST_ASSERT(ok(OpenV2g_ChargingCoordinator_OnEnergySnapshot(&s.coordinator, &energy, 172u)));
     TEST_ASSERT(s.coordinator.energy.limits.max_charge_current_ma == 1000); /* Duplicate cannot replace source data. */
     for (source = 0u; source < 5u; ++source) {
         TEST_ASSERT(ready(&s, false) == 0 && ok(OpenV2g_HostSimulation_StartEnergyTransfer(&s, 160u)));
         if (source == 0u) {
             energy = s.coordinator.energy; energy.env.timestamp = 0u; energy.env.quality = OPENV2G_QUALITY_INVALID;
-            TEST_ASSERT(OpenV2g_HostSimulation_InjectEnergy(&s, &energy) == OPENV2G_RESULT_REJECTED);
+            TEST_ASSERT(OpenV2g_HostSimulation_InjectEnergy(&s, &energy, 170u) == OPENV2G_RESULT_REJECTED);
         } else if (source == 1u) {
             OpenV2g_PlcLinkStatus link = s.coordinator.link; link.env.timestamp = 170u; ++link.env.sequence_counter; link.env.quality = OPENV2G_QUALITY_INVALID;
             TEST_ASSERT(OpenV2g_ChargingCoordinator_OnLinkStatus(&s.coordinator, &link, 170u) == OPENV2G_RESULT_REJECTED);
@@ -92,7 +92,7 @@ int main(void)
     }
     TEST_ASSERT(ready(&s, false) == 0);
     energy = s.coordinator.energy; energy.env.timestamp = 160u; energy.availability_mask = 0u;
-    TEST_ASSERT(OpenV2g_ChargingCoordinator_OnEnergySnapshot(&s.coordinator, &energy) == OPENV2G_RESULT_REJECTED);
+    TEST_ASSERT(OpenV2g_ChargingCoordinator_OnEnergySnapshot(&s.coordinator, &energy, 160u) == OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_EvaluatePermission(&s.coordinator, 161u) == OPENV2G_RESULT_REJECTED);
     TEST_ASSERT(s.coordinator.permission_manager.current.decision == OPENV2G_PERMISSION_DENY);
     TEST_ASSERT(ready(&s, false) == 0);

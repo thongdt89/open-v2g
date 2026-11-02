@@ -166,7 +166,7 @@ int main(void)
     energy = OpenV2g_HostSimulation_DefaultEnergy(&simulation, 140u);
     TEST_ASSERT(OpenV2g_HostSimulation_InjectEnergy(
                     &simulation,
-                    &energy) == OPENV2G_RESULT_OK);
+                    &energy, 140u) == OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_HostSimulation_InitializeHardwareSafe(
                     &simulation,
                     141u) == OPENV2G_RESULT_OK);
@@ -192,7 +192,7 @@ int main(void)
     energy.snapshot_id++;
     TEST_ASSERT(OpenV2g_HostSimulation_InjectEnergy(
                     &simulation,
-                    &energy) == OPENV2G_RESULT_REJECTED);
+                    &energy, 170u) == OPENV2G_RESULT_REJECTED);
 
     /* Bounded protocol-stop phase must revoke before the hardware request,
      * retain HLC/PLC for the tail exchange, and never renew permission. */

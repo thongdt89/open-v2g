@@ -137,6 +137,9 @@ static bool evidence_is_complete(
         return false;
     }
 
+    if (evidence->coordinator_state == OPENV2G_COORDINATOR_ENERGY_TRANSFER &&
+        evidence->hardware->state != OPENV2G_HW_ENERGIZED) { return false; }
+
     return (evidence->hardware->state == OPENV2G_HW_SAFE) ||
            (evidence->hardware->state == OPENV2G_HW_PREPARING) ||
            (evidence->hardware->state == OPENV2G_HW_READY) ||

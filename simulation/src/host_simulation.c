@@ -386,17 +386,18 @@ OpenV2g_Result OpenV2g_HostSimulation_InjectCpPp(
 
 OpenV2g_Result OpenV2g_HostSimulation_InjectEnergy(
     OpenV2g_HostSimulation *simulation,
-    const OpenV2g_EvEnergySnapshot *value)
+    const OpenV2g_EvEnergySnapshot *value, OpenV2g_TimeUs now)
 {
     OpenV2g_EvEnergySnapshot published;
     OpenV2g_Result result;
 
-    if ((simulation == NULL) || (value == NULL)) {
+    if ((simulation == NULL) || (value == NULL) || now == 0u || now < simulation->coordinator.owner_time ||
+        value->env.session_generation != simulation->coordinator.generation) {
         return OPENV2G_RESULT_REJECTED;
     }
     result = OpenV2g_EnergyDataProvider_Publish(
         &simulation->energy,
-        value);
+        value, now, simulation->config.coordinator.permission.energy_max_age_us);
     if (result == OPENV2G_RESULT_OK) {
         result = simulation->energy_status_port.read(
             simulation->energy_status_port.context,
@@ -405,12 +406,12 @@ OpenV2g_Result OpenV2g_HostSimulation_InjectEnergy(
     if (result == OPENV2G_RESULT_OK) {
         result = OpenV2g_ChargingCoordinator_OnEnergySnapshot(
             &simulation->coordinator,
-            &published);
+            &published, now);
     }
     record(
         simulation,
         OPENV2G_HOST_SIM_OP_ENERGY_PUBLISHED,
-        value->env.timestamp,
+        now,
         result);
     return result;
 }

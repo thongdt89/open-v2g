@@ -181,12 +181,12 @@ int main(void)
                     &hlc_status, rig.now) == OPENV2G_RESULT_OK);
 
     energy = energy_snapshot(generation, 171u);
-    TEST_ASSERT(OpenV2g_EnergyDataProvider_Publish(&rig.energy, &energy) ==
+    TEST_ASSERT(OpenV2g_EnergyDataProvider_Publish(&rig.energy, &energy, 171u, 1000000u) ==
                 OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_TestRig_ReadEnergy(&rig, &energy) == OPENV2G_RESULT_OK);
     TEST_ASSERT(OpenV2g_ChargingCoordinator_OnEnergySnapshot(
                     &coordinator,
-                    &energy) == OPENV2G_RESULT_OK);
+                    &energy, 171u) == OPENV2G_RESULT_OK);
     TEST_ASSERT(rig.hardware_control_port.request_safe_state(
                     rig.hardware_control_port.context,
                     generation,

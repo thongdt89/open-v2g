@@ -127,7 +127,7 @@ static int TestEvidenceSenderReceiverPorts(void)
     energy.env.quality = OPENV2G_QUALITY_VALID;
     energy.env.timestamp = 11u;
     energy.snapshot_id = 7u;
-    TEST_ASSERT(OpenV2g_EnergyDataProvider_Publish(&energy_provider, &energy) ==
+    TEST_ASSERT(OpenV2g_EnergyDataProvider_Publish(&energy_provider, &energy, 11u, 1000u) ==
                 OPENV2G_RESULT_OK);
     TEST_ASSERT(energy_port.read(energy_port.context, &energy_copy) ==
                 OPENV2G_RESULT_OK);

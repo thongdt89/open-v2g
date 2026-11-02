@@ -80,7 +80,7 @@ static bool refresh(OvWireClient *client, OpenV2g_TimeUs now)
     /* Explicit surrounding-component sample, not freshness restamping of a
      * cached sample. freeze_energy intentionally stops this provider. */
     if (!(client->freeze_energy && client->energy_started)) {
-        if (!ok(OpenV2g_HostSimulation_InjectEnergy(sim, &energy))) { return false; }
+        if (!ok(OpenV2g_HostSimulation_InjectEnergy(sim, &energy, now))) { return false; }
     }
     {
         OpenV2g_PowerLimits cable = {INT32_MAX, 0, client->ac_mode ? 32000 : 125000, 0,

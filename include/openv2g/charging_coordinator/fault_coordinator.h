@@ -26,6 +26,9 @@ void OpenV2g_FaultCoordinator_BeginSession(
     uint32_t generation,
     OpenV2g_TimeUs now);
 
+/* Current-generation, monotonic owner reports only. A latch retains its first
+ * blocking cause/id; stronger severity records one bounded escalation. Equal or
+ * lower reports cannot overwrite that trace. BeginSession is trusted lifecycle. */
 void OpenV2g_FaultCoordinator_Raise(
     OpenV2g_FaultCoordinator *coordinator,
     uint32_t generation,

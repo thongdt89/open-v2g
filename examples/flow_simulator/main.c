@@ -56,7 +56,7 @@ int main(void)
     energy = OpenV2g_HostSimulation_DefaultEnergy(&simulation, 140u);
     if (!require_success(
             "energy data",
-            OpenV2g_HostSimulation_InjectEnergy(&simulation, &energy)) ||
+            OpenV2g_HostSimulation_InjectEnergy(&simulation, &energy, 140u)) ||
         !require_success(
             "hardware safe status",
             OpenV2g_HostSimulation_InitializeHardwareSafe(

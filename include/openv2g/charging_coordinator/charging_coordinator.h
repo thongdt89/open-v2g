@@ -106,9 +106,11 @@ OpenV2g_Result OpenV2g_ChargingCoordinator_OnLimitEvidence(
     OpenV2g_ChargingCoordinator *coordinator, const OpenV2g_LimitEvidence *evidence,
     OpenV2g_TimeUs now);
 
+/* Owner receipt time validates source freshness; rejected samples never become
+ * the accepted energy ordering watermark. */
 OpenV2g_Result OpenV2g_ChargingCoordinator_OnEnergySnapshot(
     OpenV2g_ChargingCoordinator *coordinator,
-    const OpenV2g_EvEnergySnapshot *energy);
+    const OpenV2g_EvEnergySnapshot *energy, OpenV2g_TimeUs now);
 
 /* Serialized PROJECT ingress: now is trusted monotonic owner receipt time,
  * independent of the producer envelope. Invalid current-generation evidence

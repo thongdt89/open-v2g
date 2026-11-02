@@ -36,11 +36,16 @@ void OpenV2g_FaultCoordinator_Raise(
     OpenV2g_FaultSeverity severity,
     OpenV2g_ReasonCode cause)
 {
-    if (coordinator == NULL) {
-        return;
-    }
-
+    if (coordinator == NULL || generation == 0u || generation != coordinator->status.env.session_generation ||
+        coordinator->status.env.quality != OPENV2G_QUALITY_VALID || now == 0u || now < coordinator->status.env.timestamp ||
+        severity < OPENV2G_FAULT_INFO || severity > OPENV2G_FAULT_EMERGENCY_STOP) { return; }
     if (coordinator->status.latched) {
+        if (severity <= coordinator->status.severity) { return; }
+        coordinator->status.severity = severity;
+        coordinator->status.env.sequence_counter++;
+        coordinator->status.env.timestamp = now; coordinator->status.env.reason = cause;
+        coordinator->status.has_escalation = true; coordinator->status.escalation_cause = cause;
+        coordinator->status.escalation_timestamp = now;
         return;
     }
 
@@ -51,7 +56,7 @@ void OpenV2g_FaultCoordinator_Raise(
     coordinator->status.env.reason = cause;
     coordinator->status.fault_id = coordinator->next_fault_id++;
     coordinator->status.severity = severity;
-    coordinator->status.cause = cause;
+    coordinator->status.cause = cause; coordinator->status.root_timestamp = now;
     coordinator->status.latched = severity >= OPENV2G_FAULT_CONTROLLED_STOP;
 }
 
