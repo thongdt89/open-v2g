@@ -212,3 +212,92 @@ TASK-3 / TASK-4 closure — 2026-10-31
     docs/architecture/evidence/coordinator_bugfix34_verification.json
   All four current buglist tasks are done. Historical review probes are unchanged;
   no whole-project defect-free, target safety or production freeze claim follows.
+
+Independent closure review — 2026-11-02
+  Reviewed commit: 5b084401bd47da8b769a58efd94757323d433bae.
+  TASK-1 through TASK-4 remain fixed within their documented host scope.
+  Fresh portable build: 27/27 passed. Rebuilt integration configuration:
+  42/51 initially passed; 9 local-socket tests were blocked by the sandbox.
+  Approved retry outside the sandbox: all 9/9 passed, covering all 51 tests.
+  No implementation changes or unresolved finding in the reviewed fixes.
+  Full review, limits and verification metadata:
+    docs/architecture/reviews/BUGLIST_CLOSURE_REVIEW_2026-11-02.md
+    docs/architecture/reviews/evidence/buglist_closure_20261102.json
+
+Additional review — 2026-11-02
+  Baseline: 5b084401bd47da8b769a58efd94757323d433bae.
+  TASK-1 through TASK-4 remain closed within their stated scope. The following
+  are additional reproduced findings, not a reversal of those fix dispositions.
+  Report: docs/architecture/reviews/ADDITIONAL_FINDINGS_2026-11-02.md
+  Probe: docs/architecture/reviews/evidence/additional_probe_20261102.c
+
+[x] TASK-5 | P1 | Deny unexpected hardware states during energy transfer | done
+Status: FIXED — implementation 47fb1b17ee4138289546c320b91b2780081dbcfe
+Files: src/charging_coordinator/permission_manager.c
+       src/charging_coordinator/charging_coordinator.c
+Problem: With physical assessment enabled, fresh SAFE/PREPARING evidence during
+  ENERGY_TRANSFER bypasses the continued-ENERGIZED check and grants ALLOW/PREPARE.
+  EvaluatePermission requests preparation while leaving the lifecycle in transfer.
+Fix: Enforce transfer-specific hardware consistency before selecting actions.
+  Deny and coordinate stopping on unexpected state; preserve valid initial
+  preparation, explicit renegotiation and fresh ENERGIZED continuation.
+Acceptance:
+  - SAFE/PREPARING/READY/FAULT/invalid/stale transfer evidence cannot grant PREPARE
+    or cause a new preparation command in ENERGY_TRANSFER.
+  - The denial path revokes before supervised stopping; repeated callbacks remain
+    idempotent and cannot revive the session.
+  - Normal start, assessment, transfer and renegotiation tests still pass.
+
+[x] TASK-6 | P2 | Preserve accepted limit and energy ordering on invalid updates | done
+Status: FIXED — implementation 47fb1b17ee4138289546c320b91b2780081dbcfe
+File: src/charging_coordinator/charging_coordinator.c
+Operations: OnLimitEvidence, OnEnergySnapshot
+Problem: Rejected future/invalid samples are cached as ordering watermarks.
+  A subsequent valid timestamp 180/sequence 101 is rejected after an invalid
+  timestamp 1000000/sequence 100, blocking recovery during HLC_NEGOTIATION.
+Fix: Clear usability without replacing accepted ordering metadata. Keep rejected
+  diagnostic data separate; give energy ingress trusted receipt-time validation
+  where needed. Preserve unrelated-generation and genuine reordering rejection.
+Acceptance:
+  - All limit sources and energy recover on valid ordered current evidence after
+    future/invalid/high-sequence input without a session reset during negotiation.
+  - Invalid evidence remains fail-closed; recovery cannot revive a stopping session.
+  - Accepted ordering, duplicates and generation isolation have regressions.
+
+[x] TASK-7 | P2 | Allow higher fault severity to escalate an existing latch | done
+Status: FIXED — implementation 47fb1b17ee4138289546c320b91b2780081dbcfe
+File: src/charging_coordinator/fault_coordinator.c
+Operation: Raise; integration with coordinator Tick
+Problem: A latched CONTROLLED_STOP/INTERNAL discards the EMERGENCY_STOP/TIMEOUT
+  report when hardware stopping misses its deadline. State/result escalate, but
+  authoritative fault status does not retain the higher severity or timeout.
+Fix: Retain root cause while allowing monotonic severity escalation and secondary
+  evidence. Do not invent physical reaction policy or clear the existing latch.
+Acceptance:
+  - Controlled fault followed by failed-stop timeout or hardware emergency exposes
+    the stronger severity and traceable secondary cause.
+  - Duplicate/lower-severity reports cannot downgrade, clear or erase the latch.
+  - Generation isolation and bounded-stop permission/state behavior remain valid.
+
+For TASK-5 through TASK-7, add desired-behavior regressions separate from the
+historical defect probe, run the affected portable/integration suites, and record
+implementation commit and evidence before marking done.
+
+TASK-5 / TASK-6 / TASK-7 closure — 2026-11-02
+  Transfer requires fresh ENERGIZED hardware; unexpected states cannot select
+  PREPARE. Existing denial-to-stop ordering and explicit renegotiation remain.
+  Invalid limit/energy publications clear usability without replacing accepted
+  ordering metadata. Energy ingress/publication now use trusted receipt time;
+  the provider's invalid visible publication is separate from its accepted envelope.
+  A latched fault preserves root cause/id while accepting strictly stronger
+  severity and publishing bounded escalation cause/time. Lower/equal reports and
+  unrelated generations cannot erase or downgrade the latch.
+  Desired-behavior regression functions in openv2g_test_coordinator_fault_ingress:
+    transfer_hardware, limit_energy_recovery, fault_escalation.
+  Final suites: fresh portable 27/27; portable ASAN/UBSAN 27/27;
+                generated EXI/Linux/TLS/PnC integration 51/51 passed.
+  Disposition, commands, source/log hashes and exact host limits:
+    docs/architecture/BUGLIST_FIX_DISPOSITION_2026-11-02.md
+    docs/architecture/evidence/coordinator_bugfix567_verification.json
+  Historical reports/probes remain unchanged. All seven current buglist tasks
+  are done; no whole-project defect-free, production or target safety claim.

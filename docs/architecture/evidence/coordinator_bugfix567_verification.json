@@ -1,0 +1,67 @@
+{
+  "date": "2026-11-02",
+  "review_baseline": "5b084401bd47da8b769a58efd94757323d433bae",
+  "implementation_commit": "47fb1b17ee4138289546c320b91b2780081dbcfe",
+  "closed_tasks": [
+    "TASK-5",
+    "TASK-6",
+    "TASK-7"
+  ],
+  "scope": "PROJECT host permission/evidence/fault fixes; no imported AUTOSAR ABI change",
+  "regression": "openv2g_test_coordinator_fault_ingress",
+  "new_functions": [
+    "transfer_hardware",
+    "limit_energy_recovery",
+    "fault_escalation"
+  ],
+  "fresh_build": "/tmp/openv2g-bugfix567-ckx4pil6",
+  "builds": {
+    "fresh_portable": {
+      "passed": 27,
+      "failed": 0,
+      "log": "/tmp/bugfix567-fresh-tests.log",
+      "log_sha256": "891b667852715bd0deb4da8643180c39d0d738fdcd6733cb6361f302da33ff71"
+    },
+    "portable_asan_ubsan": {
+      "passed": 27,
+      "failed": 0,
+      "log": "/tmp/bugfix567-sanitize-tests.log",
+      "log_sha256": "8fa8d2159c7a1a285fe445e7753dedb328e32bc5f4d65bfc9e43f8e3ed53a1b5"
+    },
+    "generated_linux_tls_pnc": {
+      "passed": 51,
+      "failed": 0,
+      "log": "/tmp/bugfix567-tls-tests.log",
+      "log_sha256": "c1fcb6fcfdcd63386a9a603a96f2fd66e2c63be2d21699a2d756785db7696b46"
+    }
+  },
+  "source_sha256": {
+    "docs/architecture/CONTROL_BOUNDARY_HARDENING.md": "c9ec46a36ee6c847318c09e31a432460a3018d4666f09aa0dfb62a1c2da2375f",
+    "examples/flow_simulator/main.c": "94a9f28aefcf88494b7a1e1b6505cfaf97afe920437e20748492612b240d9958",
+    "include/openv2g/charging_coordinator/charging_coordinator.h": "f4ca3b50a1f421eb4370961aef061a3d2e5ffdfc03912a957e54887907cb0c24",
+    "include/openv2g/charging_coordinator/fault_coordinator.h": "3d1810231c1d23b5431c80a520fd9cb5b9b56bf3df61d36f122c5c8d5da636bf",
+    "include/openv2g/common/types.h": "458e19ef8204fd757f5cd5596daf39207e62539f64dded4f82fd89ded67453a1",
+    "include/openv2g/support/energy_data_provider.h": "e8e16cce7ce947b5fb660ee15e8ab2c59ae954671cb54f27a6f4c6019d6bd28a",
+    "simulation/include/openv2g/simulation/host_simulation.h": "071573574bce28eb49a7da6b71f277edc1a5b2596242ab16cff97e26715ec3b9",
+    "simulation/linux/src/rte.c": "5e252113736aac08c0aa59e206257425ffc2dbd49c9106ed624f44796bf344b9",
+    "simulation/linux/wire/client.c": "5b3dfff238e2b1c7de147f5172894f1cb82241c2b4e33da086b71d01c646a64d",
+    "simulation/src/host_simulation.c": "9200d5e9b1d93157ad12317926f1ca5b7c2c3e26cb08bf01864897e8d3587046",
+    "src/charging_coordinator/charging_coordinator.c": "69e613089fd5685743dbadc70a5a63b68168dd22b6cfe598ef73dcedaecf1307",
+    "src/charging_coordinator/fault_coordinator.c": "470e0360680a9b3f9134a3f34235140487b23372528d290d61589b55555133ea",
+    "src/charging_coordinator/permission_manager.c": "b39d376279afe88ba7770d701d4cc961acdb3afae8e572b7a3fa08fd251d4d12",
+    "src/support/energy_data_provider.c": "f88fa719b56fd65425c314dd22e8ec41cd33f4aaa7503fa3c95de45cb10c95b4",
+    "tests/integration/test_control_boundaries.c": "354d908a6631237b1eebe8ebf35dc941f9e43442d698bdd780a980edc4370f7b",
+    "tests/integration/test_coordinator_fault_ingress.c": "f0f967e41f7dea8147ea75452117309720e154a20314b5cab5d8d3b10fefb17b",
+    "tests/integration/test_host_simulation.c": "410972aaa78a74a8a56c59e2720ffa2e3d5b1fe42765e07e262367cdc657b463",
+    "tests/integration/test_nominal_flow.c": "272e52e80e0c9aab816d90c29a2fd3f2e58ee7c8fdd5649b8cc486912b9158d4",
+    "tests/integration/test_processing_budgets.c": "27ded5cef06f06b3b19452396d88bd0e2835b775e544a5dae3c784b7e058dd56",
+    "tests/unit/test_asr_style_ports.c": "d175e047ac4665b289af118463fcde90b0c9b796102196bcfe73325d8a048c0b"
+  },
+  "limitations": [
+    "No production, target safety timing allocation or physical interoperability conclusion",
+    "Portable sanitizer results cover changed core behavior; system OpenSSL libraries are not instrumented",
+    "Fault secondary trace records the strictly stronger escalation, not an unbounded event history",
+    "Historical defect probes remain unchanged against their original baseline",
+    "No whole-project defect-free claim"
+  ]
+}
