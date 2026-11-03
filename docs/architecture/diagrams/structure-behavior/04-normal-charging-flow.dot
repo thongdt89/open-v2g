@@ -1,0 +1,36 @@
+digraph EVCC {
+
+  graph [rankdir=TB, bgcolor="#ffffff", pad="0.35", nodesep="0.45", ranksep="0.55", fontname="DejaVu Sans", fontsize=22, fontcolor="#142f46", labelloc=t, labeljust=l, compound=true];
+  node [shape=box, style="rounded,filled", fillcolor="#edf5fc", color="#6b91b0", penwidth=1.2, fontname="DejaVu Sans", fontsize=12, fontcolor="#17324a", margin="0.18,0.13"];
+  edge [color="#55758c", penwidth=1.2, fontname="DejaVu Sans", fontsize=10, fontcolor="#34566e", arrowsize=0.75];
+  label="04  Normal charging behavior\nCurrent host wire profile at 346c11f | simplified activity flow";
+
+  connect [label="CpPpManager -> ChargeStateMachine\nQualified connection / create sessionGeneration"];
+  link [label="Coordinator -> PlcLinkManager\nStartLink / modem + SLAC + association + IPv6 ready", fillcolor="#eaf7f3", color="#75a99a"];
+  start [label="Coordinator -> HlcSessionAdapter / Supervisor\nStartHlc after current link readiness"];
+  network [label="HLC: SdpClient -> TcpTlsSession -> SapNegotiator\nEndpoint / TCP / optional configured TLS / schema selection"];
+  setup [label="Selected DIN or ISO-2 adapter\nSessionSetup -> service selection -> EIM authorization\nChargeParameterDiscovery / selected operating mode"];
+  mode [shape=diamond, label="Selected mode", fillcolor="#f5f8fa", width=1.6];
+  dc [label="DC: DIN or ISO-2\nCableCheck -> coordinator PREPARE\nPreCharge -> correlated readiness assessment"];
+  ac [label="AC: ISO-2 opt-in\nCoordinator PREPARE\nLocal OBC / AC readiness assessment"];
+  permission [label="PermissionManager\nFresh required evidence + configured readiness assessment\nPublish bounded ALLOW / ENERGIZE", fillcolor="#daeefa", color="#397aa5", penwidth=2];
+  pd [label="HLC adapter -> EVSE\nPowerDelivery START using current permission\nValidate response and active session"];
+  enable [label="ChargeStateMachine -> ChargeHardwareAdapter\nReevaluate permission / EnableEnergyPath\nAccepted -> ENERGY_TRANSFER; supervise measured feedback"];
+  loop [label="Supervised energy transfer\nDC: CurrentDemand | AC: ChargingStatus\nRefresh vehicle evidence / handle peer limits / optional host receipt", fillcolor="#eaf7f3", color="#75a99a"];
+  stop [label="Normal completion / stop request\nEnter stop transaction — diagram 05", fillcolor="#fff4da", color="#c1a15d"];
+  {rank=same; dc; ac;}
+  connect -> link -> start -> network -> setup -> mode;
+  mode -> dc [label="DC"];
+  mode -> ac [label="AC"];
+  dc -> permission; ac -> permission;
+  permission -> pd [label="ENERGIZE granted"];
+  pd -> enable [label="peer accepts START"];
+  enable -> loop;
+  loop -> loop [label="continue only while\nevidence / permission valid"];
+  loop -> stop [label="complete / request stop"];
+  exception [shape=note, label="At every applicable step:\ninvalid evidence, expiry, link loss,\nprotocol/security failure or hardware fault\npre-empts normal progression -> diagram 05", fillcolor="#fdecec", color="#c87b7b", fontsize=11];
+  network -> exception [style=dashed, arrowhead=none, constraint=false];
+  note [shape=note, label="HOST scope: simulated CP / energy / PLC / hardware; real opt-in EXI and sockets.\nPeer/schedule limit mapping still partly lives in the runner at this commit.\nEIM authorization is protocol evidence, never vehicle energy permission.\nThe drawing specifies responsibility/order, not approved electrical sequencing.", fillcolor="#f1f4f7", color="#a3b1be", fontsize=11];
+  stop -> note [style=invis];
+
+}

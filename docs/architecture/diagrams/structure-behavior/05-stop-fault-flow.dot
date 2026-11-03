@@ -1,0 +1,41 @@
+digraph EVCC {
+
+  graph [rankdir=TB, bgcolor="#ffffff", pad="0.35", nodesep="0.45", ranksep="0.55", fontname="DejaVu Sans", fontsize=22, fontcolor="#142f46", labelloc=t, labeljust=l, compound=true];
+  node [shape=box, style="rounded,filled", fillcolor="#edf5fc", color="#6b91b0", penwidth=1.2, fontname="DejaVu Sans", fontsize=12, fontcolor="#17324a", margin="0.18,0.13"];
+  edge [color="#55758c", penwidth=1.2, fontname="DejaVu Sans", fontsize=10, fontcolor="#34566e", arrowsize=0.75];
+  label="05  Stop and fault behavior\nCurrent coordinator transaction at 346c11f | bounded by owner Tick";
+
+  normal [label="Normal protocol stop\nBeginProtocolStop from READY / TRANSFER"];
+  failure [label="Fault / expiry / evidence loss / explicit Stop\nStop(now, reason)", fillcolor="#fdecec", color="#c87b7b"];
+  deny [label="1  PermissionManager: publish DENY\nChargeStateMachine: enter STOPPING", fillcolor="#daeefa", color="#397aa5", penwidth=2];
+  safe [label="2  Request safe hardware once\nRetain command result + starting hardware sequence\nArm coordinator stop deadline"];
+  choose [shape=diamond, label="Normal protocol tail\nstill permitted?", fillcolor="#f5f8fa"];
+  tail [label="3a  Wire fixture checks safe / zero-current hardware\nRetain HLC / PLC for bounded protocol tail\nPowerDelivery STOP -> DC WeldingDetection -> SessionStop\nAC skips WeldingDetection", fillcolor="#eae7fa", color="#8872b7"];
+  teardown [label="3b  Coordinator calls Stop\nHLC cancel / transport close -> PLC StopLink\nRepeated calls retain result; no automatic physical retry"];
+  complete [shape=diamond, label="Qualified measured SAFE\n+ successful service teardown\n+ fresh CP / hardware?", fillcolor="#f5f8fa"];
+  wait [label="Pending: retain DENY and observe status\nHardware result alone is not safe confirmation\nHLC / link ACCEPTED requires IDLE / DOWN evidence"];
+  deadline [shape=diamond, label="Owner stop deadline\nreached?", fillcolor="#fff4da", color="#c1a15d"];
+  latch [label="Incomplete physical confirmation or async teardown\nFaultCoordinator records timeout / BLOCKING_FAULT\nFAULT_LATCHED; retain DENY", fillcolor="#fdecec", color="#c87b7b"];
+  plugged [shape=diamond, label="Qualified plug state", fillcolor="#f5f8fa"];
+  idle [label="CONNECTED_IDLE\nExplicit RestartConnected requires\nfresh safe evidence; new generation"];
+  unplugged [label="UNPLUGGED\nSafe completion confirmed"];
+  {rank=same; normal; failure;}
+  {rank=same; idle; unplugged;}
+  normal -> deny; failure -> deny;
+  deny -> safe -> choose;
+  choose -> tail [label="normal path"];
+  choose -> teardown [label="fault / direct Stop"];
+  tail -> teardown [label="completed, fault, or owner deadline\nTick forces teardown at deadline"];
+  teardown -> complete;
+  complete -> plugged [label="yes"];
+  complete -> wait [label="no"];
+  wait -> deadline;
+  deadline -> complete [label="no / next owner turn", constraint=false];
+  deadline -> wait [label="otherwise retain DENY\nawait qualifying completion evidence", style=dashed, constraint=false];
+  deadline -> latch [label="yes + missing physical\nor service completion"];
+  plugged -> idle [label="connected"];
+  plugged -> unplugged [label="unplugged"];
+  caveat [shape=note, label="Measured SAFE: current generation / newer hardware sequence, before deadline,\nopen contactors, inactive precharge, zero measured current; evidence remains fresh.\nUnplug does not erase a pending stop. Late callbacks cannot revive a session.\nPhysical retry/fallback and watchdog if the owner stalls remain vehicle/target work.", fillcolor="#f1f4f7", color="#a3b1be", fontsize=11];
+  latch -> caveat [style=invis]; idle -> caveat [style=invis]; unplugged -> caveat [style=invis];
+
+}

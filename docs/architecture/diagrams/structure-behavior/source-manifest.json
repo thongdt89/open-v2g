@@ -1,0 +1,58 @@
+{
+  "revision": "Draft 0.1",
+  "date": "2026-10-30",
+  "commit": "346c11fda28f91a2fe65316f5a7ab4263ec8081a",
+  "scope": "Logical design plus selected host behavior; concurrent working-tree implementation changes excluded.",
+  "sources": [
+    {
+      "path": "docs/EVCC_AUTOSAR_Two_Main_Compositions_Atomic_Interface_Spec_VI.md",
+      "git_blob": "9dd29bc0f96032b1931281237c0882aa77581a58",
+      "sha256": "fa52c1dd7e3122c4d27cc3a82323b1cf333723be3c715a586b4f1745088e6bdf"
+    },
+    {
+      "path": "docs/EVCC_AUTOSAR_Two_Main_Compositions_Detailed_Description_VI.md",
+      "git_blob": "b9d036f1d284c5362543f9229e075299f652ccd9",
+      "sha256": "f27f2010d0e3fded104a52f794d2717e867607f5633760cde6fd798f05be213d"
+    },
+    {
+      "path": "docs/EVCC_AUTOSAR_Charging_Architecture.md",
+      "git_blob": "dcf3971bc5e5903ab82214a2ce7e9de4434b7867",
+      "sha256": "efad896b04002a9b470844e614f714397338f2949caf02784aa24bc2cc68e2f4"
+    },
+    {
+      "path": "docs/architecture/CONTROL_BOUNDARY_HARDENING.md",
+      "git_blob": "613091ccdfbf85ea0305f34b65110e17362e9d22",
+      "sha256": "6257cf24db5cafcb427b7f354541a9193fba86038a3c31dc952e705d96ed6d2a"
+    },
+    {
+      "path": "simulation/linux/TLS_CRYPTO.md",
+      "git_blob": "fc1913c833f33dc843d23aeb32afac867d098193",
+      "sha256": "6e0a1ac0f1b01466d5a2b73d9466e1268197558aff30ef58cdd6eca1fc8fd4de"
+    },
+    {
+      "path": "src/charging_coordinator/charge_state_machine.c",
+      "git_blob": "4e288213f04195855f3f78b11e7700b9b08168fe",
+      "sha256": "97e81e8465ae6deb136034714d728d2cf80d49d8e441e255e5a7f4bb92109445"
+    },
+    {
+      "path": "src/charging_coordinator/charging_coordinator.c",
+      "git_blob": "969c0f8065602317924693d6e454b370e2c66b17",
+      "sha256": "32f7364bb08d63f5f0adfbfc7e7812cc755feba496ee86d236d4af558a721a2f"
+    },
+    {
+      "path": "src/charging_coordinator/permission_manager.c",
+      "git_blob": "c19035aff67ad66eaad9edbe844650f03e5ebeea",
+      "sha256": "2636ec91ad5c2aafb489fcd96490e066549b5e3616381c255a7cd1cf991e2aea"
+    },
+    {
+      "path": "simulation/linux/wire/client.c",
+      "git_blob": "feb01c466f88bcccdcc6006024c4f1ec04b85059",
+      "sha256": "6b37d74c030287641e9eede89841eff7c6bc05140dd27d4b7a6fb00d826df0d7"
+    },
+    {
+      "path": "src/iso15118_chrg/iso15118_chrg.c",
+      "git_blob": "7f73f97c93d4aea3bdac6701a6ee96c99555c216",
+      "sha256": "00b45f7a1e750c79bd3394609e4bac55e802a47970f7052cd7710ba5667772fd"
+    }
+  ]
+}

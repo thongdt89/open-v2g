@@ -87,3 +87,52 @@ supplier/vehicle/target work still open.
 [Control-boundary contracts and evidence](architecture/CONTROL_BOUNDARY_HARDENING.md)
 records current-source invalidation, permission readiness/expiry, bounded measured
 stopping and connected restart. Remaining review and target gates stay explicit.
+
+## Structure and behavioral diagrams — 30/10/2026
+
+[EVCC structure and behavior](architecture/STRUCTURE_AND_BEHAVIOR.md), Draft 0.1:
+five rendered diagrams for system structure, HLC decomposition, coordinator
+states, normal DC/AC charging, and stop/fault handling. Logical design follows
+Atomic Rev.3; host behavior is pinned to `346c11f`. Includes PNG previews,
+scalable SVG, editable DOT, a source manifest and explicit remaining target
+boundaries. This is the diagram entry point for that implementation snapshot;
+earlier diagrams retain their historical scope.
+
+## Architecture re-review — 31/10/2026
+
+[Architecture re-review](architecture/reviews/ARCHITECTURE_REVIEW_2026-10-31.md),
+Revision 0.1, baseline `4f4df51`: disposition of the eight earlier findings,
+two reproduced coordinator control-path defects, newer ownership boundaries,
+and 26/26 passing portable tests. Existing diagrams remain historical snapshots;
+this review does not freeze the target architecture.
+
+## Buglist closure review — 02/11/2026
+
+[Coordinator closure review](architecture/reviews/BUGLIST_CLOSURE_REVIEW_2026-11-02.md),
+Revision 0.1, baseline `5b08440`: all four buglist fixes confirmed within host
+scope; fresh portable tests 27/27, all 51 integration tests passed across the
+initial run and approved local-socket retry. External architecture decisions
+remain separate.
+
+## Additional coordinator findings — 02/11/2026
+
+[Additional findings](architecture/reviews/ADDITIONAL_FINDINGS_2026-11-02.md),
+Revision 0.1, baseline `5b08440`: three newly reproduced permission, source
+recovery and fault-escalation gaps, tracked as TASK-5 through TASK-7 in buglist.txt.
+The four earlier fixes retain their scoped closure.
+
+## Additional finding closure — 02/11/2026
+
+[TASK-5–7 closure review](architecture/reviews/TASK_5_7_CLOSURE_REVIEW_2026-11-02.md),
+Revision 0.1, baseline `32fa56f`: confirms the three additional fixes; all seven
+current buglist tasks are closed within host scope. Fresh portable run 27/27;
+recorded sanitizer/integration evidence checked against source and log hashes.
+
+## Solution architecture design — 02/11/2026
+
+[EVCC solution architecture](architecture/SOLUTION_ARCHITECTURE.md), Revision 0.1:
+logical solution overview and detailed HLC decomposition, with editable DOT,
+SVG and PNG exports. Uses Atomic Rev.3 ownership and interface contracts, with
+host status annotations at `32fa56f`, including restricted PnC and disabled
+ISO-20/BPT session paths. Distinguishes design intent, host implementation and
+remaining supplier/vehicle/target boundaries; preserves historical diagrams.

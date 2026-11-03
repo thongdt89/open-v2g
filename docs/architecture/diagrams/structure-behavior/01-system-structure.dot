@@ -1,0 +1,36 @@
+digraph EVCC {
+
+  graph [rankdir=TB, bgcolor="#ffffff", pad="0.35", nodesep="0.45", ranksep="0.55", fontname="DejaVu Sans", fontsize=22, fontcolor="#142f46", labelloc=t, labeljust=l, compound=true];
+  node [shape=box, style="rounded,filled", fillcolor="#edf5fc", color="#6b91b0", penwidth=1.2, fontname="DejaVu Sans", fontsize=12, fontcolor="#17324a", margin="0.18,0.13"];
+  edge [color="#55758c", penwidth=1.2, fontname="DejaVu Sans", fontsize=10, fontcolor="#34566e", arrowsize=0.75];
+  label="01  EVCC system structure\nLogical responsibilities | Atomic Rev.3 | host mapping at 346c11f";
+
+  vehicle [label="Vehicle application / charging policy", fillcolor="#f1f4f7", color="#a3b1be"];
+  cp [label="CpPpManager\nCpStateEvaluator / PpCapabilityEvaluator\nCpPpHwIf", fillcolor="#eaf7f3", color="#75a99a"];
+  energy [label="EvEnergyDataProvider\nEnergySnapshotProvider / EnergyDataValidator\nBptCapabilityProvider", fillcolor="#eaf7f3", color="#75a99a"];
+  cc [label="ChargingCoordinator\n\nChargeStateMachine — progression\nPermissionManager — ChargePermission\nFaultCoordinator — fault / recovery policy\nBptCoordinator — direction / zero crossing", fillcolor="#daeefa", color="#397aa5", penwidth=2];
+  hlc [label="ISO15118Chrg\n\nHlcSessionAdapter / HlcSessionSupervisor\nSDP / TCP-TLS / V2GTP / EXI\nSAP / protocol adapters / security\nSee diagram 02", fillcolor="#eae7fa", color="#8872b7", penwidth=2];
+  plc [label="PlcLinkManager\nLinkSupervisor / PevSlac / PlcModemIf\nOwns association and link readiness", fillcolor="#eaf7f3", color="#75a99a"];
+  hw [label="ChargeHardwareAdapter\nContactor / lock / precharge / discharge\nOBC and power-path execution + measurements", fillcolor="#eaf7f3", color="#75a99a"];
+  platform [label="PlatformServices — target integration open\nRTE / OS / SchM / WdgM / Dem / NvM\nTcpIp / SoAd / Csm / KeyM / HSM / MCAL", fillcolor="#f1f4f7", color="#a3b1be"];
+  evse [label="EVSE / SECC\nExternal protocol peer", fillcolor="#f1f4f7", color="#a3b1be"];
+  {rank=same; cp; vehicle; energy;}
+  {rank=same; cc; hlc;}
+  {rank=same; plc; hw; evse;}
+  vehicle -> cc [label="policy / lifecycle request"];
+  cp -> cc [label="QualifiedCpPp\nCC-EXT-001"];
+  energy -> cc [label="EnergySnapshot\nCC-EXT-002"];
+  energy -> hlc [label="EvChargeSnapshot\nHSA-IF-007"];
+  cc -> hlc [label="to HLC: lifecycle / permission\nfrom HLC: status / events / evidence", dir=both, arrowtail=normal];
+  cc -> hw [label="hardware intent / permission\nmeasured status / result", dir=both, arrowtail=normal];
+  cc -> plc [label="StartLink / StopLink\nLinkStatus", dir=both, arrowtail=normal];
+  plc -> hlc [label="link + IPv6 readiness", constraint=false];
+  hlc -> evse [dir=both, label="logical HLC exchange\nover PLC / IP"];
+  plc -> platform [style=dashed, dir=none, label="platform dependency"];
+  hw -> platform [style=dashed, dir=none];
+  hlc -> platform [style=dashed, dir=none, constraint=false];
+  note [shape=note, fillcolor="#fff4da", color="#c1a15d", fontsize=11, label="Solid arrows: logical control or data flow; not generated RTE wiring.\nDashed lines: platform dependency. Logical modules are not fixed SWC/task allocations.\nHLC provides requests and evidence. Only the coordinator commands hardware.\nHost support uses simulated vehicle / PLC / hardware; target integration remains open."];
+  evse -> platform [style=invis];
+  platform -> note [style=invis];
+
+}

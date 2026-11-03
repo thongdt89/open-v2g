@@ -1,0 +1,59 @@
+digraph Solution {
+  graph [rankdir=TB, newrank=true, bgcolor="#ffffff", pad=0.35, nodesep=0.5, ranksep=0.8, splines=polyline, fontname="DejaVu Sans", fontsize=22, labelloc=t, label="EVCC / AUTOSAR Classic\nSolution architecture · logical responsibility view\n "];
+  node [shape=box, style="rounded,filled", fillcolor="#f1f5f9", color="#64748b", fontname="DejaVu Sans", fontsize=13, margin="0.20,0.15"];
+  edge [fontname="DejaVu Sans", fontsize=10, color="#475569", fontcolor="#334155", arrowsize=0.75];
+
+  cp [label="CpPpManager\nQualifies CP / PP measurements"];
+  energy [label="EvEnergyDataProvider\nBMS / OBC / thermal / isolation evidence"];
+  {rank=same; cp; energy;}
+
+  subgraph cluster_cc {
+    label="ChargingCoordinator  |  vehicle charge authority"; fontsize=17; fontcolor="#115e59"; color="#0f766e"; style="rounded,filled"; fillcolor="#f0fdfa"; margin=24;
+    csm [label="ChargeStateMachine\nOwns vehicle charging progression", fillcolor="#ccfbf1", color="#0f766e", penwidth=2];
+    pm [label="PermissionManager\nSole writer of ChargePermission\nExpiry / invalid evidence = DENY", fillcolor="#ccfbf1", color="#0f766e", penwidth=2];
+    fault [label="FaultCoordinator\nSeverity, reaction, latch and recovery"];
+    bpt [label="BptCoordinator\nDirection / limits / measured-zero policy\nBPT wire path remains disabled", style="rounded,dashed,filled", fillcolor="#fff7ed", color="#b45309"];
+    {rank=same; csm; pm;}
+    {rank=same; fault; bpt;}
+    csm -> pm [label="EvaluatePermission", constraint=false];
+    pm -> csm [label="PermissionDecision", color="#0f766e", fontcolor="#115e59", constraint=false];
+    fault -> csm [label="SafeStopRequest", constraint=false];
+    fault -> pm [label="BlockingFaultStatus", constraint=false];
+    bpt -> pm [label="BptPermissionRequest", constraint=false];
+    csm -> fault [style=invis];
+    pm -> bpt [style=invis];
+  }
+
+  hlc [label="ISO15118Chrg\nHlcSessionAdapter · project facade\nHLC lifecycle / protocol / codec / security\nExpanded in diagram 02", fillcolor="#eff6ff", color="#2563eb", penwidth=2];
+  hw [label="ChargeHardwareAdapter\nExecutes coordinator commands\nConfirms independently measured state", fillcolor="#f0fdfa", color="#0f766e", penwidth=2];
+  plc [label="PlcLinkManager\nLinkSupervisor · PevSlac · PlcModemIf\nOwns PEV-SLAC and link readiness"];
+  {rank=same; hlc; plc; hw;}
+  fault -> hlc [style=invis];
+  bpt -> hw [style=invis];
+
+  cp -> csm [label="QualifiedCpPp\nCC-EXT-001"];
+  energy -> pm [label="EnergySnapshot\nCC-EXT-002"];
+
+  csm -> hlc [label="Lifecycle requests →\n← Status / requests / evidence\nCC-EXT-004…005, 015…017", dir=both, color="#2563eb", minlen=2];
+
+  csm -> plc [label="StartLink / StopLink →\n← LinkStatus\nCC-EXT-003, 013…014", dir=both, minlen=2];
+
+  plc -> hlc [label="LinkStatus + IPv6 readiness\nHSA-IF-009", style=dashed, constraint=false];
+  csm -> hw [label="Prepare / Enable / Stop / SafeState →\n← Measured status / command result\nCC-EXT-006…007, 009…012", dir=both, color="#0f766e", penwidth=2, minlen=2];
+
+  pm -> hw [label="ChargePermission\nCC-EXT-008", color="#0f766e", penwidth=2];
+  pm -> hlc [label="ChargePermission\nHSA-IF-008", color="#0f766e", constraint=false];
+
+  evse [label="External EVSE / SECC\nDiscovery and HLC peer", fillcolor="#e2e8f0"];
+  modem [label="PLC modem / physical link\nVehicle integration boundary", fillcolor="#e2e8f0"];
+  actuators [label="Vehicle charging hardware\nContactor · lock · precharge\nConverter / OBC · discharge", fillcolor="#e2e8f0"];
+  hlc -> evse [label="SDP / UDP; V2GTP / TCP\nTLS per selected profile", dir=both];
+  plc -> modem [label="Modem control / link evidence", dir=both];
+  hw -> actuators [label="Actuation / measured feedback", dir=both, color="#0f766e"];
+  {rank=same; evse; modem; actuators;}
+
+  platform [shape=note, label="PlatformServices — shared dependencies (per-component edges omitted)\nRTE / OS / SchM · TcpIp / SoAd · Csm / KeyM / HSM · NvM · Dem / Det / WdgM\nHost substitutes exist; supplier mapping, runnable placement and target qualification remain open.", fillcolor="#f8fafc", fontsize=12];
+  legend [shape=note, label="READING KEY\nSolid arrows: control / permission / labeled two-way exchange. Dashed arrows: evidence.\nVehicle snapshot also feeds HLC (HSA-IF-007; connector omitted).\nArrows summarize contracts; labels are semantic direction, not generated P/R ports.\nStop responsibility: DENY → request safe hardware → coordinate HLC / PLC teardown.\nHLC has no direct actuator command path. Electrical sequencing needs the vehicle safety concept.\nDesign: Atomic Rev.3 · Status snapshot: 32fa56f · 02 Nov 2026 · No formal freeze", fillcolor="#fff7ed", color="#b45309", fontsize=12];
+  evse -> platform [style=invis]; modem -> platform [style=invis]; actuators -> platform [style=invis];
+  platform -> legend [style=invis];
+}

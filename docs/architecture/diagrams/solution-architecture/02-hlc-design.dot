@@ -1,0 +1,60 @@
+digraph Hlc {
+  graph [rankdir=TB, bgcolor="#ffffff", pad=0.35, nodesep=0.45, ranksep=0.65, splines=polyline, fontname="DejaVu Sans", fontsize=22, labelloc=t, label="ISO15118Chrg\nLogical decomposition · orchestration and message path\n "];
+  node [shape=box, style="rounded,filled", fillcolor="#eff6ff", color="#2563eb", fontname="DejaVu Sans", fontsize=13, margin="0.20,0.15"];
+  edge [fontname="DejaVu Sans", fontsize=10, color="#475569", fontcolor="#334155", arrowsize=0.75];
+  context [label="ChargingCoordinator + qualified supporting evidence\nLifecycle requests · ChargePermission · vehicle snapshot · link readiness", fillcolor="#f0fdfa", color="#0f766e"];
+
+  subgraph cluster_hlc {
+    label="ISO15118Chrg  |  logical grouping, not final SWC / BSW deployment"; fontsize=17; fontcolor="#1e40af"; color="#93c5fd"; style="rounded"; margin=22;
+    facade [label="HlcSessionAdapter\nProject facade / metadata envelopes\nPreserves ChargeControl / ChargeParameters ABI", penwidth=2];
+    supervisor [label="HlcSessionSupervisor\nOwns session orchestration\nOverall setup / session timer", penwidth=2];
+    sdp [label="SdpClient\nOwns endpoint discovery\nRequires current link + IPv6 readiness"];
+    tcp [label="TcpTlsSession\nConnect / handshake / bounded I/O\nTransport timers and cancellation"];
+    sap [label="SapNegotiator\nValidates offered protocol / schema\nDedicated SAP schema"];
+    factory [label="ProtocolAdapterFactory\nCreates exactly one active adapter"];
+    {rank=same; sdp; tcp; sap;}
+
+    subgraph cluster_protocol {
+      label="Separate protocol state owners"; fontsize=14; color="#cbd5e1"; style="rounded";
+      din [label="Din70121Adapter\nDC EIM · no TLS\nBounded host wire profile"];
+      iso2 [label="Iso15118_2Adapter\nAC / DC EIM\nRestricted opt-in host PnC"];
+      iso20 [label="Iso15118_20Adapter\nCommon / AC / DC FSMs\nPlanned session / BPT path\nHost factory path disabled", style="rounded,dashed,filled", color="#b45309", fillcolor="#fff7ed"];
+      {rank=same; din; iso2; iso20;}
+    }
+    exi [label="ExiCodec\nTyped document ↔ bounded EXI bytes\nExplicit schemaId on every operation"];
+    registry [label="SchemaRegistry\nSAP · DIN · ISO-2\nISO-20 Common / AC / DC slots\nISO-20 host session bindings absent"];
+    v2gtp [label="V2gtpCodec\nVersion / type / length validation\nIncremental framing and bounded payload"];
+    pki [label="PkiSecurityAdapter\nVerification / signing evidence\nBounded correlated security jobs"];
+    cert [label="CertificateManager\nCredential lifecycle / key references\nVersion and validity evidence"];
+
+    facade -> supervisor [label="Start / Stop / Renegotiate\nHSS-IF-001…003"];
+    supervisor -> facade [label="Status / events\nHSS-IF-011…012", style=dashed, constraint=false];
+    supervisor -> sdp [label="Discover / cancel"];
+    supervisor -> tcp [label="Connect / close"];
+    supervisor -> sap [label="Negotiate after transport ready"];
+    sdp -> tcp [label="Validated endpoint\n(via supervisor)", style=dashed, constraint=false];
+    sap -> factory [label="Validated ProtocolSelection"];
+    factory -> din [label="Select DIN"];
+    factory -> iso2 [label="Select ISO-2"];
+    factory -> iso20 [label="Design extension", style=dashed, color="#b45309"];
+    din -> exi [label="Typed message", dir=both];
+    iso2 -> exi [label="Typed message", dir=both];
+    iso20 -> exi [label="Common / AC / DC schema", dir=both, style=dashed, color="#b45309"];
+    sap -> exi [label="SAP encode / decode", style=dashed, constraint=false];
+    exi -> registry [label="GetSchemaDescriptor\nEXI-IF-007"];
+    exi -> v2gtp [label="Bounded payload ↔ frame", dir=both];
+    v2gtp -> tcp [label="Ordered byte stream\nRX reverse path", dir=both, constraint=false];
+    iso2 -> pki [label="Security request / result", dir=both];
+    pki -> cert [label="Credential / key evidence", dir=both];
+    {rank=same; exi; pki;}
+    {rank=same; registry; cert; v2gtp;}
+  }
+  context -> facade [label="Project contracts; HSA-IF-001…003, 007…009", dir=both];
+  platform [label="PlatformServices\nUDP / TCP / TLS providers · Csm / KeyM / HSM · NvM\nHost: POSIX sockets, optional OpenSSL and storage fault models", fillcolor="#f1f5f9", color="#64748b"];
+  sdp -> platform [label="UDP discovery", constraint=false];
+  tcp -> platform [label="Socket / TLS services", constraint=false];
+  cert -> platform [label="Credential persistence / key services"];
+  pki -> platform [label="Crypto jobs", style=dashed];
+  note [shape=note, label="CONTRACTS ACROSS THE VIEW\nOne writer per state domain; one timer owner. Callbacks copy bounded data and notify the owner.\nValidate generation, freshness, quality, correlation and buffer lifetime; stale callbacks cannot revive a session.\nProtocol state / requests return through supervisor and facade (return edges omitted for clarity).\nPermission gates readiness and energy progress; protocol authorization is evidence only.\nDashed amber = design extension, not enabled host session support.\nAtomic Rev.3 §§8–23 · Status snapshot: 32fa56f · 02 Nov 2026", fillcolor="#f8fafc", color="#64748b", fontsize=12];
+  platform -> note [style=invis];
+}

@@ -1,0 +1,37 @@
+{
+  "date": "2026-11-02",
+  "reviewed_head": "32fa56f1c8425b6b87543ce34816660f559fcfde",
+  "implementation_commit": "47fb1b17ee4138289546c320b91b2780081dbcfe",
+  "confirmed_tasks": [
+    "TASK-5",
+    "TASK-6",
+    "TASK-7"
+  ],
+  "overall_buglist_status": "TASK-1 through TASK-7 closed within documented host scope",
+  "fresh_run": {
+    "configuration": "portable; Linux stubs and concrete cbv2g adapters disabled",
+    "build_directory": "/tmp/openv2g-closure567-review-20261102",
+    "passed": 27,
+    "failed": 0,
+    "log": "/tmp/openv2g-closure567-review-tests.log",
+    "log_sha256": "b46421687675b4f8532c7610ac0e759ad1b9a486a347876aaa75b665a1536524"
+  },
+  "prior_evidence_validation": {
+    "record": "docs/architecture/evidence/coordinator_bugfix567_verification.json",
+    "record_sha256": "4b784681d1aa3e12b3a7834b520c2d44ec97665ed1f2dacc0ac522fb46af8035",
+    "source_hashes_matched": 20,
+    "saved_log_hashes_matched": 3,
+    "recorded_results": {
+      "portable": 27,
+      "asan_ubsan": 27,
+      "integration": 51
+    },
+    "sanitizers_rerun": false,
+    "integration_rerun": false
+  },
+  "implementation_changed_during_review": false,
+  "limitations": [
+    "Focused buglist closure review, not a whole-project defect-free assertion",
+    "No production or target safety/conformance qualification"
+  ]
+}

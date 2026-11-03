@@ -1,0 +1,54 @@
+digraph EVCC {
+
+  graph [rankdir=TB, bgcolor="#ffffff", pad="0.35", nodesep="0.45", ranksep="0.55", fontname="DejaVu Sans", fontsize=22, fontcolor="#142f46", labelloc=t, labeljust=l, compound=true];
+  node [shape=box, style="rounded,filled", fillcolor="#edf5fc", color="#6b91b0", penwidth=1.2, fontname="DejaVu Sans", fontsize=12, fontcolor="#17324a", margin="0.18,0.13"];
+  edge [color="#55758c", penwidth=1.2, fontname="DejaVu Sans", fontsize=10, fontcolor="#34566e", arrowsize=0.75];
+  label="02  ISO15118Chrg decomposition\nLogical design | module names retained from Atomic Rev.3";
+
+  caller [label="ChargingCoordinator / vehicle context", fillcolor="#daeefa", color="#397aa5"];
+  subgraph cluster_hlc {
+    label="ISO15118Chrg"; style="rounded"; color="#aa9bc7"; fontsize=17;
+    facade [label="HlcSessionAdapter\nProject facade / metadata / normalized status"];
+    supervisor [label="HlcSessionSupervisor\nSession lifecycle / cancellation / cumulative budgets"];
+    sdp [label="SdpClient\nEndpoint discovery after link readiness"];
+    transport [label="TcpTlsSession\nConnection / security / bounded TX"];
+    sap [label="SapNegotiator\nExplicit offered protocol / schema selection"];
+    factory [label="ProtocolAdapterFactory\nExactly one adapter active"];
+    din [label="Din70121Adapter\nDC EIM host profile"];
+    iso2 [label="Iso15118_2Adapter\nDC / single-phase AC EIM host profiles"];
+    iso20 [label="Iso15118_20Adapter\nCommon / AC / DC / BPT\nDISABLED: future implementation", fillcolor="#fff4da", color="#c1a15d", style="rounded,filled,dashed"];
+    exi [label="ExiCodec\nBounded typed encode / decode"];
+    registry [label="SchemaRegistry\nSAP / DIN / ISO-2\nISO-20 Common / AC / DC reserved"];
+    frame [label="V2gtpCodec\nFraming / length and payload-type validation"];
+    pki [label="PkiSecurityAdapter\nCrypto / trust evidence\nPnC integration incomplete", fillcolor="#fff4da", color="#c1a15d", style="rounded,filled,dashed"];
+    cert [label="CertificateManager\nIdentity / certificate lifecycle\nProduction lifecycle open", fillcolor="#fff4da", color="#c1a15d", style="rounded,filled,dashed"];
+    {rank=same; sdp; transport; sap;}
+    {rank=same; din; iso2; iso20;}
+    {rank=same; exi; registry;}
+    {rank=same; pki; cert;}
+    facade -> supervisor [label="session control / status", dir=both];
+    supervisor -> sdp [label="discover / cancel"];
+    supervisor -> transport [label="connect / close"];
+    supervisor -> sap [label="negotiate"];
+    sap -> factory [label="selected schema"];
+    factory -> din; factory -> iso2; factory -> iso20 [style=dashed];
+    din -> exi [label="typed messages", dir=both];
+    iso2 -> exi [dir=both];
+    iso20 -> exi [style=dashed, dir=both];
+    exi -> registry [label="explicit lookup"];
+    exi -> frame [label="encoded payload / validated frame", dir=both];
+    frame -> transport [label="TCP byte stream", dir=both, constraint=false];
+    iso2 -> pki [style=dashed, label="PnC / signatures"];
+    pki -> cert [style=dashed, label="versioned references"];
+  }
+  caller -> facade [label="start / stop / energy / permission\nstatus / requests / evidence", dir=both];
+  frame -> pki [style=invis];
+  frame -> cert [style=invis];
+  platform [label="Platform boundary\nUDP / TCP / TLS / crypto / certificate persistence", fillcolor="#f1f4f7", color="#a3b1be"];
+  sdp -> platform [style=dashed, constraint=false];
+  transport -> platform [style=dashed, constraint=false];
+  pki -> platform [style=dashed]; cert -> platform [style=dashed];
+  note [shape=note, fillcolor="#f1f4f7", color="#a3b1be", fontsize=11, label="Host allocation: facade + supervisor share iso15118_chrg.c.\nConcrete EXI / registry and part of session mapping live in the wire runner.\nOptional OpenSSL TLS / crypto are host providers; they do not implement PnC.\nThe imported ChargeControl / ChargeParameters ABI remains supplier dependent."];
+  platform -> note [style=invis];
+
+}

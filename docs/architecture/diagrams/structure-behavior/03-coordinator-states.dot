@@ -1,0 +1,37 @@
+digraph EVCC {
+
+  graph [rankdir=TB, bgcolor="#ffffff", pad="0.35", nodesep="0.45", ranksep="0.55", fontname="DejaVu Sans", fontsize=22, fontcolor="#142f46", labelloc=t, labeljust=l, compound=true];
+  node [shape=box, style="rounded,filled", fillcolor="#edf5fc", color="#6b91b0", penwidth=1.2, fontname="DejaVu Sans", fontsize=12, fontcolor="#17324a", margin="0.18,0.13"];
+  edge [color="#55758c", penwidth=1.2, fontname="DejaVu Sans", fontsize=10, fontcolor="#34566e", arrowsize=0.75];
+  label="03  ChargingCoordinator state behavior\nHost implementation at 346c11f | owner: ChargeStateMachine";
+
+  init [shape=circle, label="", width=0.15, style=filled, fillcolor="#17324a"];
+  unplugged [label="UNPLUGGED\nNo active charging progression"];
+  subgraph cluster_active {
+    label="Active progression states"; style=rounded; color="#c1d7e6"; fontsize=14;
+    connected [label="CONNECTED_IDLE\nInitial connection or connected-safe completion"];
+    link [label="LINK_SETUP\nPLC readiness pending"];
+    negotiation [label="HLC_NEGOTIATION\nProtocol progress / PREPARE permitted"];
+    ready [label="READY_FOR_ENERGY\nCurrent ENERGIZE permission"];
+    transfer [label="ENERGY_TRANSFER\nContinuously supervise evidence / permission", fillcolor="#eaf7f3", color="#75a99a"];
+    connected -> link [label="LINK_START_ACCEPTED"];
+    link -> negotiation [label="LINK_READY / HLC start accepted"];
+    negotiation -> ready [label="PERMISSION_GRANTED\nENERGIZE action; readiness checks apply"];
+    ready -> transfer [label="ENERGY_STARTED\nhardware enable OK / ACCEPTED"];
+  }
+  stopping [label="STOPPING\nDENY / retained stop transaction\nMeasured completion + service teardown", fillcolor="#fff4da", color="#c1a15d"];
+  fault [label="FAULT_LATCHED\nMaintain DENY / fault evidence", fillcolor="#fdecec", color="#c87b7b"];
+  anyfault [shape=note, label="BLOCKING_FAULT\nGlobal FSM event from any state", fillcolor="#fdecec", color="#c87b7b", fontsize=11];
+  init -> unplugged;
+  unplugged -> connected [label="QUALIFIED_CONNECT\nnew sessionGeneration"];
+  negotiation -> stopping [ltail=cluster_active, label="STOP_REQUESTED\nfrom any active progression state", minlen=2];
+  stopping -> connected [label="SAFE_CONNECTED\nmeasured safe + teardown complete\nfresh evidence; still connected", constraint=false];
+  stopping -> unplugged [label="STOP_COMPLETED\nmeasured safe + teardown complete\nfresh unplugged evidence", constraint=false];
+  connected -> unplugged [label="UNPLUGGED event", style=dotted, constraint=false];
+  stopping -> fault [label="stop deadline / incomplete safe state\nor incomplete asynchronous teardown"];
+  anyfault -> fault [label="BLOCKING_FAULT"];
+  fault -> unplugged [style=dashed, label="RESET_FAULT event exists\nqualified recovery integration open", constraint=false];
+  note [shape=note, fillcolor="#f1f4f7", color="#a3b1be", fontsize=11, label="RestartConnected requires completed connected-safe stop, fresh CP/hardware,\nno latched fault; it creates a new generation and restarts LINK_SETUP.\nStop completion is guarded by the coordinator, not by bare FSM dispatch.\nENERGY_STARTED means command acceptance here; measured feedback follows.\nPhysical sequencing and fault-reset policy still need the vehicle safety concept."];
+  fault -> note [style=invis];
+
+}
